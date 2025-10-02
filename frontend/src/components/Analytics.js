@@ -218,14 +218,34 @@ const Analytics = () => {
 
       {/* Analytics Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="performance">Performance Analysis</TabsTrigger>
-          <TabsTrigger value="abc">ABC Analysis</TabsTrigger>
-          <TabsTrigger value="capital">Capital Blocking</TabsTrigger>
-          <TabsTrigger value="seasonal">Seasonal Trends</TabsTrigger>
-          <TabsTrigger value="profitability">Profitability</TabsTrigger>
-          <TabsTrigger value="inventory">Inventory Health</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-wrap gap-3 mb-6">
+          {[
+            { id: 'performance', label: 'Performance Analysis', icon: TrendingUp, color: 'blue' },
+            { id: 'abc', label: 'ABC Analysis', icon: BarChart3, color: 'green' },
+            { id: 'capital', label: 'Capital Blocking', icon: AlertTriangle, color: 'red' },
+            { id: 'seasonal', label: 'Seasonal Trends', icon: Calendar, color: 'purple' },
+            { id: 'profitability', label: 'Profitability', icon: TrendingUp, color: 'yellow' },
+            { id: 'inventory', label: 'Inventory Health', icon: Package, color: 'orange' }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all transform hover:scale-105 ${
+                  isActive 
+                    ? `bg-${tab.color}-600 text-white shadow-lg` 
+                    : `bg-${tab.color}-50 text-${tab.color}-700 hover:bg-${tab.color}-100 border-2 border-${tab.color}-200`
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
         {/* Performance Analysis Tab */}
         <TabsContent value="performance" className="space-y-6">
