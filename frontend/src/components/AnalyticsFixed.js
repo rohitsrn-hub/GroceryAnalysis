@@ -30,6 +30,13 @@ const AnalyticsFixed = () => {
     fetchAnalyticsData();
   }, []);
 
+  useEffect(() => {
+    // Re-fetch data when group selection changes (for ABC and Capital analysis)
+    if (selectedGroup !== 'all') {
+      fetchAnalyticsData();
+    }
+  }, [selectedGroup]);
+
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
