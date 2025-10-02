@@ -164,12 +164,13 @@ def process_excel_data(file_content: bytes, filename: str) -> List[Dict]:
             item_name = str(row.get('item_name', '')).strip()
             pluno = str(row.get('pluno', '')).strip()
             
-            # Skip rows with problematic data
+            # Skip rows with problematic data or round off amounts
             if (pd.isna(row.get('pluno')) and pd.isna(row.get('item_name'))) or \
                len(item_name) > 100 or '\t' in item_name or '_x000D_' in item_name or \
                item_name == 'nan' or pluno == 'nan' or \
                any(char in item_name for char in ['#', '$', '%']) or \
-               (len(item_name) < 3 and not item_name.isalpha()):
+               (len(item_name) < 3 and not item_name.isalpha()) or \
+               'round off' in item_name.lower() or 'roundoff' in item_name.lower():
                 continue
                 
             # Skip rows that look like numbers instead of item names
