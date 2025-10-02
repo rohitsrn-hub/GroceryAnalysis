@@ -177,6 +177,123 @@ const Forecasting = () => {
 
   return (
     <div className="space-y-6">
+      {/* Forecast Data Requirements */}
+      {showRequirements && forecastRequirements && (
+        <Card className="border-2 border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center space-x-2">
+                <Info className="h-5 w-5 text-blue-600" />
+                <span>Data Requirements for Accurate Forecasting</span>
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => setShowRequirements(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+            <CardDescription>
+              Current data status and requirements for different forecast accuracy levels
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Current Data Status */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-blue-800">Current Data Status</h4>
+                <div className="p-4 bg-white rounded-lg border border-blue-200">
+                  <div className="space-y-2">
+                    <p className="text-sm">
+                      <strong>Available Periods:</strong> {forecastRequirements.current_data_status.available_periods.join(", ")}
+                    </p>
+                    <p className="text-sm">
+                      <strong>Total Records:</strong> {forecastRequirements.current_data_status.total_records.toLocaleString()}
+                    </p>
+                    <p className="text-sm">
+                      <strong>Items with Sales:</strong> {forecastRequirements.current_data_status.sample_items}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Accuracy Levels */}
+                <h4 className="font-semibold text-blue-800">Forecast Accuracy Levels</h4>
+                <div className="space-y-3">
+                  {Object.entries(forecastRequirements.forecast_accuracy_levels).map(([key, level]) => (
+                    <div key={key} className="p-3 bg-white rounded-lg border border-blue-200">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-medium text-blue-800 capitalize">
+                          {key.replace("_", " ")}
+                        </span>
+                        <Badge className={
+                          level.accuracy.includes("85-90") ? "bg-green-600" :
+                          level.accuracy.includes("80-85") ? "bg-blue-600" :
+                          "bg-orange-600"
+                        }>
+                          {level.accuracy}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-blue-700">{level.description}</p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        <strong>Data needed:</strong> {level.data_needed}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Data Upload Instructions */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-blue-800">Upload Additional Data</h4>
+                <div className="p-4 bg-white rounded-lg border border-blue-200">
+                  <h5 className="font-medium mb-2">For Seasonal Analysis:</h5>
+                  <p className="text-sm text-blue-700 mb-3">
+                    {forecastRequirements.required_for_seasonal_forecast.description}
+                  </p>
+                  
+                  <h5 className="font-medium mb-2">For Year-over-Year Comparison:</h5>
+                  <p className="text-sm text-blue-700 mb-2">
+                    {forecastRequirements.required_for_yearly_comparison.description}
+                  </p>
+                  <div className="flex space-x-2 mb-3">
+                    {forecastRequirements.required_for_yearly_comparison.years_needed.map((year) => (
+                      <Badge key={year} variant="outline">{year} Data</Badge>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 p-3 bg-blue-100 rounded-lg">
+                    <h6 className="font-medium text-blue-800 mb-2">Upload Format Requirements:</h6>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>• <strong>Format:</strong> {forecastRequirements.data_upload_instructions.format}</li>
+                      <li>• <strong>Naming:</strong> {forecastRequirements.data_upload_instructions.naming_convention}</li>
+                      <li>• <strong>Required Columns:</strong> {forecastRequirements.data_upload_instructions.required_columns.join(", ")}</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="space-y-2">
+                  <Button 
+                    className="w-full" 
+                    onClick={() => {
+                      // Navigate to upload tab
+                      window.location.hash = "#upload";
+                    }}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Historical Data
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => setShowRequirements(false)}
+                  >
+                    Continue with Current Data
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Forecasting Setup */}
       <Card>
         <CardHeader>
