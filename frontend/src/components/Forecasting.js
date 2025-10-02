@@ -29,7 +29,18 @@ const Forecasting = () => {
 
   useEffect(() => {
     fetchFastestItems();
+    fetchForecastRequirements();
   }, []);
+
+  const fetchForecastRequirements = async () => {
+    try {
+      const response = await fetch(`${API}/forecast-requirements`);
+      const data = await response.json();
+      setForecastRequirements(data);
+    } catch (error) {
+      console.error(\"Error fetching forecast requirements:\", error);
+    }
+  };
 
   const fetchFastestItems = async () => {
     try {
