@@ -157,9 +157,22 @@ def process_excel_data(file_content: bytes, filename: str) -> List[Dict]:
         for _, row in df.iterrows():
             # Skip empty rows or rows with invalid data
             item_name = str(row.get('item_name', '')).strip()
+            pluno = str(row.get('pluno', '')).strip()
+            
+            # Skip rows with problematic data
             if (pd.isna(row.get('pluno')) and pd.isna(row.get('item_name'))) or \
-               len(item_name) > 100 or '\t' in item_name or '_x000D_' in item_name:
+               len(item_name) > 100 or '\t' in item_name or '_x000D_' in item_name or \
+               item_name == 'nan' or pluno == 'nan' or \
+               any(char in item_name for char in ['#', '$', '%']) or \
+               (len(item_name) < 3 and not item_name.isalpha()):
                 continue
+                
+            # Skip rows that look like numbers instead of item names
+            try:
+                float(item_name)
+                continue  # Skip if item_name is just a number
+            except ValueError:
+                pass  # Good, it's not just a number
                 
             def safe_float(value):
                 if pd.isna(value):
