@@ -284,8 +284,8 @@ const AnalyticsFixed = () => {
                     <YAxis />
                     <Tooltip 
                       formatter={(value, name) => [
-                        name === 'sold' ? `${value} units` : 
-                        name === 'revenue' ? `₹${value.toLocaleString()}` : 
+                        name === 'sold' ? `${formatTableNumber(value)} units` : 
+                        name === 'revenue' ? `₹${formatTableNumber(value)}` : 
                         `${value.toFixed(1)}`,
                         name === 'sold' ? 'Units Sold' : 
                         name === 'revenue' ? 'Revenue' : 
