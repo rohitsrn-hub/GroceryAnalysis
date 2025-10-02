@@ -211,3 +211,5 @@ test_plan:
 agent_communication:
     - agent: "main"
       message: "Implemented all requested UI improvements: larger font sizes for dashboard metrics, Indian number formatting system (crores/lakhs), enhanced tab styling with gradients and hover effects. Groups III/IV data confirmed in backend. Ready for comprehensive testing to verify group filtering functionality and overall user experience."
+    - agent: "testing"
+      message: "BACKEND TESTING COMPLETE: Comprehensive testing of all sales analytics APIs completed with 16/16 tests passing (100% success rate). Groups III & IV data verified - Group III: 739 items, ₹32.9M revenue; Group IV: 99 items, ₹1.9M revenue. ABC analysis and capital blocking analysis group filtering working correctly. CRITICAL BUG FOUND: fastest-selling-items endpoint completely ignores group parameter - this is the root cause of Groups III/IV filtering issues in Performance Analytics. Backend fix required at line 264 in server.py to add group parameter and filtering logic."
