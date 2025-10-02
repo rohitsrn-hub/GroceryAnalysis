@@ -962,6 +962,9 @@ const Analytics = () => {
                     {profitabilityData.map((group, index) => (
                       <tr key={index} className="border-b hover:bg-gray-50">
                         <td className="p-3">
+                          <span className="text-sm bg-yellow-600 text-white px-2 py-1 rounded font-bold">#{index + 1}</span>
+                        </td>
+                        <td className="p-3">
                           <Badge variant="outline">Group {group.group}</Badge>
                         </td>
                         <td className="p-3 font-medium text-green-600">
