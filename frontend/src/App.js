@@ -183,7 +183,7 @@ function MainApp() {
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
-            <Analytics />
+            <AnalyticsSimple />
           </TabsContent>
 
           <TabsContent value="forecasting" className="space-y-6">
