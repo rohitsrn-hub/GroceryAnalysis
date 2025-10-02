@@ -16,16 +16,17 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const Forecasting = () => {
-  const [forecastMethod, setForecastMethod] = useState('trend');
-  const [forecastMonths, setForecastMonths] = useState(4);
-  const [selectedItems, setSelectedItems] = useState([]);
+  const [step, setStep] = useState(1); // 1: Date Selection, 2: Method Selection, 3: Data Upload, 4: Results
+  const [forecastMonth, setForecastMonth] = useState('');
+  const [forecastYear, setForecastYear] = useState('');
+  const [forecastMethod, setForecastMethod] = useState('');
+  const [requiredDataUploads, setRequiredDataUploads] = useState([]);
+  const [uploadedData, setUploadedData] = useState({});
   const [forecastResults, setForecastResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [additionalInputs, setAdditionalInputs] = useState('');
   const [fastestItems, setFastestItems] = useState([]);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
-  const [forecastRequirements, setForecastRequirements] = useState(null);
-  const [showRequirements, setShowRequirements] = useState(true);
+  const [showRequirements, setShowRequirements] = useState(false);
 
   useEffect(() => {
     fetchFastestItems();
