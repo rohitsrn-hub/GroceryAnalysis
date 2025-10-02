@@ -646,6 +646,119 @@ async def get_group_analysis():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error in group analysis: {str(e)}")
 
+@api_router.get("/export-data/{analysis_type}")
+async def export_data_to_excel(analysis_type: str, group: Optional[str] = Query(None)):
+    """Export analysis data to Excel file"""
+    try:
+        # Create a new workbook
+        workbook = openpyxl.Workbook()
+        ws = workbook.active
+        
+        if analysis_type == "abc":
+            # Get ABC analysis data
+            response = await get_abc_analysis(group)
+            ws.title = "ABC Analysis"
+            
+            # Headers
+            headers = ["Item Code", "Item Name", "Group", "Category", "Revenue", "Revenue %", "Qty Sold", "Profit", "Capital Blocked"]
+            ws.append(headers)
+            
+            # Add data from all categories
+            for category_name, items in response["abc_categories"].items():
+                for item in items:
+                    ws.append([
+                        item["pluno"],
+                        item["item_name"],
+                        item["group"],
+                        f"Category {category_name}",
+                        item["total_revenue"],
+                        f"{item['revenue_percentage']:.2f}%",
+                        item["total_qty_sold"],
+                        item["total_profit"],
+                        item["capital_blocked"]
+                    ])
+                    
+        elif analysis_type == "capital-blocking":
+            # Get capital blocking data
+            response = await get_capital_blocking_analysis(group)
+            ws.title = "Capital Blocking Analysis"
+            
+            headers = ["Item Code", "Item Name", "Group", "Capital Blocked", "Days to Sell", "Monthly Sales", "Risk Level", "Recommendation"]
+            ws.append(headers)
+            
+            for item in response["capital_blocking_items"]:
+                recommendation = "Liquidate" if item["risk_level"] == "CRITICAL" else \
+                               "Discount" if item["risk_level"] == "HIGH" else "Monitor"
+                ws.append([
+                    item["_id"]["pluno"],
+                    item["_id"]["item_name"],
+                    item["_id"]["group"],
+                    item["capital_blocked"],
+                    item["days_to_sell"] if item["days_to_sell"] != 9999 else "∞",
+                    item["avg_monthly_sales"],
+                    item["risk_level"],
+                    recommendation
+                ])
+                
+        elif analysis_type == "fastest-selling":
+            # Get fastest selling items
+            fastest_items = await get_fastest_selling_items(50)
+            ws.title = "Fastest Selling Items"
+            
+            headers = ["Item Code", "Item Name", "Group", "Total Sold", "Avg Monthly Sales", "Total Revenue", "Rank"]
+            ws.append(headers)
+            
+            for i, item in enumerate(fastest_items, 1):
+                ws.append([
+                    item["item_code"],
+                    item["item_name"],
+                    item["group"],
+                    item["total_sold"],
+                    item["avg_monthly_sales"],
+                    item["total_revenue"],
+                    i
+                ])
+                
+        elif analysis_type == "group-analysis":
+            # Get group analysis
+            response = await get_group_analysis()
+            ws.title = "Group Performance Analysis"
+            
+            headers = ["Group", "Items Count", "Total Revenue", "Total Profit", "Profit Margin %", "Top Performer"]
+            ws.append(headers)
+            
+            for group in response:
+                top_performer = group["top_performers"][0]["item_name"] if group["top_performers"] else "N/A"
+                ws.append([
+                    group["group"],
+                    group["item_count"],
+                    group["total_revenue"],
+                    group["total_profit"],
+                    f"{group['profit_margin']:.2f}%",
+                    top_performer
+                ])
+                
+        else:
+            raise HTTPException(status_code=400, detail="Invalid analysis type")
+            
+        # Save to BytesIO
+        excel_buffer = io.BytesIO()
+        workbook.save(excel_buffer)
+        excel_buffer.seek(0)
+        
+        # Create filename
+        filename = f"{analysis_type}-analysis-{group if group else 'all'}.xlsx"
+        
+        # Return as streaming response
+        return StreamingResponse(
+            io.BytesIO(excel_buffer.read()),
+            media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exporting data: {str(e)}")
+
 @api_router.get("/forecast-requirements")
 async def get_forecast_requirements():
     """Get data requirements for accurate demand forecasting"""
