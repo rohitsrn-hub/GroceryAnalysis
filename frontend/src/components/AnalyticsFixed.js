@@ -43,7 +43,7 @@ const AnalyticsFixed = () => {
       console.log('Fetching analytics data...');
       
       const [fastestResponse, groupResponse, inventoryResponse, abcResponse, capitalResponse] = await Promise.all([
-        fetch(`${API}/fastest-selling-items?limit=20`),
+        fetch(`${API}/fastest-selling-items?limit=20${selectedGroup !== 'all' ? `&group=${selectedGroup}` : ''}`),
         fetch(`${API}/group-analysis`),
         fetch(`${API}/inventory-analysis`),
         fetch(`${API}/abc-analysis${selectedGroup !== 'all' ? `?group=${selectedGroup}` : ''}`),
