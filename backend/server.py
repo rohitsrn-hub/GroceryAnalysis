@@ -297,6 +297,193 @@ async def get_fastest_selling_items(limit: int = Query(10, ge=1, le=50)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching fastest selling items: {str(e)}")
 
+@api_router.get("/abc-analysis")
+async def get_abc_analysis(group: Optional[str] = Query(None)):
+    """Perform ABC analysis - 80/20 rule for inventory classification"""
+    try:
+        # Build match filter
+        match_filter = {"net_qty": {"$ne": None, "$exists": True, "$gt": 0}}
+        if group and group != "all":
+            match_filter["product_group"] = group
+            
+        # Get all items with revenue data
+        pipeline = [
+            {"$match": match_filter},
+            {
+                "$group": {
+                    "_id": {
+                        "pluno": "$pluno",
+                        "item_name": "$item_name",
+                        "group": "$product_group"
+                    },
+                    "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+                    "total_qty_sold": {"$sum": {"$ifNull": ["$net_qty", 0]}},
+                    "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
+                    "avg_closing_stock": {"$avg": "$closing_stock"},
+                    "avg_cost": {"$avg": "$w_rate"}
+                }
+            },
+            {"$match": {"total_revenue": {"$gt": 0}}},
+            {"$sort": {"total_revenue": -1}}
+        ]
+        
+        results = await db.sales_records.aggregate(pipeline).to_list(None)
+        
+        if not results:
+            return {"abc_categories": {"A": [], "B": [], "C": []}, "summary": {}}
+            
+        # Calculate cumulative revenue percentage
+        total_revenue = sum(item['total_revenue'] for item in results)
+        cumulative_revenue = 0
+        
+        abc_categories = {"A": [], "B": [], "C": []}
+        
+        for i, item in enumerate(results):
+            cumulative_revenue += item['total_revenue']
+            cumulative_percentage = (cumulative_revenue / total_revenue) * 100
+            
+            item_data = {
+                "pluno": item['_id']['pluno'],
+                "item_name": item['_id']['item_name'],
+                "group": item['_id']['group'],
+                "total_revenue": item['total_revenue'],
+                "total_qty_sold": item['total_qty_sold'],
+                "total_profit": item['total_profit'],
+                "revenue_percentage": (item['total_revenue'] / total_revenue) * 100,
+                "cumulative_percentage": cumulative_percentage,
+                "avg_closing_stock": item.get('avg_closing_stock', 0) or 0,
+                "capital_blocked": (item.get('avg_closing_stock', 0) or 0) * (item.get('avg_cost', 0) or 0)
+            }
+            
+            # ABC Classification based on cumulative revenue
+            if cumulative_percentage <= 80:
+                abc_categories["A"].append(item_data)
+            elif cumulative_percentage <= 95:
+                abc_categories["B"].append(item_data)
+            else:
+                abc_categories["C"].append(item_data)
+        
+        # Calculate summary statistics
+        total_items = len(results)
+        summary = {
+            "total_items": total_items,
+            "total_revenue": total_revenue,
+            "category_A": {
+                "item_count": len(abc_categories["A"]),
+                "percentage_items": (len(abc_categories["A"]) / total_items) * 100,
+                "revenue": sum(item['total_revenue'] for item in abc_categories["A"]),
+                "revenue_percentage": 80 if abc_categories["A"] else 0
+            },
+            "category_B": {
+                "item_count": len(abc_categories["B"]),
+                "percentage_items": (len(abc_categories["B"]) / total_items) * 100,
+                "revenue": sum(item['total_revenue'] for item in abc_categories["B"]),
+                "revenue_percentage": 15 if abc_categories["B"] else 0
+            },
+            "category_C": {
+                "item_count": len(abc_categories["C"]),
+                "percentage_items": (len(abc_categories["C"]) / total_items) * 100,
+                "revenue": sum(item['total_revenue'] for item in abc_categories["C"]),
+                "revenue_percentage": 5 if abc_categories["C"] else 0
+            }
+        }
+        
+        return {"abc_categories": abc_categories, "summary": summary}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in ABC analysis: {str(e)}")
+
+@api_router.get("/capital-blocking-analysis")
+async def get_capital_blocking_analysis(group: Optional[str] = Query(None)):
+    """Identify slow moving items with high inventory causing capital blocking"""
+    try:
+        match_filter = {}
+        if group and group != "all":
+            match_filter["product_group"] = group
+            
+        pipeline = [
+            {"$match": match_filter},
+            {
+                "$group": {
+                    "_id": {
+                        "pluno": "$pluno",
+                        "item_name": "$item_name",
+                        "group": "$product_group"
+                    },
+                    "total_qty_sold": {"$sum": {"$ifNull": ["$net_qty", 0]}},
+                    "avg_closing_stock": {"$avg": {"$ifNull": ["$closing_stock", 0]}},
+                    "avg_wholesale_rate": {"$avg": {"$ifNull": ["$w_rate", 0]}},
+                    "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+                    "periods_count": {"$sum": 1}
+                }
+            },
+            {
+                "$addFields": {
+                    "avg_monthly_sales": {"$divide": ["$total_qty_sold", "$periods_count"]},
+                    "capital_blocked": {"$multiply": ["$avg_closing_stock", "$avg_wholesale_rate"]},
+                    "inventory_turnover": {
+                        "$cond": {
+                            "if": {"$gt": ["$avg_closing_stock", 0]},
+                            "then": {"$divide": ["$total_qty_sold", "$avg_closing_stock"]},
+                            "else": 0
+                        }
+                    },
+                    "days_to_sell": {
+                        "$cond": {
+                            "if": {"$gt": ["$avg_monthly_sales", 0]},
+                            "then": {"$divide": ["$avg_closing_stock", {"$divide": ["$avg_monthly_sales", 30]}]},
+                            "else": 9999
+                        }
+                    }
+                }
+            },
+            {
+                "$match": {
+                    "$and": [
+                        {"avg_closing_stock": {"$gt": 10}},  # High inventory
+                        {"capital_blocked": {"$gt": 1000}},   # Significant capital
+                        {"$or": [
+                            {"inventory_turnover": {"$lt": 2}},  # Low turnover
+                            {"days_to_sell": {"$gt": 180}}      # Takes more than 6 months to sell
+                        ]}
+                    ]
+                }
+            },
+            {"$sort": {"capital_blocked": -1}},
+            {"$limit": 50}
+        ]
+        
+        results = await db.sales_records.aggregate(pipeline).to_list(None)
+        
+        # Calculate risk levels
+        for item in results:
+            capital_blocked = item['capital_blocked']
+            days_to_sell = item['days_to_sell']
+            
+            if capital_blocked > 50000 and days_to_sell > 365:
+                risk_level = "CRITICAL"
+            elif capital_blocked > 10000 and days_to_sell > 180:
+                risk_level = "HIGH"
+            elif capital_blocked > 5000 and days_to_sell > 90:
+                risk_level = "MEDIUM"
+            else:
+                risk_level = "LOW"
+                
+            item['risk_level'] = risk_level
+        
+        return {
+            "capital_blocking_items": results,
+            "summary": {
+                "total_items_analyzed": len(results),
+                "total_capital_blocked": sum(item['capital_blocked'] for item in results),
+                "critical_items": len([item for item in results if item['risk_level'] == 'CRITICAL']),
+                "high_risk_items": len([item for item in results if item['risk_level'] == 'HIGH'])
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in capital blocking analysis: {str(e)}")
+
 @api_router.get("/inventory-analysis")
 async def get_inventory_analysis():
     """Analyze inventory for slow moving and dead stock"""
