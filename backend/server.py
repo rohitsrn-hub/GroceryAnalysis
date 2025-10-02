@@ -550,6 +550,18 @@ async def ai_forecast(request: ForecastRequest):
         ]
     }
 
+@api_router.delete("/clear-data")
+async def clear_all_data():
+    """Clear all sales data from database"""
+    try:
+        result = await db.sales_records.delete_many({})
+        return {
+            "message": f"Successfully deleted {result.deleted_count} records",
+            "deleted_count": result.deleted_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clearing data: {str(e)}")
+
 @api_router.get("/dashboard-summary")
 async def get_dashboard_summary():
     """Get overall dashboard summary statistics"""
