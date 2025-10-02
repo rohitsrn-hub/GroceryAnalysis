@@ -665,7 +665,7 @@ const Analytics = () => {
                     <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                       <h4 className="font-semibold text-blue-800">Inventory Turnover</h4>
                       <p className="text-sm text-blue-700 mt-1">
-                        Focus on items with turnover ratio < 2. Improve turnover to 4-6 times annually.
+                        Focus on items with turnover ratio &lt; 2. Improve turnover to 4-6 times annually.
                       </p>
                     </div>
                     
