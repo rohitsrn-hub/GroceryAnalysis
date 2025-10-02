@@ -354,10 +354,10 @@ const AnalyticsFixed = () => {
                         {abcAnalysis.summary.category_A?.item_count || 0}
                       </p>
                       <p className="text-sm text-green-600">
-                        {(abcAnalysis.summary.category_A?.percentage_items || 0).toFixed(1)}% of items
+                        {formatPercentage(abcAnalysis.summary.category_A?.percentage_items || 0)} of items
                       </p>
                       <p className="text-lg font-semibold text-green-700">
-                        ₹{(abcAnalysis.summary.category_A?.revenue || 0).toLocaleString()}
+                        {formatIndianNumber(abcAnalysis.summary.category_A?.revenue || 0, true)}
                       </p>
                     </div>
                   </CardContent>
