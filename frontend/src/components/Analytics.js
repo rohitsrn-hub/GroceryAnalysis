@@ -345,6 +345,9 @@ const Analytics = () => {
                     {filteredFastestItems.slice(0, 20).map((item, index) => (
                       <tr key={index} className="border-b hover:bg-gray-50">
                         <td className="p-3">
+                          <span className="text-sm bg-blue-600 text-white px-2 py-1 rounded font-bold">#{index + 1}</span>
+                        </td>
+                        <td className="p-3">
                           <span className="font-medium text-sm">{item.item_code || 'N/A'}</span>
                         </td>
                         <td className="p-3">
