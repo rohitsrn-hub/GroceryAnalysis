@@ -87,6 +87,10 @@ function MainApp() {
                   <FileSpreadsheet className="h-4 w-4" />
                   <span>PDF Report</span>
                 </button>
+                
+                <div className="text-xs text-gray-500 mt-1">
+                  v2.1 - Analytics Fixed
+                </div>
               </div>
             </div>
           </div>
