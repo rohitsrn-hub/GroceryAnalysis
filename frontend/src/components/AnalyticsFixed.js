@@ -120,6 +120,16 @@ const AnalyticsFixed = () => {
     selectedGroup === 'all' || group.group === selectedGroup
   );
 
+  console.log('Filter Debug:', {
+    selectedGroup,
+    totalFastestItems: fastestItems.length,
+    filteredFastestItems: filteredFastestItems.length,
+    totalGroupAnalysis: groupAnalysis.length,
+    filteredGroupAnalysis: filteredGroupAnalysis.length,
+    availableGroups: [...new Set(fastestItems.map(item => item.group))],
+    groupAnalysisGroups: groupAnalysis.map(g => g.group)
+  });
+
   if (loading) {
     return (
       <div className="space-y-6">
