@@ -554,7 +554,7 @@ async def get_dashboard_summary():
             {
                 "$match": {
                     "$and": [
-                        {"r_amt": {"$ne": None, "$exists": True, "$ne": 0}},
+                        {"r_amt": {"$ne": None, "$exists": True, "$not": {"$eq": 0}}},
                         {"profit": {"$ne": None, "$exists": True}},
                         {"net_qty": {"$ne": None, "$exists": True}}
                     ]
