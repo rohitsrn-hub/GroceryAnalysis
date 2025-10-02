@@ -183,6 +183,78 @@ class SalesAnalyticsAPITester:
             data=forecast_data
         )
 
+    def test_abc_analysis_all_groups(self):
+        """Test ABC analysis without group filter"""
+        return self.run_test(
+            "ABC Analysis - All Groups",
+            "GET",
+            "abc-analysis",
+            200
+        )
+
+    def test_abc_analysis_group_iii(self):
+        """Test ABC analysis for Group III specifically"""
+        return self.run_test(
+            "ABC Analysis - Group III",
+            "GET",
+            "abc-analysis?group=Group III",
+            200
+        )
+
+    def test_abc_analysis_group_iv(self):
+        """Test ABC analysis for Group IV specifically"""
+        return self.run_test(
+            "ABC Analysis - Group IV",
+            "GET",
+            "abc-analysis?group=Group IV",
+            200
+        )
+
+    def test_capital_blocking_all_groups(self):
+        """Test capital blocking analysis without group filter"""
+        return self.run_test(
+            "Capital Blocking Analysis - All Groups",
+            "GET",
+            "capital-blocking-analysis",
+            200
+        )
+
+    def test_capital_blocking_group_iii(self):
+        """Test capital blocking analysis for Group III"""
+        return self.run_test(
+            "Capital Blocking Analysis - Group III",
+            "GET",
+            "capital-blocking-analysis?group=Group III",
+            200
+        )
+
+    def test_capital_blocking_group_iv(self):
+        """Test capital blocking analysis for Group IV"""
+        return self.run_test(
+            "Capital Blocking Analysis - Group IV",
+            "GET",
+            "capital-blocking-analysis?group=Group IV",
+            200
+        )
+
+    def test_fastest_selling_group_iii(self):
+        """Test fastest selling items for Group III"""
+        return self.run_test(
+            "Fastest Selling Items - Group III",
+            "GET",
+            "fastest-selling-items?group=Group III&limit=10",
+            200
+        )
+
+    def test_fastest_selling_group_iv(self):
+        """Test fastest selling items for Group IV"""
+        return self.run_test(
+            "Fastest Selling Items - Group IV",
+            "GET",
+            "fastest-selling-items?group=Group IV&limit=10",
+            200
+        )
+
     def test_file_upload_validation(self):
         """Test file upload validation (without actual file)"""
         # This should fail with 422 due to missing file
