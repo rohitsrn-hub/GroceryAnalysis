@@ -607,7 +607,7 @@ const AnalyticsFixed = () => {
                               {item._id?.pluno || 'N/A'} - {item._id?.item_name || 'Unknown Item'}
                             </p>
                             <p className="text-red-600 text-xs">
-                              Capital Blocked: ₹{(item.capital_blocked || 0).toFixed(2)}
+                              Capital Blocked: {formatIndianNumber(item.capital_blocked || 0, true)}
                             </p>
                           </div>
                         )) || <p className="text-gray-500 text-sm">No dead inventory found</p>}
