@@ -9,7 +9,7 @@ import { Textarea } from "./ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Skeleton } from "./ui/skeleton";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ReferenceLine } from "recharts";
-import { TrendingUp, Brain, Calculator, Zap, AlertTriangle, CheckCircle, Info, X, Upload, Calendar, ArrowRight, ArrowLeft } from "lucide-react";
+import { TrendingUp, Brain, Calculator, Zap, AlertTriangle, CheckCircle, Info, X, Upload, Calendar, ArrowRight, ArrowLeft, Download } from "lucide-react";
 import { toast } from "sonner";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
