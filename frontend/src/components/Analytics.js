@@ -1075,8 +1075,13 @@ const Analytics = () => {
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <p className="font-medium text-sm">{item._id?.item_name || 'Unknown Item'}</p>
-                        <p className="text-xs text-gray-600">Code: {item._id?.pluno || 'N/A'}</p>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className={`text-xs text-white px-2 py-1 rounded font-bold ${
+                            item.color === 'red' ? 'bg-red-600' :
+                            item.color === 'orange' ? 'bg-orange-600' : 'bg-yellow-600'
+                          }`}>#{index + 1}</span>
+                        </div>
+                        <p className="font-medium text-sm">{item._id?.pluno || 'N/A'} - {item._id?.item_name || 'Unknown Item'}</p>
                         <div className="mt-2 space-y-1">
                           {item.avg_cost && (
                             <p className="text-xs">Avg Cost: ₹{item.avg_cost.toFixed(2)}</p>
