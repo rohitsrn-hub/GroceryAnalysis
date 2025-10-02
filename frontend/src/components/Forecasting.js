@@ -33,14 +33,142 @@ const Forecasting = () => {
     fetchForecastRequirements();
   }, []);
 
-  const fetchForecastRequirements = async () => {
-    try {
-      const response = await fetch(`${API}/forecast-requirements`);
-      const data = await response.json();
-      setForecastRequirements(data);
-    } catch (error) {
-      console.error("Error fetching forecast requirements:", error);
+  const generateDataRequirements = () => {
+    if (!forecastMonth || !forecastYear || !forecastMethod) return [];
+
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1;
+    const currentYear = currentDate.getFullYear();
+    const targetMonth = parseInt(forecastMonth);
+    const targetYear = parseInt(forecastYear);
+
+    const requirements = [];
+
+    if (forecastMethod === 'trend') {
+      // For trend analysis: need last 3 months of data
+      for (let i = 1; i <= 3; i++) {
+        let month = currentMonth - i;
+        let year = currentYear;
+        
+        if (month <= 0) {
+          month += 12;
+          year -= 1;
+        }
+
+        requirements.push({
+          id: `trend_month_${i}`,
+          title: `${new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' })} ${year} Sales Data`,
+          description: `Upload sales data for ${new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' })} ${year}`,
+          type: 'monthly_sales',
+          period: `${year}-${month.toString().padStart(2, '0')}`,
+          required: true
+        });
+      }
+    } else if (forecastMethod === 'statistical') {
+      // For statistical: last 3 months + same month from previous years
+      // Last 3 months
+      for (let i = 1; i <= 3; i++) {
+        let month = currentMonth - i;
+        let year = currentYear;
+        
+        if (month <= 0) {
+          month += 12;
+          year -= 1;
+        }
+
+        requirements.push({
+          id: `stat_recent_${i}`,
+          title: `${new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' })} ${year} Sales Data`,
+          description: `Recent sales data for trend analysis`,
+          type: 'monthly_sales',
+          period: `${year}-${month.toString().padStart(2, '0')}`,
+          required: true
+        });
+      }
+
+      // Same month from previous years for seasonal analysis
+      const monthName = new Date(targetYear, targetMonth - 1).toLocaleDateString('en-US', { month: 'long' });
+      for (let yearBack = 1; yearBack <= 3; yearBack++) {
+        const pastYear = targetYear - yearBack;
+        requirements.push({
+          id: `stat_seasonal_${yearBack}`,
+          title: `${monthName} ${pastYear} Sales Data`,
+          description: `Historical data for seasonal pattern analysis`,
+          type: 'seasonal_data',
+          period: `${pastYear}-${targetMonth.toString().padStart(2, '0')}`,
+          required: true
+        });
+      }
+
+      // Optional: Quarter data around target month
+      requirements.push({
+        id: 'stat_quarterly',
+        title: `Quarterly Data Around ${monthName}`,
+        description: 'Optional: Upload sales data for months before/after target month for better seasonal analysis',
+        type: 'quarterly_data',
+        period: `quarter_${targetMonth}`,
+        required: false
+      });
+
+    } else if (forecastMethod === 'ai') {
+      // For AI: comprehensive data requirements
+      
+      // Recent trend data (6 months)
+      for (let i = 1; i <= 6; i++) {
+        let month = currentMonth - i;
+        let year = currentYear;
+        
+        if (month <= 0) {
+          month += 12;
+          year -= 1;
+        }
+
+        requirements.push({
+          id: `ai_recent_${i}`,
+          title: `${new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' })} ${year} Sales Data`,
+          description: `Recent sales data for AI pattern recognition`,
+          type: 'monthly_sales',
+          period: `${year}-${month.toString().padStart(2, '0')}`,
+          required: i <= 3 // Only first 3 are required
+        });
+      }
+
+      // Historical seasonal data
+      const monthName = new Date(targetYear, targetMonth - 1).toLocaleDateString('en-US', { month: 'long' });
+      for (let yearBack = 1; yearBack <= 5; yearBack++) {
+        const pastYear = targetYear - yearBack;
+        requirements.push({
+          id: `ai_seasonal_${yearBack}`,
+          title: `${monthName} ${pastYear} Complete Data`,
+          description: `Historical ${monthName} data for deep learning patterns`,
+          type: 'seasonal_data',
+          period: `${pastYear}-${targetMonth.toString().padStart(2, '0')}`,
+          required: yearBack <= 3
+        });
+      }
+
+      // Market context data
+      requirements.push({
+        id: 'ai_market_context',
+        title: 'Market Context & External Factors',
+        description: 'Upload market research, competitor analysis, economic indicators, promotional calendars',
+        type: 'market_data',
+        period: 'contextual',
+        required: false
+      });
+
+      // Inventory levels
+      requirements.push({
+        id: 'ai_inventory',
+        title: 'Current Inventory Levels',
+        description: 'Upload current stock levels, procurement pipeline, supplier data',
+        type: 'inventory_data',
+        period: 'current',
+        required: true
+      });
     }
+
+    return requirements;
   };
 
   const fetchFastestItems = async () => {
