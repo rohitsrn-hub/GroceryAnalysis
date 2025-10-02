@@ -103,12 +103,12 @@ function MainApp() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Total Revenue</p>
-                      <p className="text-2xl font-bold text-green-600">
-                        ₹{(dashboardData.total_revenue || 0).toLocaleString()}
+                      <p className="text-sm text-gray-600 font-medium">Total Revenue</p>
+                      <p className="text-4xl font-bold text-green-600">
+                        {formatIndianNumber(dashboardData.total_revenue || 0, true)}
                       </p>
                     </div>
-                    <BarChart3 className="h-8 w-8 text-green-600" />
+                    <BarChart3 className="h-10 w-10 text-green-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -117,12 +117,12 @@ function MainApp() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Total Profit</p>
-                      <p className="text-2xl font-bold text-blue-600">
-                        ₹{(dashboardData.total_profit || 0).toLocaleString()}
+                      <p className="text-sm text-gray-600 font-medium">Total Profit</p>
+                      <p className="text-4xl font-bold text-blue-600">
+                        {formatIndianNumber(dashboardData.total_profit || 0, true)}
                       </p>
                     </div>
-                    <TrendingUp className="h-8 w-8 text-blue-600" />
+                    <TrendingUp className="h-10 w-10 text-blue-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -131,12 +131,12 @@ function MainApp() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Items Sold</p>
-                      <p className="text-2xl font-bold text-purple-600">
-                        {(dashboardData.total_items_sold || 0).toLocaleString()}
+                      <p className="text-sm text-gray-600 font-medium">Items Sold</p>
+                      <p className="text-4xl font-bold text-purple-600">
+                        {formatIndianNumber(dashboardData.total_items_sold || 0)}
                       </p>
                     </div>
-                    <FileSpreadsheet className="h-8 w-8 text-purple-600" />
+                    <FileSpreadsheet className="h-10 w-10 text-purple-600" />
                   </div>
                 </CardContent>
               </Card>
@@ -145,12 +145,12 @@ function MainApp() {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Profit Margin</p>
-                      <p className="text-2xl font-bold text-orange-600">
-                        {(dashboardData.profit_margin || 0).toFixed(1)}%
+                      <p className="text-sm text-gray-600 font-medium">Profit Margin</p>
+                      <p className="text-4xl font-bold text-orange-600">
+                        {formatPercentage(dashboardData.profit_margin || 0)}
                       </p>
                     </div>
-                    <BarChart3 className="h-8 w-8 text-orange-600" />
+                    <BarChart3 className="h-10 w-10 text-orange-600" />
                   </div>
                 </CardContent>
               </Card>
