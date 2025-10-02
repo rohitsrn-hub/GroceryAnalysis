@@ -161,8 +161,11 @@ def process_excel_data(file_content: bytes, filename: str) -> List[Dict]:
                     return None
                 try:
                     # Handle string values with quotes or other formatting
-                    str_val = str(value).replace("'", "").replace('"', "").strip()
-                    return float(str_val) if str_val and str_val != 'nan' else None
+                    str_val = str(value).replace("'", "").replace('"', "").replace(",", "").strip()
+                    # Handle negative values and empty strings
+                    if str_val == '' or str_val == 'nan' or str_val == 'None':
+                        return None
+                    return float(str_val)
                 except (ValueError, TypeError):
                     return None
             
