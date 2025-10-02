@@ -54,6 +54,8 @@ const Analytics = () => {
       setFastestItems(fastest);
       setGroupAnalysis(groups);
       setInventoryAnalysis(inventory);
+      setAbcAnalysis(abc);
+      setCapitalAnalysis(capital);
     } catch (error) {
       console.error("Error fetching analytics data:", error);
       toast.error("Failed to load analytics data");
