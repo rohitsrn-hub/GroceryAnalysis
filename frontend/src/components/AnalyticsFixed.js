@@ -522,7 +522,7 @@ const AnalyticsFixed = () => {
                   <div className="p-4 bg-purple-50 rounded-lg text-center">
                     <BarChart3 className="h-8 w-8 text-purple-500 mx-auto mb-2" />
                     <p className="text-xl font-bold text-purple-600">
-                      ₹{(capitalAnalysis.summary.total_capital_blocked || 0).toLocaleString()}
+                      {formatIndianNumber(capitalAnalysis.summary.total_capital_blocked || 0, true)}
                     </p>
                     <p className="text-sm text-purple-700">Capital Blocked</p>
                   </div>
