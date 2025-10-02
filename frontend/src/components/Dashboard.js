@@ -243,8 +243,11 @@ const Dashboard = ({ dashboardData, loading }) => {
               <div className="space-y-3">
                 {inventoryAnalysis.high_cost_poor_performance?.slice(0, 5).map((item, index) => (
                   <div key={index} className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="text-xs bg-yellow-600 text-white px-2 py-1 rounded font-bold">#{index + 1}</span>
+                    </div>
                     <p className="font-medium text-yellow-800 text-sm">
-                      {item._id?.item_name || 'Unknown Item'}
+                      {item._id?.pluno || 'N/A'} - {item._id?.item_name || 'Unknown Item'}
                     </p>
                     <p className="text-yellow-600 text-xs">
                       Avg Cost: ₹{(item.avg_cost || 0).toFixed(2)}
