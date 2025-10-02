@@ -549,7 +549,7 @@ const AnalyticsFixed = () => {
                             {item._id.pluno} - {item._id.item_name}
                           </p>
                           <div className="flex space-x-4 mt-2 text-xs text-gray-600">
-                            <span>Capital: ₹{item.capital_blocked.toLocaleString()}</span>
+                            <span>Capital: {formatIndianNumber(item.capital_blocked, true)}</span>
                             <span>Days to Sell: {item.days_to_sell === 9999 ? '∞' : Math.round(item.days_to_sell)}</span>
                             <span>Monthly Sales: {item.avg_monthly_sales.toFixed(1)}</span>
                           </div>
