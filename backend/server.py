@@ -105,17 +105,20 @@ def extract_group_from_pluno(pluno) -> str:
     if not pluno or pd.isna(pluno):
         return "Unknown"
     
-    pluno_str = str(pluno)
-    if pluno_str.startswith("I/"):
-        return "Group I"
-    elif pluno_str.startswith("II/"):
-        return "Group II"
-    elif pluno_str.startswith("III/"):
-        return "Group III"
-    elif pluno_str.startswith("IV/"):
-        return "Group IV"
-    elif pluno_str.startswith("VI/"):
+    pluno_str = str(pluno).strip()
+    
+    # Handle different formats
+    if pluno_str.startswith("VI/") or pluno_str.startswith("6/"):
         return "Group VI"
+    elif pluno_str.startswith("IV/") or pluno_str.startswith("4/"):
+        return "Group IV"  
+    elif pluno_str.startswith("III/") or pluno_str.startswith("3/"):
+        return "Group III"
+    elif pluno_str.startswith("II/") or pluno_str.startswith("2/"):
+        return "Group II"
+    elif pluno_str.startswith("I/") or pluno_str.startswith("1/"):
+        return "Group I"
+    
     return "Unknown"
 
 def process_excel_data(file_content: bytes, filename: str) -> List[Dict]:
