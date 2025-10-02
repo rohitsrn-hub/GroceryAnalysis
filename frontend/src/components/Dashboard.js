@@ -311,7 +311,7 @@ const Dashboard = ({ dashboardData, loading }) => {
                         (group.profit_margin || 0) > 20 ? 'text-green-600' : 
                         (group.profit_margin || 0) > 10 ? 'text-orange-600' : 'text-red-600'
                       }`}>
-                        {(group.profit_margin || 0).toFixed(1)}%
+                        {formatPercentage(group.profit_margin || 0)}
                       </span>
                     </td>
                     <td className="p-3">
