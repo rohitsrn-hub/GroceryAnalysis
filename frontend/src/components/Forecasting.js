@@ -273,8 +273,11 @@ const Forecasting = () => {
                   <Button 
                     className="w-full" 
                     onClick={() => {
-                      // Navigate to upload tab
-                      window.location.hash = "#upload";
+                      // Navigate to upload tab - fix for React Router
+                      const uploadTab = document.querySelector('[data-testid="upload-tab"]') || 
+                                       document.querySelector('button:contains("Data Upload")') ||
+                                       document.querySelectorAll('[role="tab"]')[1];
+                      if (uploadTab) uploadTab.click();
                     }}
                   >
                     <Upload className="h-4 w-4 mr-2" />
