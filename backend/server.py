@@ -66,6 +66,11 @@ class ForecastRequest(BaseModel):
     forecast_months: int = 4
     additional_data: Optional[Dict[str, Any]] = None
 
+class ForecastDataRequirement(BaseModel):
+    last_3_months_data: Optional[Dict[str, Any]] = None
+    yearly_data_for_month: Optional[Dict[str, Any]] = None
+    seasonal_data: Optional[List[Dict[str, Any]]] = None
+
 class FastestSellingResponse(BaseModel):
     item_code: str
     item_name: str
