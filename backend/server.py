@@ -646,6 +646,123 @@ async def get_group_analysis():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error in group analysis: {str(e)}")
 
+@api_router.get("/comprehensive-report")
+async def generate_comprehensive_report(format: str = Query("excel")):
+    """Generate comprehensive business analysis report"""
+    try:
+        # Gather all analytics data
+        dashboard_summary = await get_dashboard_summary()
+        abc_analysis = await get_abc_analysis()
+        capital_analysis = await get_capital_blocking_analysis()
+        group_analysis = await get_group_analysis()
+        fastest_items = await get_fastest_selling_items(20)
+        inventory_analysis = await get_inventory_analysis()
+        
+        if format == "excel":
+            # Create comprehensive Excel report
+            workbook = openpyxl.Workbook()
+            
+            # Summary Sheet
+            ws_summary = workbook.active
+            ws_summary.title = "Executive Summary"
+            
+            ws_summary.append(["URC 101 Area - Comprehensive Sales Analysis Report"])
+            ws_summary.append(["Generated on:", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+            ws_summary.append([""])
+            ws_summary.append(["KEY METRICS"])
+            ws_summary.append(["Total Revenue", f"₹{dashboard_summary['total_revenue']:,.2f}"])
+            ws_summary.append(["Total Profit", f"₹{dashboard_summary['total_profit']:,.2f}"])
+            ws_summary.append(["Profit Margin", f"{dashboard_summary['profit_margin']:.2f}%"])
+            ws_summary.append(["Total Items Sold", f"{dashboard_summary['total_items_sold']:,}"])
+            ws_summary.append(["Total Records", f"{dashboard_summary['total_records']:,}"])
+            
+            # ABC Analysis Sheet
+            ws_abc = workbook.create_sheet("ABC Analysis")
+            ws_abc.append(["Category", "Items", "% of Items", "Revenue", "% of Revenue"])
+            for category in ['A', 'B', 'C']:
+                cat_data = abc_analysis['summary'][f'category_{category}']
+                ws_abc.append([
+                    f"Category {category}",
+                    cat_data['item_count'],
+                    f"{cat_data['percentage_items']:.1f}%",
+                    f"₹{cat_data['revenue']:,.2f}",
+                    f"{(cat_data['revenue']/abc_analysis['summary']['total_revenue'])*100:.1f}%"
+                ])
+            
+            # Capital Blocking Sheet
+            ws_capital = workbook.create_sheet("Capital Blocking")
+            ws_capital.append(["Item Code", "Item Name", "Group", "Capital Blocked", "Risk Level", "Days to Sell"])
+            for item in capital_analysis['capital_blocking_items'][:50]:
+                ws_capital.append([
+                    item['_id']['pluno'],
+                    item['_id']['item_name'],
+                    item['_id']['group'],
+                    f"₹{item['capital_blocked']:,.2f}",
+                    item['risk_level'],
+                    item['days_to_sell'] if item['days_to_sell'] != 9999 else "∞"
+                ])
+            
+            # Group Performance Sheet
+            ws_groups = workbook.create_sheet("Group Performance")
+            ws_groups.append(["Group", "Items", "Revenue", "Profit", "Margin %"])
+            for group in group_analysis:
+                ws_groups.append([
+                    group['group'],
+                    group['item_count'],
+                    f"₹{group['total_revenue']:,.2f}",
+                    f"₹{group['total_profit']:,.2f}",
+                    f"{group['profit_margin']:.2f}%"
+                ])
+            
+            # Top Performers Sheet
+            ws_top = workbook.create_sheet("Top Performers")
+            ws_top.append(["Rank", "Item Code", "Item Name", "Group", "Units Sold", "Revenue", "Monthly Avg"])
+            for i, item in enumerate(fastest_items, 1):
+                ws_top.append([
+                    i,
+                    item['item_code'],
+                    item['item_name'],
+                    item['group'],
+                    item['total_sold'],
+                    f"₹{item['total_revenue']:,.2f}",
+                    f"{item['avg_monthly_sales']:.1f}"
+                ])
+            
+            # Recommendations Sheet
+            ws_rec = workbook.create_sheet("Recommendations")
+            ws_rec.append(["STRATEGIC RECOMMENDATIONS"])
+            ws_rec.append([""])
+            ws_rec.append(["1. CAPITAL OPTIMIZATION"])
+            ws_rec.append([f"• {capital_analysis['summary']['critical_items']} items require immediate liquidation"])
+            ws_rec.append([f"• Total blocked capital: ₹{capital_analysis['summary']['total_capital_blocked']:,.2f}"])
+            ws_rec.append([""])
+            ws_rec.append(["2. INVENTORY FOCUS"])
+            ws_rec.append([f"• Focus on Category A items ({abc_analysis['summary']['category_A']['item_count']} items generating 80% revenue)"])
+            ws_rec.append([f"• Review Category C items ({abc_analysis['summary']['category_C']['item_count']} items generating only 5% revenue)"])
+            ws_rec.append([""])
+            ws_rec.append(["3. GROUP PERFORMANCE"])
+            top_group = max(group_analysis, key=lambda x: x['total_revenue'])
+            ws_rec.append([f"• {top_group['group']} is the top revenue generator"])
+            ws_rec.append([f"• Consider expanding high-margin groups"])
+            
+            # Save to BytesIO
+            excel_buffer = io.BytesIO()
+            workbook.save(excel_buffer)
+            excel_buffer.seek(0)
+            
+            return StreamingResponse(
+                io.BytesIO(excel_buffer.read()),
+                media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                headers={"Content-Disposition": "attachment; filename=URC101-Comprehensive-Analysis-Report.xlsx"}
+            )
+            
+        else:
+            # For PDF format (placeholder - would need additional PDF library)
+            return {"message": "PDF format coming soon. Please use Excel format for now."}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
+
 @api_router.get("/export-data/{analysis_type}")
 async def export_data_to_excel(analysis_type: str, group: Optional[str] = Query(None)):
     """Export analysis data to Excel file"""
