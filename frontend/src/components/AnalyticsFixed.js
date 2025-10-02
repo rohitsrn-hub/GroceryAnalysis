@@ -204,11 +204,31 @@ const AnalyticsFixed = () => {
 
       {/* Analytics Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="performance">Performance Analysis</TabsTrigger>
-          <TabsTrigger value="abc">ABC Analysis</TabsTrigger>
-          <TabsTrigger value="capital">Capital Blocking</TabsTrigger>
-          <TabsTrigger value="inventory">Inventory Health</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 bg-white shadow-md rounded-lg p-1 border border-gray-200">
+          <TabsTrigger 
+            value="performance"
+            className="px-4 py-3 rounded-md font-medium transition-all duration-200 hover:bg-blue-50 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+          >
+            Performance Analysis
+          </TabsTrigger>
+          <TabsTrigger 
+            value="abc"
+            className="px-4 py-3 rounded-md font-medium transition-all duration-200 hover:bg-green-50 data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+          >
+            ABC Analysis
+          </TabsTrigger>
+          <TabsTrigger 
+            value="capital"
+            className="px-4 py-3 rounded-md font-medium transition-all duration-200 hover:bg-red-50 data-[state=active]:bg-red-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+          >
+            Capital Blocking
+          </TabsTrigger>
+          <TabsTrigger 
+            value="inventory"
+            className="px-4 py-3 rounded-md font-medium transition-all duration-200 hover:bg-orange-50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+          >
+            Inventory Health
+          </TabsTrigger>
         </TabsList>
 
         {/* Performance Analysis Tab */}
