@@ -95,7 +95,10 @@ const Dashboard = ({ dashboardData, loading }) => {
               <TrendingUp className="h-5 w-5" />
               <span>Group-wise Revenue & Profit</span>
             </CardTitle>
-            <CardDescription>Performance comparison across product groups</CardDescription>
+            <CardDescription>
+              This chart compares revenue (blue bars) and profit (green bars) across all product groups. 
+              It helps identify which groups contribute most to business growth and profitability.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
