@@ -619,6 +619,7 @@ async def get_group_analysis():
                     }
                 }
             },
+            {"$match": {"_id": {"$ne": "Unknown"}}},
             {"$sort": {"total_revenue": -1}}
         ]
         
