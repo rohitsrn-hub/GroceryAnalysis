@@ -6,6 +6,7 @@ import { Skeleton } from "./ui/skeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { TrendingUp, TrendingDown, Package, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { formatIndianNumber, formatTableNumber, formatPercentage } from "../utils/numberUtils";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
