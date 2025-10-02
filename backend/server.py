@@ -922,6 +922,48 @@ async def export_data_to_excel(analysis_type: str, group: Optional[str] = Query(
                     top_performer
                 ])
                 
+        elif analysis_type == "inventory-health":
+            # Get inventory analysis
+            response = await get_inventory_analysis()
+            ws.title = "Inventory Health Analysis"
+            
+            # Dead Inventory Sheet
+            headers = ["Type", "Item Code", "Item Name", "Group", "Capital Blocked", "Closing Stock", "Avg Cost"]
+            ws.append(headers)
+            
+            for item in response.get("dead_inventory", []):
+                ws.append([
+                    "Dead Inventory",
+                    item["_id"]["pluno"] if "pluno" in item["_id"] else "N/A",
+                    item["_id"]["item_name"] if "item_name" in item["_id"] else "N/A",
+                    item["_id"].get("group", "N/A"),
+                    item.get("capital_blocked", 0),
+                    item.get("avg_closing_stock", 0),
+                    item.get("avg_cost", 0)
+                ])
+            
+            for item in response.get("slow_moving", []):
+                ws.append([
+                    "Slow Moving",
+                    item["_id"]["pluno"] if "pluno" in item["_id"] else "N/A",
+                    item["_id"]["item_name"] if "item_name" in item["_id"] else "N/A",
+                    "N/A",  # Group not available in slow moving
+                    0,  # Capital blocked calculation needed
+                    0,  # Closing stock not available
+                    item.get("avg_cost", 0)
+                ])
+            
+            for item in response.get("high_cost_poor_performance", []):
+                ws.append([
+                    "High Cost Poor Performance",
+                    item["_id"]["pluno"] if "pluno" in item["_id"] else "N/A",
+                    item["_id"]["item_name"] if "item_name" in item["_id"] else "N/A",
+                    "N/A",  # Group not available
+                    0,  # Capital blocked calculation needed
+                    0,  # Closing stock not available
+                    item.get("avg_cost", 0)
+                ])
+                
         else:
             raise HTTPException(status_code=400, detail="Invalid analysis type")
             
