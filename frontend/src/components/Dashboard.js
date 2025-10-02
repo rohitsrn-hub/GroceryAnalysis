@@ -123,7 +123,10 @@ const Dashboard = ({ dashboardData, loading }) => {
               <Package className="h-5 w-5" />
               <span>Group Distribution</span>
             </CardTitle>
-            <CardDescription>Revenue distribution by product groups</CardDescription>
+            <CardDescription>
+              This pie chart shows the revenue contribution of each product group as a percentage of total sales. 
+              Larger slices indicate groups that generate more revenue for the business.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
