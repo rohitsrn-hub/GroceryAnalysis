@@ -1075,6 +1075,31 @@ const Analytics = () => {
 
         {/* Inventory Health Tab */}
         <TabsContent value="inventory" className="space-y-6">
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Package className="h-5 w-5 text-orange-600" />
+                    <span>Inventory Health Analysis</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Comprehensive analysis of inventory performance identifying dead stock, slow-moving items, and capital optimization opportunities.
+                  </CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => exportToExcel('inventory-health')}
+                  className="flex items-center space-x-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Export Inventory</span>
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+          
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
               <CardHeader>
