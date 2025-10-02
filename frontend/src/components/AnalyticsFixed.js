@@ -222,28 +222,28 @@ const AnalyticsFixed = () => {
 
       {/* Analytics Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 bg-white shadow-md rounded-lg p-1 border border-gray-200">
+        <TabsList className="grid w-full grid-cols-4 bg-gradient-to-r from-slate-100 to-slate-200 shadow-lg rounded-xl p-2 border border-gray-300">
           <TabsTrigger 
             value="performance"
-            className="px-4 py-3 rounded-md font-medium transition-all duration-200 hover:bg-blue-50 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+            className="px-5 py-3 rounded-lg font-semibold transition-all duration-300 bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md hover:shadow-lg hover:from-blue-600 hover:to-blue-700 transform hover:scale-105 data-[state=active]:from-slate-400 data-[state=active]:to-slate-500 data-[state=active]:text-slate-100 data-[state=active]:shadow-inner data-[state=active]:scale-100 border border-blue-300"
           >
             Performance Analysis
           </TabsTrigger>
           <TabsTrigger 
             value="abc"
-            className="px-4 py-3 rounded-md font-medium transition-all duration-200 hover:bg-green-50 data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+            className="px-5 py-3 rounded-lg font-semibold transition-all duration-300 bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md hover:shadow-lg hover:from-green-600 hover:to-green-700 transform hover:scale-105 data-[state=active]:from-slate-400 data-[state=active]:to-slate-500 data-[state=active]:text-slate-100 data-[state=active]:shadow-inner data-[state=active]:scale-100 border border-green-300"
           >
             ABC Analysis
           </TabsTrigger>
           <TabsTrigger 
             value="capital"
-            className="px-4 py-3 rounded-md font-medium transition-all duration-200 hover:bg-red-50 data-[state=active]:bg-red-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+            className="px-5 py-3 rounded-lg font-semibold transition-all duration-300 bg-gradient-to-r from-red-500 to-red-600 text-white shadow-md hover:shadow-lg hover:from-red-600 hover:to-red-700 transform hover:scale-105 data-[state=active]:from-slate-400 data-[state=active]:to-slate-500 data-[state=active]:text-slate-100 data-[state=active]:shadow-inner data-[state=active]:scale-100 border border-red-300"
           >
             Capital Blocking
           </TabsTrigger>
           <TabsTrigger 
             value="inventory"
-            className="px-4 py-3 rounded-md font-medium transition-all duration-200 hover:bg-orange-50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+            className="px-5 py-3 rounded-lg font-semibold transition-all duration-300 bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md hover:shadow-lg hover:from-amber-600 hover:to-amber-700 transform hover:scale-105 data-[state=active]:from-slate-400 data-[state=active]:to-slate-500 data-[state=active]:text-slate-100 data-[state=active]:shadow-inner data-[state=active]:scale-100 border border-amber-300"
           >
             Inventory Health
           </TabsTrigger>
