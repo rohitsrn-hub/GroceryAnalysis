@@ -235,7 +235,7 @@ async def get_fastest_selling_items(limit: int = Query(10, ge=1, le=50)):
     """Get fastest selling items with seasonal patterns"""
     try:
         pipeline = [
-            {"$match": {"net_qty": {"$gt": 0}}},
+            {"$match": {"net_qty": {"$ne": None, "$exists": True}}},
             {
                 "$group": {
                     "_id": {
