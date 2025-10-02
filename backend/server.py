@@ -156,22 +156,41 @@ def process_excel_data(file_content: bytes, filename: str) -> List[Dict]:
             if pd.isna(row.get('pluno')) and pd.isna(row.get('item_name')):
                 continue
                 
+            def safe_float(value):
+                if pd.isna(value):
+                    return None
+                try:
+                    # Handle string values with quotes or other formatting
+                    str_val = str(value).replace("'", "").replace('"', "").strip()
+                    return float(str_val) if str_val and str_val != 'nan' else None
+                except (ValueError, TypeError):
+                    return None
+            
+            def safe_int(value):
+                if pd.isna(value):
+                    return None
+                try:
+                    str_val = str(value).replace("'", "").replace('"', "").strip()
+                    return int(float(str_val)) if str_val and str_val != 'nan' else None
+                except (ValueError, TypeError):
+                    return None
+            
             record = {
-                's_no': int(row.get('s_no')) if not pd.isna(row.get('s_no')) else None,
+                's_no': safe_int(row.get('s_no')),
                 'gp_index_no': str(row.get('gp_index_no')) if not pd.isna(row.get('gp_index_no')) else None,
                 'pluno': str(row.get('pluno')) if not pd.isna(row.get('pluno')) else None,
                 'item_name': str(row.get('item_name')) if not pd.isna(row.get('item_name')) else None,
-                'w_rate': float(row.get('w_rate')) if not pd.isna(row.get('w_rate')) else None,
-                'r_rate': float(row.get('r_rate')) if not pd.isna(row.get('r_rate')) else None,
-                'qty': int(row.get('qty')) if not pd.isna(row.get('qty')) else None,
-                'refund_qty': int(row.get('refund_qty')) if not pd.isna(row.get('refund_qty')) else None,
-                'net_qty': int(row.get('net_qty')) if not pd.isna(row.get('net_qty')) else None,
-                'r_amt': float(row.get('r_amt')) if not pd.isna(row.get('r_amt')) else None,
-                'w_amt': float(row.get('w_amt')) if not pd.isna(row.get('w_amt')) else None,
-                'profit': float(row.get('profit')) if not pd.isna(row.get('profit')) else None,
+                'w_rate': safe_float(row.get('w_rate')),
+                'r_rate': safe_float(row.get('r_rate')),
+                'qty': safe_int(row.get('qty')),
+                'refund_qty': safe_int(row.get('refund_qty')),
+                'net_qty': safe_int(row.get('net_qty')),
+                'r_amt': safe_float(row.get('r_amt')),
+                'w_amt': safe_float(row.get('w_amt')),
+                'profit': safe_float(row.get('profit')),
                 'o_b': str(row.get('o_b')) if not pd.isna(row.get('o_b')) else None,
                 'closing_stock': str(row.get('closing_stock')) if not pd.isna(row.get('closing_stock')) else None,
-                'net_tax': float(row.get('net_tax')) if not pd.isna(row.get('net_tax')) else None,
+                'net_tax': safe_float(row.get('net_tax')),
                 'data_period': data_period,
                 'product_group': extract_group_from_pluno(row.get('pluno'))
             }
