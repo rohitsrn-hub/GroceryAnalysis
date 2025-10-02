@@ -359,21 +359,48 @@ const Forecasting = () => {
 
   return (
     <div className="space-y-6">
-      {/* Forecast Data Requirements */}
-      {showRequirements && forecastRequirements && (
-        <Card className="border-2 border-blue-200 bg-blue-50">
+      {/* Progress Indicator */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">Demand Forecasting Wizard</h2>
+            <Badge variant="outline" className="text-sm">
+              Step {step} of 4
+            </Badge>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            {[1, 2, 3, 4].map((stepNum) => (
+              <div key={stepNum} className="flex items-center space-x-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  step >= stepNum ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {stepNum}
+                </div>
+                <span className={`text-sm ${
+                  step >= stepNum ? 'text-blue-600 font-medium' : 'text-gray-500'
+                }`}>
+                  {stepNum === 1 ? 'Select Date' : 
+                   stepNum === 2 ? 'Choose Method' : 
+                   stepNum === 3 ? 'Upload Data' : 'Generate Forecast'}
+                </span>
+                {stepNum < 4 && <div className="w-8 h-px bg-gray-300" />}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step 1: Date Selection */}
+      {step === 1 && (
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center space-x-2">
-                <Info className="h-5 w-5 text-blue-600" />
-                <span>Data Requirements for Accurate Forecasting</span>
-              </span>
-              <Button variant="ghost" size="sm" onClick={() => setShowRequirements(false)}>
-                <X className="h-4 w-4" />
-              </Button>
+            <CardTitle className="flex items-center space-x-2">
+              <Calendar className="h-5 w-5" />
+              <span>Select Forecast Period</span>
             </CardTitle>
             <CardDescription>
-              Current data status and requirements for different forecast accuracy levels
+              Choose the month and year for which you want to generate demand forecast
             </CardDescription>
           </CardHeader>
           <CardContent>
