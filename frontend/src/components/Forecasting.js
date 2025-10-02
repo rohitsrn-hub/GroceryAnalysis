@@ -29,9 +29,11 @@ const Forecasting = () => {
   const [showRequirements, setShowRequirements] = useState(false);
 
   useEffect(() => {
-    fetchFastestItems();
-    fetchForecastRequirements();
-  }, []);
+    if (forecastMethod) {
+      const requirements = generateDataRequirements();
+      setRequiredDataUploads(requirements);
+    }
+  }, [forecastMonth, forecastYear, forecastMethod]);
 
   const generateDataRequirements = () => {
     if (!forecastMonth || !forecastYear || !forecastMethod) return [];
