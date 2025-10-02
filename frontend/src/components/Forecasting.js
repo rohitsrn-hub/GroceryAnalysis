@@ -27,6 +27,9 @@ const Forecasting = () => {
   const [additionalInputs, setAdditionalInputs] = useState('');
   const [fastestItems, setFastestItems] = useState([]);
   const [showRequirements, setShowRequirements] = useState(false);
+  const [forecastMonths, setForecastMonths] = useState(4);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [selectedItems, setSelectedItems] = useState([]);
 
   useEffect(() => {
     if (forecastMethod) {
