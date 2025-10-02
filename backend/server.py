@@ -48,7 +48,7 @@ class SalesRecord(BaseModel):
     w_amt: Optional[float] = None  # Wholesale Amount
     profit: Optional[float] = None
     o_b: Optional[str] = None  # Opening Balance
-    closing_stock: Optional[str] = None
+    closing_stock: Optional[float] = None
     net_tax: Optional[float] = None
     upload_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     data_period: Optional[str] = None  # e.g., "2024", "Jan-2024"
