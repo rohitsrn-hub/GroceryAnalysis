@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ScatterChart, Scatter, PieChart, Pie, Cell } from "recharts";
 import { TrendingUp, TrendingDown, Package, AlertTriangle, Filter, RefreshCw, Calendar, BarChart3, Download } from "lucide-react";
 import { toast } from "sonner";
+import { formatIndianNumber, formatTableNumber, formatPercentage } from "../utils/numberUtils";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
