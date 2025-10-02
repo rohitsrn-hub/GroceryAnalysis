@@ -214,7 +214,7 @@ def process_excel_data(file_content: bytes, filename: str) -> List[Dict]:
                 'r_amt': safe_float(row.get('r_amt')),
                 'w_amt': safe_float(row.get('w_amt')),
                 'profit': safe_float(row.get('profit')),
-                'o_b': str(row.get('o_b')) if not pd.isna(row.get('o_b')) else None,
+                'o_b': safe_float(row.get('o_b')),
                 'closing_stock': safe_float(row.get('closing_stock')),
                 'net_tax': safe_float(row.get('net_tax')),
                 'data_period': data_period,
