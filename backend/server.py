@@ -261,11 +261,16 @@ async def upload_sales_data(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 @api_router.get("/fastest-selling-items")
-async def get_fastest_selling_items(limit: int = Query(10, ge=1, le=50)):
+async def get_fastest_selling_items(limit: int = Query(10, ge=1, le=50), group: Optional[str] = Query(None)):
     """Get fastest selling items with seasonal patterns"""
     try:
+        # Build match filter
+        match_filter = {"net_qty": {"$ne": None, "$exists": True}}
+        if group and group != "all":
+            match_filter["product_group"] = group
+            
         pipeline = [
-            {"$match": {"net_qty": {"$ne": None, "$exists": True}}},
+            {"$match": match_filter},
             {
                 "$group": {
                     "_id": {
