@@ -686,6 +686,9 @@ const Analytics = () => {
                         {capitalAnalysis.capital_blocking_items?.map((item, index) => (
                           <tr key={index} className="border-b hover:bg-gray-50">
                             <td className="p-3">
+                              <span className="text-sm bg-red-600 text-white px-2 py-1 rounded font-bold">#{index + 1}</span>
+                            </td>
+                            <td className="p-3">
                               <span className="font-medium text-sm">{item._id.pluno}</span>
                             </td>
                             <td className="p-3">
