@@ -437,8 +437,21 @@ const Analytics = () => {
               {/* ABC Distribution Chart */}
               <Card>
                 <CardHeader>
-                  <CardTitle>ABC Analysis Distribution</CardTitle>
-                  <CardDescription>80/20 Rule - Revenue concentration across item categories</CardDescription>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>ABC Analysis Distribution</CardTitle>
+                      <CardDescription>80/20 Rule - Revenue concentration across item categories</CardDescription>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => exportToExcel('abc')}
+                      className="flex items-center space-x-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>Export ABC</span>
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
