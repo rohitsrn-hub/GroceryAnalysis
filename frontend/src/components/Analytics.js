@@ -183,8 +183,10 @@ const Analytics = () => {
 
       {/* Analytics Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="performance">Performance Analysis</TabsTrigger>
+          <TabsTrigger value="abc">ABC Analysis</TabsTrigger>
+          <TabsTrigger value="capital">Capital Blocking</TabsTrigger>
           <TabsTrigger value="seasonal">Seasonal Trends</TabsTrigger>
           <TabsTrigger value="profitability">Profitability</TabsTrigger>
           <TabsTrigger value="inventory">Inventory Health</TabsTrigger>
