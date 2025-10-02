@@ -318,6 +318,370 @@ const Analytics = () => {
           </Card>
         </TabsContent>
 
+        {/* ABC Analysis Tab */}
+        <TabsContent value="abc" className="space-y-6">
+          {abcAnalysis && (
+            <div className="space-y-6">
+              {/* ABC Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="border-2 border-green-200 bg-green-50">
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-green-800">Category A - Fast Moving</CardTitle>
+                    <CardDescription className="text-green-600">~80% of Revenue</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    <div className="space-y-2">
+                      <p className="text-3xl font-bold text-green-800">
+                        {abcAnalysis.summary.category_A?.item_count || 0}
+                      </p>
+                      <p className="text-sm text-green-600">
+                        {(abcAnalysis.summary.category_A?.percentage_items || 0).toFixed(1)}% of items
+                      </p>
+                      <p className="text-lg font-semibold text-green-700">
+                        ₹{(abcAnalysis.summary.category_A?.revenue || 0).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-green-500">
+                        {((abcAnalysis.summary.category_A?.revenue || 0) / (abcAnalysis.summary.total_revenue || 1) * 100).toFixed(1)}% of revenue
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-2 border-blue-200 bg-blue-50">
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-blue-800">Category B - Medium Moving</CardTitle>
+                    <CardDescription className="text-blue-600">~15% of Revenue</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    <div className="space-y-2">
+                      <p className="text-3xl font-bold text-blue-800">
+                        {abcAnalysis.summary.category_B?.item_count || 0}
+                      </p>
+                      <p className="text-sm text-blue-600">
+                        {(abcAnalysis.summary.category_B?.percentage_items || 0).toFixed(1)}% of items
+                      </p>
+                      <p className="text-lg font-semibold text-blue-700">
+                        ₹{(abcAnalysis.summary.category_B?.revenue || 0).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-blue-500">
+                        {((abcAnalysis.summary.category_B?.revenue || 0) / (abcAnalysis.summary.total_revenue || 1) * 100).toFixed(1)}% of revenue
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-2 border-red-200 bg-red-50">
+                  <CardHeader className="text-center">
+                    <CardTitle className="text-red-800">Category C - Slow Moving</CardTitle>
+                    <CardDescription className="text-red-600">~5% of Revenue</CardDescription>
+                  </CardHeader>
+                  <CardContent className="text-center">
+                    <div className="space-y-2">
+                      <p className="text-3xl font-bold text-red-800">
+                        {abcAnalysis.summary.category_C?.item_count || 0}
+                      </p>
+                      <p className="text-sm text-red-600">
+                        {(abcAnalysis.summary.category_C?.percentage_items || 0).toFixed(1)}% of items
+                      </p>
+                      <p className="text-lg font-semibold text-red-700">
+                        ₹{(abcAnalysis.summary.category_C?.revenue || 0).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-red-500">
+                        {((abcAnalysis.summary.category_C?.revenue || 0) / (abcAnalysis.summary.total_revenue || 1) * 100).toFixed(1)}% of revenue
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* ABC Distribution Chart */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>ABC Analysis Distribution</CardTitle>
+                  <CardDescription>80/20 Rule - Revenue concentration across item categories</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={[
+                      {
+                        category: 'Category A\n(Fast Moving)',
+                        items: abcAnalysis.summary.category_A?.item_count || 0,
+                        revenue: abcAnalysis.summary.category_A?.revenue || 0,
+                        percentage: abcAnalysis.summary.category_A?.percentage_items || 0
+                      },
+                      {
+                        category: 'Category B\n(Medium Moving)',
+                        items: abcAnalysis.summary.category_B?.item_count || 0,
+                        revenue: abcAnalysis.summary.category_B?.revenue || 0,
+                        percentage: abcAnalysis.summary.category_B?.percentage_items || 0
+                      },
+                      {
+                        category: 'Category C\n(Slow Moving)',
+                        items: abcAnalysis.summary.category_C?.item_count || 0,
+                        revenue: abcAnalysis.summary.category_C?.revenue || 0,
+                        percentage: abcAnalysis.summary.category_C?.percentage_items || 0
+                      }
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="category" />
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <Tooltip 
+                        formatter={(value, name) => [
+                          name === 'items' ? `${value} items` : 
+                          name === 'revenue' ? `₹${value.toLocaleString()}` :
+                          `${value.toFixed(1)}%`,
+                          name === 'items' ? 'Items Count' :
+                          name === 'revenue' ? 'Revenue' : 'Item Percentage'
+                        ]}
+                      />
+                      <Bar yAxisId="left" dataKey="items" fill="#3B82F6" />
+                      <Bar yAxisId="right" dataKey="percentage" fill="#10B981" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Top Items by Category */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-green-700">Top Category A Items</CardTitle>
+                    <CardDescription>Fastest moving items generating 80% revenue</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                      {abcAnalysis.abc_categories.A?.slice(0, 10).map((item, index) => (
+                        <div key={index} className="p-3 bg-green-50 rounded-lg border border-green-200">
+                          <p className="font-medium text-green-800 text-sm">{item.item_name}</p>
+                          <div className="flex justify-between items-center mt-1">
+                            <span className="text-xs text-green-600">₹{item.total_revenue.toLocaleString()}</span>
+                            <span className="text-xs text-green-500">{item.revenue_percentage.toFixed(2)}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-blue-700">Category B Items</CardTitle>
+                    <CardDescription>Medium performers contributing ~15% revenue</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                      {abcAnalysis.abc_categories.B?.slice(0, 10).map((item, index) => (
+                        <div key={index} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="font-medium text-blue-800 text-sm">{item.item_name}</p>
+                          <div className="flex justify-between items-center mt-1">
+                            <span className="text-xs text-blue-600">₹{item.total_revenue.toLocaleString()}</span>
+                            <span className="text-xs text-blue-500">{item.revenue_percentage.toFixed(2)}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-red-700">Category C Items</CardTitle>
+                    <CardDescription>Slow movers contributing only ~5% revenue</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                      {abcAnalysis.abc_categories.C?.slice(0, 10).map((item, index) => (
+                        <div key={index} className="p-3 bg-red-50 rounded-lg border border-red-200">
+                          <p className="font-medium text-red-800 text-sm">{item.item_name}</p>
+                          <div className="flex justify-between items-center mt-1">
+                            <span className="text-xs text-red-600">₹{item.total_revenue.toLocaleString()}</span>
+                            <span className="text-xs text-red-500">{item.revenue_percentage.toFixed(2)}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Capital Blocking Analysis Tab */}
+        <TabsContent value="capital" className="space-y-6">
+          {capitalAnalysis && (
+            <div className="space-y-6">
+              {/* Capital Summary */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card className="border-2 border-red-200 bg-red-50">
+                  <CardContent className="p-4 text-center">
+                    <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-2" />
+                    <p className="text-3xl font-bold text-red-600">
+                      {capitalAnalysis.summary.critical_items}
+                    </p>
+                    <p className="text-sm text-red-700">Critical Items</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-2 border-orange-200 bg-orange-50">
+                  <CardContent className="p-4 text-center">
+                    <Package className="h-12 w-12 text-orange-500 mx-auto mb-2" />
+                    <p className="text-3xl font-bold text-orange-600">
+                      {capitalAnalysis.summary.high_risk_items}
+                    </p>
+                    <p className="text-sm text-orange-700">High Risk Items</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-2 border-yellow-200 bg-yellow-50">
+                  <CardContent className="p-4 text-center">
+                    <TrendingDown className="h-12 w-12 text-yellow-500 mx-auto mb-2" />
+                    <p className="text-3xl font-bold text-yellow-600">
+                      {capitalAnalysis.summary.total_items_analyzed}
+                    </p>
+                    <p className="text-sm text-yellow-700">Items Analyzed</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-2 border-purple-200 bg-purple-50">
+                  <CardContent className="p-4 text-center">
+                    <BarChart3 className="h-12 w-12 text-purple-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-purple-600">
+                      ₹{(capitalAnalysis.summary.total_capital_blocked || 0).toLocaleString()}
+                    </p>
+                    <p className="text-sm text-purple-700">Capital Blocked</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Capital Blocking Items List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    <span>Capital Blocking Items Analysis</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Items with high inventory value but slow sales velocity - immediate action required
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-3 font-semibold">Item Name</th>
+                          <th className="text-left p-3 font-semibold">Group</th>
+                          <th className="text-left p-3 font-semibold">Capital Blocked</th>
+                          <th className="text-left p-3 font-semibold">Days to Sell</th>
+                          <th className="text-left p-3 font-semibold">Monthly Sales</th>
+                          <th className="text-left p-3 font-semibold">Risk Level</th>
+                          <th className="text-left p-3 font-semibold">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {capitalAnalysis.capital_blocking_items?.map((item, index) => (
+                          <tr key={index} className="border-b hover:bg-gray-50">
+                            <td className="p-3">
+                              <div>
+                                <p className="font-medium text-sm">{item._id.item_name}</p>
+                                <p className="text-xs text-gray-500">{item._id.pluno}</p>
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <Badge variant="outline">{item._id.group}</Badge>
+                            </td>
+                            <td className="p-3">
+                              <span className="font-bold text-red-600">
+                                ₹{item.capital_blocked.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <span className={`font-medium ${
+                                item.days_to_sell > 365 ? 'text-red-600' : 
+                                item.days_to_sell > 180 ? 'text-orange-600' : 'text-yellow-600'
+                              }`}>
+                                {item.days_to_sell === 9999 ? '∞' : Math.round(item.days_to_sell)}
+                              </span>
+                            </td>
+                            <td className="p-3">{item.avg_monthly_sales.toFixed(1)}</td>
+                            <td className="p-3">
+                              <Badge 
+                                className={
+                                  item.risk_level === 'CRITICAL' ? 'bg-red-600' :
+                                  item.risk_level === 'HIGH' ? 'bg-orange-600' :
+                                  item.risk_level === 'MEDIUM' ? 'bg-yellow-600' : 'bg-green-600'
+                                }
+                              >
+                                {item.risk_level}
+                              </Badge>
+                            </td>
+                            <td className="p-3">
+                              {item.risk_level === 'CRITICAL' ? (
+                                <Badge variant="destructive">Liquidate</Badge>
+                              ) : item.risk_level === 'HIGH' ? (
+                                <Badge className="bg-orange-600">Discount</Badge>
+                              ) : (
+                                <Badge variant="secondary">Monitor</Badge>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Recommendations */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-red-600">Immediate Actions Required</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                      <h4 className="font-semibold text-red-800">Critical Items ({capitalAnalysis.summary.critical_items})</h4>
+                      <p className="text-sm text-red-700 mt-1">
+                        Items blocking >₹50K capital with >1 year to sell. Consider liquidation or deep discounts.
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                      <h4 className="font-semibold text-orange-800">High Risk Items ({capitalAnalysis.summary.high_risk_items})</h4>
+                      <p className="text-sm text-orange-700 mt-1">
+                        Items blocking >₹10K capital with slow turnover. Plan promotional campaigns.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-blue-600">Capital Optimization Tips</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h4 className="font-semibold text-blue-800">Inventory Turnover</h4>
+                      <p className="text-sm text-blue-700 mt-1">
+                        Focus on items with turnover ratio < 2. Improve turnover to 4-6 times annually.
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                      <h4 className="font-semibold text-green-800">Cash Flow Impact</h4>
+                      <p className="text-sm text-green-700 mt-1">
+                        Clearing blocked inventory can free up ₹{(capitalAnalysis.summary.total_capital_blocked || 0).toLocaleString()} for faster-moving items.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
         {/* Seasonal Trends Tab */}
         <TabsContent value="seasonal" className="space-y-6">
           <Card>
