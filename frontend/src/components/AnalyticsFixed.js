@@ -322,7 +322,7 @@ const AnalyticsFixed = () => {
                     />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value) => [`₹${value.toLocaleString()}`, 'Revenue']}
+                      formatter={(value) => [`₹${formatTableNumber(value)}`, 'Revenue']}
                       labelFormatter={(label, payload) => {
                         if (payload && payload[0]) {
                           return `${payload[0].payload.fullName} (${payload[0].payload.itemCode})`;
