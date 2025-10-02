@@ -296,6 +296,21 @@ def main():
     tester.test_group_analysis()
     tester.test_inventory_analysis()
     
+    print("\n🎯 Testing Group-Specific Analysis (Groups III & IV Focus)...")
+    # ABC Analysis with group filtering
+    tester.test_abc_analysis_all_groups()
+    tester.test_abc_analysis_group_iii()
+    tester.test_abc_analysis_group_iv()
+    
+    # Capital Blocking Analysis with group filtering
+    tester.test_capital_blocking_all_groups()
+    tester.test_capital_blocking_group_iii()
+    tester.test_capital_blocking_group_iv()
+    
+    # Fastest Selling Items with group filtering
+    tester.test_fastest_selling_group_iii()
+    tester.test_fastest_selling_group_iv()
+    
     print("\n🔮 Testing Forecasting APIs...")
     tester.test_trend_forecast()
     tester.test_statistical_forecast()
@@ -322,14 +337,34 @@ def main():
             else:
                 print(f"      Expected: {result['expected_status']}, Got: {result['actual_status']}")
     
-    # Check for critical failures
-    critical_endpoints = ['dashboard-summary', 'fastest-selling-items', 'group-analysis', 'inventory-analysis']
+    # Check for critical failures - focusing on Groups III & IV
+    critical_endpoints = ['dashboard-summary', 'fastest-selling-items', 'group-analysis', 'abc-analysis', 'capital-blocking-analysis']
     critical_failures = [r for r in tester.test_results if not r['success'] and any(ep in r['endpoint'] for ep in critical_endpoints)]
+    
+    # Specifically check Groups III & IV tests
+    group_iii_iv_tests = [r for r in tester.test_results if ('Group III' in r['name'] or 'Group IV' in r['name'])]
+    group_iii_iv_failures = [r for r in group_iii_iv_tests if not r['success']]
     
     if critical_failures:
         print(f"\n⚠️  CRITICAL ISSUES FOUND:")
         for failure in critical_failures:
             print(f"   - {failure['name']}: {failure.get('error', 'Status code mismatch')}")
+    
+    if group_iii_iv_failures:
+        print(f"\n🚨 GROUPS III & IV SPECIFIC ISSUES:")
+        for failure in group_iii_iv_failures:
+            print(f"   - {failure['name']}: {failure.get('error', 'Status code mismatch')}")
+    
+    # Summary for Groups III & IV
+    group_iii_iv_passed = len([r for r in group_iii_iv_tests if r['success']])
+    group_iii_iv_total = len(group_iii_iv_tests)
+    
+    if group_iii_iv_total > 0:
+        print(f"\n📈 GROUPS III & IV TEST SUMMARY:")
+        print(f"   Tests for Groups III & IV: {group_iii_iv_passed}/{group_iii_iv_total}")
+        print(f"   Success Rate: {(group_iii_iv_passed/group_iii_iv_total)*100:.1f}%")
+    
+    if critical_failures or group_iii_iv_failures:
         return 1
     
     if tester.tests_passed < tester.tests_run * 0.8:  # Less than 80% success
