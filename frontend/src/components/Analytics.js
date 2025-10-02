@@ -324,10 +324,10 @@ const Analytics = () => {
                     {filteredFastestItems.slice(0, 20).map((item, index) => (
                       <tr key={index} className="border-b hover:bg-gray-50">
                         <td className="p-3">
-                          <div>
-                            <p className="font-medium text-sm">{item.item_name}</p>
-                            <p className="text-xs text-gray-500">{item.item_code}</p>
-                          </div>
+                          <span className="font-medium text-sm">{item.item_code || 'N/A'}</span>
+                        </td>
+                        <td className="p-3">
+                          <span className="font-medium text-sm">{item.item_name}</span>
                         </td>
                         <td className="p-3">
                           <Badge variant="outline">{item.group}</Badge>
