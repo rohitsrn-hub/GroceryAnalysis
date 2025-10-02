@@ -45,13 +45,32 @@ function MainApp() {
       <div className="container mx-auto p-6">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center space-x-3 mb-2">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <Building2 className="h-6 w-6 text-white" />
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-blue-600 rounded-lg">
+                <Building2 className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">URC 101 Area</h1>
+                <p className="text-gray-600">Sales Analytics Dashboard</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">URC 101 Area</h1>
-              <p className="text-gray-600">Sales Analytics Dashboard</p>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = `${API}/comprehensive-report?format=excel`;
+                  link.download = 'URC101-Comprehensive-Analysis-Report.xlsx';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                <span>Comprehensive Report</span>
+              </button>
             </div>
           </div>
           
