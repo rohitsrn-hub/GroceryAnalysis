@@ -275,6 +275,7 @@ const Forecasting = () => {
       
       if (response.ok) {
         setForecastResults(results);
+        setStep(4); // Move to results step
         toast.success(`Generated ${forecastMethod} forecast successfully`);
       } else {
         throw new Error(results.detail || 'Forecast generation failed');
