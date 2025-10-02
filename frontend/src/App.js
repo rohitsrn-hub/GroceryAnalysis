@@ -160,31 +160,31 @@ function MainApp() {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6 bg-white shadow-lg rounded-xl p-2 border-2 border-gray-200">
+          <TabsList className="grid w-full grid-cols-4 mb-6 bg-gradient-to-r from-gray-100 to-gray-200 shadow-xl rounded-2xl p-3 border border-gray-300">
             <TabsTrigger 
               value="dashboard" 
-              className="flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:bg-blue-50 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg transform data-[state=active]:scale-105"
+              className="flex items-center space-x-2 px-6 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-blue-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
             >
               <BarChart3 className="h-5 w-5" />
               <span>Dashboard</span>
             </TabsTrigger>
             <TabsTrigger 
               value="upload" 
-              className="flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:bg-green-50 data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transform data-[state=active]:scale-105"
+              className="flex items-center space-x-2 px-6 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
             >
               <Upload className="h-5 w-5" />
               <span>Data Upload</span>
             </TabsTrigger>
             <TabsTrigger 
               value="analytics" 
-              className="flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:bg-purple-50 data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transform data-[state=active]:scale-105"
+              className="flex items-center space-x-2 px-6 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-purple-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
             >
               <TrendingUp className="h-5 w-5" />
               <span>Analytics</span>
             </TabsTrigger>
             <TabsTrigger 
               value="forecasting" 
-              className="flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:bg-orange-50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-lg transform data-[state=active]:scale-105"
+              className="flex items-center space-x-2 px-6 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl hover:from-orange-600 hover:to-orange-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
             >
               <FileSpreadsheet className="h-5 w-5" />
               <span>Forecasting</span>
