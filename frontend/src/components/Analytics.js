@@ -33,10 +33,12 @@ const Analytics = () => {
     try {
       setLoading(true);
       
-      const [fastestResponse, groupResponse, inventoryResponse] = await Promise.all([
+      const [fastestResponse, groupResponse, inventoryResponse, abcResponse, capitalResponse] = await Promise.all([
         fetch(`${API}/fastest-selling-items?limit=20`),
         fetch(`${API}/group-analysis`),
-        fetch(`${API}/inventory-analysis`)
+        fetch(`${API}/inventory-analysis`),
+        fetch(`${API}/abc-analysis${selectedGroup !== 'all' ? `?group=${selectedGroup}` : ''}`),
+        fetch(`${API}/capital-blocking-analysis${selectedGroup !== 'all' ? `?group=${selectedGroup}` : ''}`)
       ]);
 
       if (!fastestResponse.ok || !groupResponse.ok || !inventoryResponse.ok) {
@@ -46,6 +48,8 @@ const Analytics = () => {
       const fastest = await fastestResponse.json();
       const groups = await groupResponse.json();
       const inventory = await inventoryResponse.json();
+      const abc = await abcResponse.json();
+      const capital = await capitalResponse.json();
 
       setFastestItems(fastest);
       setGroupAnalysis(groups);
