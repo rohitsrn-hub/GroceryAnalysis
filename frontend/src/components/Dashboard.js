@@ -108,7 +108,7 @@ const Dashboard = ({ dashboardData, loading }) => {
                 <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip formatter={(value, name) => [
-                  `₹${value.toLocaleString()}`,
+                  `₹${formatTableNumber(value)}`,
                   name === 'revenue' ? 'Revenue' : 'Profit'
                 ]} />
                 <Bar dataKey="revenue" fill="#3B82F6" name="revenue" />
