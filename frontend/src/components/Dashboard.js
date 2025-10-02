@@ -301,10 +301,10 @@ const Dashboard = ({ dashboardData, loading }) => {
                     </td>
                     <td className="p-3">{group.item_count}</td>
                     <td className="p-3 font-medium text-green-600">
-                      ₹{(group.total_revenue || 0).toLocaleString()}
+                      ₹{formatTableNumber(group.total_revenue || 0)}
                     </td>
                     <td className="p-3 font-medium text-blue-600">
-                      ₹{(group.total_profit || 0).toLocaleString()}
+                      ₹{formatTableNumber(group.total_profit || 0)}
                     </td>
                     <td className="p-3">
                       <span className={`font-medium ${
