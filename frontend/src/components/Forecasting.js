@@ -173,14 +173,65 @@ const Forecasting = () => {
     return requirements;
   };
 
-  const fetchFastestItems = async () => {
+  const handleDataUpload = async (requirementId, file) => {
     try {
-      const response = await fetch(`${API}/fastest-selling-items?limit=50`);
-      const data = await response.json();
-      setFastestItems(data);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${API}/upload-sales-data`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setUploadedData(prev => ({
+          ...prev,
+          [requirementId]: {
+            file: file.name,
+            status: 'success',
+            records: result.records_count
+          }
+        }));
+        toast.success(`Successfully uploaded ${file.name}`);
+      } else {
+        throw new Error(result.detail || 'Upload failed');
+      }
     } catch (error) {
-      console.error("Error fetching items:", error);
+      setUploadedData(prev => ({
+        ...prev,
+        [requirementId]: {
+          file: file.name,
+          status: 'error',
+          error: error.message
+        }
+      }));
+      toast.error(`Failed to upload ${file.name}: ${error.message}`);
     }
+  };
+
+  const proceedToNextStep = () => {
+    if (step === 1 && forecastMonth && forecastYear) {
+      setStep(2);
+    } else if (step === 2 && forecastMethod) {
+      setStep(3);
+    } else if (step === 3) {
+      const requiredUploads = requiredDataUploads.filter(req => req.required);
+      const completedRequired = requiredUploads.filter(req => 
+        uploadedData[req.id] && uploadedData[req.id].status === 'success'
+      );
+      
+      if (completedRequired.length === requiredUploads.length || requiredUploads.length === 0) {
+        handleForecast();
+      } else {
+        toast.error(`Please upload all required data files (${completedRequired.length}/${requiredUploads.length} completed)`);
+      }
+    }
+  };
+
+  const goBack = () => {
+    if (step > 1) setStep(step - 1);
   };
 
   const handleForecast = async () => {
