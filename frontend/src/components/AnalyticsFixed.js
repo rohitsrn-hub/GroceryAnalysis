@@ -110,22 +110,16 @@ const AnalyticsFixed = () => {
     }
   };
 
-  const filteredFastestItems = fastestItems.filter(item => 
-    selectedGroup === 'all' || item.group === selectedGroup
-  );
+  // Use server-side filtered data directly
+  const filteredFastestItems = fastestItems;
+  const filteredGroupAnalysis = groupAnalysis;
 
-  const filteredGroupAnalysis = groupAnalysis.filter(group =>
-    selectedGroup === 'all' || group.group === selectedGroup
-  );
-
-  console.log('Filter Debug:', {
+  console.log('Analytics Debug:', {
     selectedGroup,
-    totalFastestItems: fastestItems.length,
-    filteredFastestItems: filteredFastestItems.length,
-    totalGroupAnalysis: groupAnalysis.length,
-    filteredGroupAnalysis: filteredGroupAnalysis.length,
-    availableGroups: [...new Set(fastestItems.map(item => item.group))],
-    groupAnalysisGroups: groupAnalysis.map(g => g.group)
+    fastestItemsCount: fastestItems.length,
+    groupAnalysisCount: groupAnalysis.length,
+    firstItem: fastestItems[0],
+    availableGroups: [...new Set(fastestItems.map(item => item.group))]
   });
 
   if (loading) {
