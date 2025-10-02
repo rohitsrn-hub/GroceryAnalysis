@@ -38,7 +38,7 @@ const Forecasting = () => {
       const data = await response.json();
       setForecastRequirements(data);
     } catch (error) {
-      console.error(\"Error fetching forecast requirements:\", error);
+      console.error("Error fetching forecast requirements:", error);
     }
   };
 
