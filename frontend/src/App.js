@@ -9,6 +9,7 @@ import { Toaster } from "./components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { BarChart3, Upload, TrendingUp, FileSpreadsheet, Building2, Download } from "lucide-react";
+import { formatIndianNumber, formatPercentage } from "./utils/numberUtils";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
