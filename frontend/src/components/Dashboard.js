@@ -213,8 +213,11 @@ const Dashboard = ({ dashboardData, loading }) => {
               <div className="space-y-3">
                 {inventoryAnalysis.slow_moving?.slice(0, 5).map((item, index) => (
                   <div key={index} className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="text-xs bg-orange-600 text-white px-2 py-1 rounded font-bold">#{index + 1}</span>
+                    </div>
                     <p className="font-medium text-orange-800 text-sm">
-                      {item._id?.item_name || 'Unknown Item'}
+                      {item._id?.pluno || 'N/A'} - {item._id?.item_name || 'Unknown Item'}
                     </p>
                     <p className="text-orange-600 text-xs">
                       Monthly Avg: {(item.avg_monthly_sales || 0).toFixed(1)} units
