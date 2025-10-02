@@ -152,8 +152,10 @@ def process_excel_data(file_content: bytes, filename: str) -> List[Dict]:
         
         records = []
         for _, row in df.iterrows():
-            # Skip empty rows
-            if pd.isna(row.get('pluno')) and pd.isna(row.get('item_name')):
+            # Skip empty rows or rows with invalid data
+            item_name = str(row.get('item_name', '')).strip()
+            if (pd.isna(row.get('pluno')) and pd.isna(row.get('item_name'))) or \
+               len(item_name) > 100 or '\t' in item_name or '_x000D_' in item_name:
                 continue
                 
             def safe_float(value):
