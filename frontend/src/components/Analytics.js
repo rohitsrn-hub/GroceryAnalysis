@@ -25,6 +25,30 @@ const Analytics = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('all');
   const [activeTab, setActiveTab] = useState('performance');
 
+  const exportToExcel = async (analysisType) => {
+    try {
+      const groupParam = selectedGroup !== 'all' ? `?group=${selectedGroup}` : '';
+      const response = await fetch(`${API}/export-data/${analysisType}${groupParam}`);
+      
+      if (!response.ok) throw new Error('Export failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${analysisType}-analysis-${selectedGroup || 'all'}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success(`${analysisType} analysis exported successfully`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export data');
+    }
+  };
+
   useEffect(() => {
     fetchAnalyticsData();
   }, []);
