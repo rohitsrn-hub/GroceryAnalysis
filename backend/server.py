@@ -100,19 +100,21 @@ def prepare_for_mongo(data):
                 data[key] = float(value)
     return data
 
-def extract_group_from_pluno(pluno: str) -> str:
+def extract_group_from_pluno(pluno) -> str:
     """Extract group from product code"""
-    if not pluno:
+    if not pluno or pd.isna(pluno):
         return "Unknown"
-    if pluno.startswith("I/"):
+    
+    pluno_str = str(pluno)
+    if pluno_str.startswith("I/"):
         return "Group I"
-    elif pluno.startswith("II/"):
+    elif pluno_str.startswith("II/"):
         return "Group II"
-    elif pluno.startswith("III/"):
+    elif pluno_str.startswith("III/"):
         return "Group III"
-    elif pluno.startswith("IV/"):
+    elif pluno_str.startswith("IV/"):
         return "Group IV"
-    elif pluno.startswith("VI/"):
+    elif pluno_str.startswith("VI/"):
         return "Group VI"
     return "Unknown"
 
