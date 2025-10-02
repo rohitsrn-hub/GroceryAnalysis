@@ -232,8 +232,21 @@ const Analytics = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Top Performers by Quantity</CardTitle>
-                <CardDescription>Items ranked by total units sold</CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Top Performers by Quantity</CardTitle>
+                    <CardDescription>Items ranked by total units sold</CardDescription>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => exportToExcel('fastest-selling')}
+                    className="flex items-center space-x-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Export</span>
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
