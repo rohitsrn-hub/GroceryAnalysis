@@ -52,7 +52,7 @@ function MainApp() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">URC 101 Area</h1>
-                <p className="text-gray-600">Sales Analytics Dashboard</p>
+                <p className="text-gray-600">Sales Analytics Dashboard - Updated {new Date().toLocaleString()}</p>
               </div>
             </div>
             
