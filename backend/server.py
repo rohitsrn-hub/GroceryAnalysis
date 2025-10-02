@@ -758,9 +758,74 @@ async def generate_comprehensive_report(format: str = Query("excel")):
                 filename="URC101-Comprehensive-Analysis-Report.xlsx"
             )
             
+        elif format == "pdf":
+            # Create HTML content for PDF conversion
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>URC 101 Area - Comprehensive Sales Analysis Report</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                    .header {{ text-align: center; margin-bottom: 30px; }}
+                    .section {{ margin-bottom: 30px; }}
+                    .table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
+                    .table th, .table td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                    .table th {{ background-color: #f2f2f2; }}
+                    .metric {{ background-color: #f8f9fa; padding: 15px; margin: 10px 0; border-left: 4px solid #007bff; }}
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>URC 101 Area - Comprehensive Sales Analysis Report</h1>
+                    <p>Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+                </div>
+                
+                <div class="section">
+                    <h2>Executive Summary</h2>
+                    <div class="metric">Total Revenue: ₹{dashboard_summary['total_revenue']:,.2f}</div>
+                    <div class="metric">Total Profit: ₹{dashboard_summary['total_profit']:,.2f}</div>
+                    <div class="metric">Profit Margin: {dashboard_summary['profit_margin']:.2f}%</div>
+                    <div class="metric">Items Sold: {dashboard_summary['total_items_sold']:,}</div>
+                </div>
+                
+                <div class="section">
+                    <h2>ABC Analysis Summary</h2>
+                    <table class="table">
+                        <tr><th>Category</th><th>Items</th><th>% of Items</th><th>Revenue</th><th>% of Revenue</th></tr>
+                        <tr><td>Category A (Fast Moving)</td><td>{abc_analysis['summary']['category_A']['item_count']}</td><td>{abc_analysis['summary']['category_A']['percentage_items']:.1f}%</td><td>₹{abc_analysis['summary']['category_A']['revenue']:,.2f}</td><td>80%</td></tr>
+                        <tr><td>Category B (Medium Moving)</td><td>{abc_analysis['summary']['category_B']['item_count']}</td><td>{abc_analysis['summary']['category_B']['percentage_items']:.1f}%</td><td>₹{abc_analysis['summary']['category_B']['revenue']:,.2f}</td><td>15%</td></tr>
+                        <tr><td>Category C (Slow Moving)</td><td>{abc_analysis['summary']['category_C']['item_count']}</td><td>{abc_analysis['summary']['category_C']['percentage_items']:.1f}%</td><td>₹{abc_analysis['summary']['category_C']['revenue']:,.2f}</td><td>5%</td></tr>
+                    </table>
+                </div>
+                
+                <div class="section">
+                    <h2>Strategic Recommendations</h2>
+                    <ul>
+                        <li>Focus on Category A items ({abc_analysis['summary']['category_A']['item_count']} items generating 80% revenue)</li>
+                        <li>Review Category C items ({abc_analysis['summary']['category_C']['item_count']} items generating only 5% revenue)</li>
+                        <li>{capital_analysis['summary']['critical_items']} items require immediate liquidation</li>
+                        <li>Total blocked capital: ₹{capital_analysis['summary']['total_capital_blocked']:,.2f}</li>
+                    </ul>
+                </div>
+            </body>
+            </html>
+            """
+            
+            # Save HTML to temporary file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.html', mode='w', encoding='utf-8')
+            temp_file.write(html_content)
+            temp_file.close()
+            
+            return FileResponse(
+                temp_file.name,
+                media_type='text/html',
+                headers={"Content-Disposition": "attachment; filename=URC101-Comprehensive-Analysis-Report.html"},
+                filename="URC101-Comprehensive-Analysis-Report.html"
+            )
         else:
-            # For PDF format (placeholder - would need additional PDF library)
-            return {"message": "PDF format coming soon. Please use Excel format for now."}
+            # Default to Excel
+            return {"message": "Invalid format. Use 'excel' or 'pdf'."}
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
