@@ -57,20 +57,37 @@ function MainApp() {
             </div>
             
             <div className="flex items-center space-x-3">
-              <button
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = `${API}/comprehensive-report?format=excel`;
-                  link.download = 'URC101-Comprehensive-Analysis-Report.xlsx';
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Download className="h-4 w-4" />
-                <span>Comprehensive Report</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = `${API}/comprehensive-report?format=excel`;
+                    link.download = 'URC101-Comprehensive-Analysis-Report.xlsx';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Excel Report</span>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = `${API}/comprehensive-report?format=pdf`;
+                    link.download = 'URC101-Comprehensive-Analysis-Report.html';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <span>PDF Report</span>
+                </button>
+              </div>
             </div>
           </div>
           
