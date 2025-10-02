@@ -122,14 +122,26 @@ const Analytics = () => {
     group: item.group
   }));
 
-  const seasonalData = filteredFastestItems.slice(0, 5).map(item => {
+  const seasonalData = filteredFastestItems.slice(0, 5).reduce((acc, item, itemIndex) => {
     const patterns = Object.entries(item.seasonal_pattern || {}).map(([period, value]) => ({
-      period,
+      period: period.replace('_corrected', '').replace('Yr_', '').replace('_', ' '),
       value,
-      itemName: item.item_name.substring(0, 20)
+      itemName: `${item.item_code} - ${item.item_name.substring(0, 15)}`,
+      itemIndex
     }));
-    return patterns;
-  }).flat();
+    return [...acc, ...patterns];
+  }, []);
+
+  // Group seasonal data by period for better visualization
+  const seasonalByPeriod = seasonalData.reduce((acc, item) => {
+    if (!acc[item.period]) {
+      acc[item.period] = { period: item.period };
+    }
+    acc[item.period][item.itemName] = item.value;
+    return acc;
+  }, {});
+
+  const seasonalChartData = Object.values(seasonalByPeriod);
 
   const profitabilityData = filteredGroupAnalysis.map(group => ({
     group: group.group.replace('Group ', ''),
