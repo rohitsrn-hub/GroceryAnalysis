@@ -311,7 +311,8 @@ const Analytics = () => {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-3 font-semibold">Item</th>
+                      <th className="text-left p-3 font-semibold">Item Code</th>
+                      <th className="text-left p-3 font-semibold">Item Name</th>
                       <th className="text-left p-3 font-semibold">Group</th>
                       <th className="text-left p-3 font-semibold">Units Sold</th>
                       <th className="text-left p-3 font-semibold">Revenue</th>
