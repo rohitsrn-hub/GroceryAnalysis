@@ -944,34 +944,79 @@ const Analytics = () => {
 
             <Card>
               <CardHeader>
-                <CardTitle>Revenue vs Profit Distribution</CardTitle>
-                <CardDescription>Relationship between revenue and profit by group</CardDescription>
+                <CardTitle>Profitability Performance Matrix</CardTitle>
+                <CardDescription>
+                  This bubble chart shows the relationship between revenue (X-axis) and profit margin (Y-axis) for each product group. 
+                  Bubble size represents total items in the group. Top-right quadrant indicates high revenue + high margin groups.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={400}>
                   <ScatterChart data={profitabilityData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis 
                       dataKey="revenue" 
                       name="Revenue" 
                       type="number" 
-                      tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
+                      tickFormatter={(value) => `₹${(value / 100000).toFixed(0)}L`}
                     />
                     <YAxis 
-                      dataKey="profit" 
-                      name="Profit" 
+                      dataKey="margin" 
+                      name="Profit Margin" 
                       type="number"
-                      tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
+                      tickFormatter={(value) => `${value.toFixed(1)}%`}
+                      domain={['dataMin - 1', 'dataMax + 1']}
                     />
                     <Tooltip 
-                      formatter={(value, name) => [
-                        `₹${value.toLocaleString()}`,
-                        name === 'profit' ? 'Profit' : 'Revenue'
-                      ]}
+                      formatter={(value, name, props) => {
+                        if (name === 'items') {
+                          return [`${value} items`, 'Group Size'];
+                        }
+                        return [
+                          name === 'revenue' ? `₹${value.toLocaleString()}` : `${value.toFixed(2)}%`,
+                          name === 'revenue' ? 'Total Revenue' : 'Profit Margin'
+                        ];
+                      }}
+                      labelFormatter={(label, payload) => {
+                        if (payload && payload[0]) {
+                          return `Group ${payload[0].payload.group}`;
+                        }
+                        return '';
+                      }}
                     />
-                    <Scatter dataKey="profit" fill="#3B82F6" />
+                    {profitabilityData.map((group, index) => {
+                      const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
+                      return (
+                        <Scatter 
+                          key={group.group}
+                          dataKey="items"
+                          fill={colors[index % colors.length]}
+                          data={[{
+                            ...group,
+                            x: group.revenue,
+                            y: group.margin
+                          }]}
+                        />
+                      );
+                    })}
                   </ScatterChart>
                 </ResponsiveContainer>
+                
+                {/* Legend */}
+                <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {profitabilityData.map((group, index) => {
+                    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
+                    return (
+                      <div key={group.group} className="flex items-center space-x-2 text-sm">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: colors[index % colors.length] }}
+                        />
+                        <span>Group {group.group}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </CardContent>
             </Card>
           </div>
