@@ -172,11 +172,26 @@ backend:
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: true
           agent: "main"
           comment: "Confirmed via curl test that Groups III and IV exist in database. Backend group-analysis endpoint returns all groups including Group III and Group IV."
+        - working: true
+          agent: "testing"
+          comment: "COMPREHENSIVE TESTING COMPLETED: All backend APIs tested successfully. Group III has 739 items with ₹32.9M revenue, Group IV has 99 items with ₹1.9M revenue. ABC analysis, capital blocking analysis working correctly with group filtering. CRITICAL BUG FOUND: fastest-selling-items endpoint ignores group parameter completely - always returns Group VI items regardless of requested group."
+
+  - task: "Fix fastest-selling-items group filtering"
+    implemented: false
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "testing"
+          comment: "CRITICAL BUG IDENTIFIED: The fastest-selling-items endpoint at line 264 in server.py does not implement group filtering. Missing 'group' parameter in function signature and missing group filter in MongoDB pipeline. This is the root cause of Groups III/IV filtering not working in Performance Analytics tab."
 
 metadata:
   created_by: "main_agent"
