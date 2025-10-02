@@ -56,6 +56,7 @@ const Analytics = () => {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
+      console.log('Fetching analytics data...');
       
       const [fastestResponse, groupResponse, inventoryResponse, abcResponse, capitalResponse] = await Promise.all([
         fetch(`${API}/fastest-selling-items?limit=20`),
@@ -65,8 +66,16 @@ const Analytics = () => {
         fetch(`${API}/capital-blocking-analysis${selectedGroup !== 'all' ? `?group=${selectedGroup}` : ''}`)
       ]);
 
+      console.log('API responses received:', {
+        fastest: fastestResponse.ok,
+        groups: groupResponse.ok,
+        inventory: inventoryResponse.ok,
+        abc: abcResponse.ok,
+        capital: capitalResponse.ok
+      });
+
       if (!fastestResponse.ok || !groupResponse.ok || !inventoryResponse.ok) {
-        throw new Error('Failed to fetch analytics data');
+        throw new Error(`API Error: Fastest:${fastestResponse.status}, Groups:${groupResponse.status}, Inventory:${inventoryResponse.status}`);
       }
 
       const fastest = await fastestResponse.json();
@@ -74,6 +83,13 @@ const Analytics = () => {
       const inventory = await inventoryResponse.json();
       const abc = await abcResponse.json();
       const capital = await capitalResponse.json();
+      
+      console.log('Data parsed successfully:', {
+        fastest: fastest.length,
+        groups: groups.length,
+        abc: abc.summary?.total_items,
+        capital: capital.summary?.total_items_analyzed
+      });
 
       setFastestItems(fastest);
       setGroupAnalysis(groups);
