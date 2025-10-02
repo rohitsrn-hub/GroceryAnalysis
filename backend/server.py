@@ -643,6 +643,71 @@ async def get_group_analysis():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error in group analysis: {str(e)}")
 
+@api_router.get("/forecast-requirements")
+async def get_forecast_requirements():
+    """Get data requirements for accurate demand forecasting"""
+    try:
+        # Check available data periods
+        periods = await db.sales_records.distinct("data_period")
+        
+        # Check if we have enough historical data
+        total_records = await db.sales_records.count_documents({})
+        
+        # Get sample items to show what data we need
+        sample_items = await db.sales_records.find(
+            {"net_qty": {"$gt": 0}}, 
+            {"item_name": 1, "pluno": 1, "product_group": 1}
+        ).limit(10).to_list(None)
+        
+        requirements = {
+            "current_data_status": {
+                "available_periods": periods,
+                "total_records": total_records,
+                "sample_items": len(sample_items)
+            },
+            "required_for_basic_forecast": {
+                "minimum_periods": 2,
+                "recommended_periods": 3,
+                "description": "Need last 3 months sales data for reliable trend analysis"
+            },
+            "required_for_seasonal_forecast": {
+                "minimum_periods": 12,
+                "recommended_periods": 24,
+                "description": "Need 12-24 months of monthly data for seasonal pattern recognition"
+            },
+            "required_for_yearly_comparison": {
+                "years_needed": ["2022", "2023", "2024"],
+                "description": "Upload year-over-year data for the same months to fine-tune forecasts"
+            },
+            "data_upload_instructions": {
+                "format": "Excel files with same column structure",
+                "naming_convention": "Month_Year (e.g., Jan_2024, Feb_2024) or Year (e.g., 2023, 2022)",
+                "required_columns": ["GP_Index_No", "Item_Name", "Net_Qty", "R_Amt", "Profit", "Closing_Stock"]
+            },
+            "forecast_accuracy_levels": {
+                "basic_trend": {
+                    "data_needed": "2-3 months",
+                    "accuracy": "70-75%",
+                    "best_for": "Short-term planning"
+                },
+                "statistical_seasonal": {
+                    "data_needed": "6-12 months",
+                    "accuracy": "80-85%",
+                    "best_for": "Medium-term planning with seasonal adjustments"
+                },
+                "advanced_yearly": {
+                    "data_needed": "2-3 years of same period data",
+                    "accuracy": "85-90%",
+                    "best_for": "Long-term strategic planning"
+                }
+            }
+        }
+        
+        return requirements
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting forecast requirements: {str(e)}")
+
 @api_router.post("/forecast-demand")
 async def forecast_demand(request: ForecastRequest):
     """Forecast demand using different methods"""
