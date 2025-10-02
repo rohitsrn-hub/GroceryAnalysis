@@ -652,8 +652,8 @@ async def generate_comprehensive_report(format: str = Query("excel")):
     try:
         # Gather all analytics data
         dashboard_summary = await get_dashboard_summary()
-        abc_analysis = await get_abc_analysis()
-        capital_analysis = await get_capital_blocking_analysis()
+        abc_analysis = await get_abc_analysis(None)
+        capital_analysis = await get_capital_blocking_analysis(None)
         group_analysis = await get_group_analysis()
         fastest_items = await get_fastest_selling_items(20)
         
