@@ -656,7 +656,6 @@ async def generate_comprehensive_report(format: str = Query("excel")):
         capital_analysis = await get_capital_blocking_analysis()
         group_analysis = await get_group_analysis()
         fastest_items = await get_fastest_selling_items(20)
-        inventory_analysis = await get_inventory_analysis()
         
         if format == "excel":
             # Create comprehensive Excel report
