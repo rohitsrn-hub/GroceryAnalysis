@@ -450,9 +450,9 @@ const AnalyticsFixed = () => {
                       <YAxis yAxisId="right" orientation="right" />
                       <Tooltip 
                         formatter={(value, name) => [
-                          name === 'items' ? `${value} items` : 
-                          name === 'revenue' ? `₹${value.toLocaleString()}` :
-                          `${value.toFixed(1)}%`,
+                          name === 'items' ? `${formatTableNumber(value)} items` : 
+                          name === 'revenue' ? `₹${formatTableNumber(value)}` :
+                          formatPercentage(value),
                           name === 'items' ? 'Items Count' :
                           name === 'revenue' ? 'Revenue' : 'Item Percentage'
                         ]}
