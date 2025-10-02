@@ -652,10 +652,10 @@ const Analytics = () => {
                         {capitalAnalysis.capital_blocking_items?.map((item, index) => (
                           <tr key={index} className="border-b hover:bg-gray-50">
                             <td className="p-3">
-                              <div>
-                                <p className="font-medium text-sm">{item._id.item_name}</p>
-                                <p className="text-xs text-gray-500">{item._id.pluno}</p>
-                              </div>
+                              <span className="font-medium text-sm">{item._id.pluno}</span>
+                            </td>
+                            <td className="p-3">
+                              <span className="font-medium text-sm">{item._id.item_name}</span>
                             </td>
                             <td className="p-3">
                               <Badge variant="outline">{item._id.group}</Badge>
