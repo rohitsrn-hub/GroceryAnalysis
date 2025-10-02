@@ -1005,8 +1005,21 @@ const Analytics = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Inventory Issues Details</CardTitle>
-              <CardDescription>Complete list of items requiring action</CardDescription>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Inventory Issues Details</CardTitle>
+                  <CardDescription>Complete list of items requiring action</CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => exportToExcel('inventory-health')}
+                  className="flex items-center space-x-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Export</span>
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-96 overflow-y-auto">
