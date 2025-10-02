@@ -554,17 +554,35 @@ async def get_dashboard_summary():
             {
                 "$match": {
                     "$and": [
-                        {"r_amt": {"$ne": None, "$exists": True}},
+                        {"r_amt": {"$ne": None, "$exists": True, "$ne": 0}},
                         {"profit": {"$ne": None, "$exists": True}},
                         {"net_qty": {"$ne": None, "$exists": True}}
                     ]
                 }
             },
             {
+                "$addFields": {
+                    "clean_r_amt": {
+                        "$cond": {
+                            "if": {"$type": "$r_amt"},
+                            "then": "$r_amt",
+                            "else": 0
+                        }
+                    },
+                    "clean_profit": {
+                        "$cond": {
+                            "if": {"$type": "$profit"},
+                            "then": "$profit",
+                            "else": 0
+                        }
+                    }
+                }
+            },
+            {
                 "$group": {
                     "_id": None,
-                    "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
-                    "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
+                    "total_revenue": {"$sum": "$clean_r_amt"},
+                    "total_profit": {"$sum": "$clean_profit"},
                     "total_items_sold": {"$sum": {"$ifNull": ["$net_qty", 0]}}
                 }
             }
