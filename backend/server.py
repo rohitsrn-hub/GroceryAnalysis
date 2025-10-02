@@ -20,7 +20,6 @@ from collections import defaultdict
 import io
 from fastapi.responses import StreamingResponse, FileResponse
 import tempfile
-import os
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
