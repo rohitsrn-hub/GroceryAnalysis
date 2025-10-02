@@ -160,21 +160,33 @@ function MainApp() {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
-            <TabsTrigger value="dashboard" className="flex items-center space-x-2">
-              <BarChart3 className="h-4 w-4" />
+          <TabsList className="grid w-full grid-cols-4 mb-6 bg-white shadow-lg rounded-xl p-2 border-2 border-gray-200">
+            <TabsTrigger 
+              value="dashboard" 
+              className="flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:bg-blue-50 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg transform data-[state=active]:scale-105"
+            >
+              <BarChart3 className="h-5 w-5" />
               <span>Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="upload" className="flex items-center space-x-2">
-              <Upload className="h-4 w-4" />
+            <TabsTrigger 
+              value="upload" 
+              className="flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:bg-green-50 data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-lg transform data-[state=active]:scale-105"
+            >
+              <Upload className="h-5 w-5" />
               <span>Data Upload</span>
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center space-x-2">
-              <TrendingUp className="h-4 w-4" />
+            <TabsTrigger 
+              value="analytics" 
+              className="flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:bg-purple-50 data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transform data-[state=active]:scale-105"
+            >
+              <TrendingUp className="h-5 w-5" />
               <span>Analytics</span>
             </TabsTrigger>
-            <TabsTrigger value="forecasting" className="flex items-center space-x-2">
-              <FileSpreadsheet className="h-4 w-4" />
+            <TabsTrigger 
+              value="forecasting" 
+              className="flex items-center space-x-2 px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:bg-orange-50 data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-lg transform data-[state=active]:scale-105"
+            >
+              <FileSpreadsheet className="h-5 w-5" />
               <span>Forecasting</span>
             </TabsTrigger>
           </TabsList>
