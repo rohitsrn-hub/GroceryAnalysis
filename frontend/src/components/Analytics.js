@@ -803,30 +803,54 @@ const Analytics = () => {
         <TabsContent value="seasonal" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Seasonal Sales Patterns</CardTitle>
-              <CardDescription>Sales variations across different time periods</CardDescription>
+              <CardTitle>Multi-Year Sales Trends</CardTitle>
+              <CardDescription>
+                This chart shows sales patterns across different years for top performing items. 
+                Each colored line represents a different product, helping identify seasonal trends and year-over-year growth patterns.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={seasonalData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="period" />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value, name, props) => [
-                      `${value} units`,
-                      `Sales (${props.payload.itemName})`
-                    ]}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="#3B82F6" 
-                    strokeWidth={2}
-                    dot={{ r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {seasonalChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={seasonalChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="period" 
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value, name) => [
+                        `${value} units`,
+                        name
+                      ]}
+                    />
+                    {filteredFastestItems.slice(0, 5).map((item, index) => {
+                      const itemKey = `${item.item_code} - ${item.item_name.substring(0, 15)}`;
+                      const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+                      return (
+                        <Line 
+                          key={itemKey}
+                          type="monotone" 
+                          dataKey={itemKey}
+                          stroke={colors[index % colors.length]}
+                          strokeWidth={2}
+                          dot={{ r: 3 }}
+                          connectNulls={false}
+                        />
+                      );
+                    })}
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p>No seasonal data available</p>
+                  <p className="text-sm">Upload multi-year data to see seasonal trends</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
