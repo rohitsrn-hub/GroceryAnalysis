@@ -192,7 +192,7 @@ def process_excel_data(file_content: bytes, filename: str) -> List[Dict]:
                 'closing_stock': str(row.get('closing_stock')) if not pd.isna(row.get('closing_stock')) else None,
                 'net_tax': safe_float(row.get('net_tax')),
                 'data_period': data_period,
-                'product_group': extract_group_from_pluno(row.get('pluno'))
+                'product_group': extract_group_from_pluno(row.get('gp_index_no') or row.get('pluno'))
             }
             
             # Clean the record
