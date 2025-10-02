@@ -615,16 +615,22 @@ async def get_dashboard_summary():
         
         group_distribution = await db.sales_records.aggregate(group_pipeline).to_list(None)
         
+        total_revenue = revenue_data.get("total_revenue", 0) or 0
+        total_profit = revenue_data.get("total_profit", 0) or 0
+        
+        # Calculate profit margin safely
+        if total_revenue > 0:
+            profit_margin = (total_profit / total_revenue) * 100
+        else:
+            profit_margin = 0.0
+            
         return {
             "total_records": total_records,
-            "total_revenue": revenue_data.get("total_revenue", 0) or 0,
-            "total_profit": revenue_data.get("total_profit", 0) or 0,
+            "total_revenue": total_revenue,
+            "total_profit": total_profit,
             "total_items_sold": revenue_data.get("total_items_sold", 0) or 0,
             "group_distribution": group_distribution,
-            "profit_margin": (
-                (revenue_data.get("total_profit", 0) or 0) / 
-                (revenue_data.get("total_revenue", 1) or 1)
-            ) * 100
+            "profit_margin": profit_margin
         }
         
     except Exception as e:
