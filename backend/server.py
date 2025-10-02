@@ -514,16 +514,32 @@ async def get_inventory_analysis():
             {"$limit": 20}
         ]
         
-        # Dead inventory (no sales)
+        # Dead inventory (no sales but has closing stock)
         pipeline_dead = [
             {
                 "$group": {
-                    "_id": {"pluno": "$pluno", "item_name": "$item_name"},
-                    "total_sold": {"$sum": "$net_qty"},
-                    "avg_cost": {"$avg": "$w_rate"}
+                    "_id": {"pluno": "$pluno", "item_name": "$item_name", "group": "$product_group"},
+                    "total_sold": {"$sum": {"$ifNull": ["$net_qty", 0]}},
+                    "avg_closing_stock": {"$avg": {"$ifNull": ["$closing_stock", 0]}},
+                    "avg_cost": {"$avg": {"$ifNull": ["$w_rate", 0]}},
+                    "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}}
                 }
             },
-            {"$match": {"total_sold": {"$lte": 0}}},
+            {
+                "$match": {
+                    "$and": [
+                        {"total_sold": {"$lte": 0}},
+                        {"avg_closing_stock": {"$gt": 0}},
+                        {"avg_cost": {"$gt": 0}}
+                    ]
+                }
+            },
+            {
+                "$addFields": {
+                    "capital_blocked": {"$multiply": ["$avg_closing_stock", "$avg_cost"]}
+                }
+            },
+            {"$sort": {"capital_blocked": -1}},
             {"$limit": 20}
         ]
         
