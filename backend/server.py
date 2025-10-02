@@ -552,11 +552,20 @@ async def get_dashboard_summary():
         # Total revenue and profit
         revenue_pipeline = [
             {
+                "$match": {
+                    "$and": [
+                        {"r_amt": {"$ne": None, "$exists": True}},
+                        {"profit": {"$ne": None, "$exists": True}},
+                        {"net_qty": {"$ne": None, "$exists": True}}
+                    ]
+                }
+            },
+            {
                 "$group": {
                     "_id": None,
-                    "total_revenue": {"$sum": "$r_amt"},
-                    "total_profit": {"$sum": "$profit"},
-                    "total_items_sold": {"$sum": "$net_qty"}
+                    "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+                    "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
+                    "total_items_sold": {"$sum": {"$ifNull": ["$net_qty", 0]}}
                 }
             }
         ]
