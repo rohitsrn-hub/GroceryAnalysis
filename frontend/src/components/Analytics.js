@@ -230,34 +230,35 @@ const Analytics = () => {
 
       {/* Analytics Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex flex-wrap gap-3 mb-6">
-          {[
-            { id: 'performance', label: 'Performance Analysis', icon: TrendingUp, color: 'blue' },
-            { id: 'abc', label: 'ABC Analysis', icon: BarChart3, color: 'green' },
-            { id: 'capital', label: 'Capital Blocking', icon: AlertTriangle, color: 'red' },
-            { id: 'seasonal', label: 'Seasonal Trends', icon: Calendar, color: 'purple' },
-            { id: 'profitability', label: 'Profitability', icon: TrendingUp, color: 'yellow' },
-            { id: 'inventory', label: 'Inventory Health', icon: Package, color: 'orange' }
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all transform hover:scale-105 ${
-                  isActive 
-                    ? `bg-${tab.color}-600 text-white shadow-lg` 
-                    : `bg-${tab.color}-50 text-${tab.color}-700 hover:bg-${tab.color}-100 border-2 border-${tab.color}-200`
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div className="flex flex-wrap gap-3 mb-6">
+            {[
+              { id: 'performance', label: 'Performance Analysis', icon: TrendingUp, color: 'bg-blue-600 hover:bg-blue-700' },
+              { id: 'abc', label: 'ABC Analysis', icon: BarChart3, color: 'bg-green-600 hover:bg-green-700' },
+              { id: 'capital', label: 'Capital Blocking', icon: AlertTriangle, color: 'bg-red-600 hover:bg-red-700' },
+              { id: 'seasonal', label: 'Seasonal Trends', icon: Calendar, color: 'bg-purple-600 hover:bg-purple-700' },
+              { id: 'profitability', label: 'Profitability', icon: TrendingUp, color: 'bg-yellow-600 hover:bg-yellow-700' },
+              { id: 'inventory', label: 'Inventory Health', icon: Package, color: 'bg-orange-600 hover:bg-orange-700' }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all transform hover:scale-105 ${
+                    isActive 
+                      ? `${tab.color} text-white shadow-lg` 
+                      : `bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-gray-200 hover:border-gray-300`
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
 
         {/* Performance Analysis Tab */}
         <TabsContent value="performance" className="space-y-6">
