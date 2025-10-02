@@ -18,6 +18,8 @@ const Analytics = () => {
   const [fastestItems, setFastestItems] = useState([]);
   const [groupAnalysis, setGroupAnalysis] = useState([]);
   const [inventoryAnalysis, setInventoryAnalysis] = useState(null);
+  const [abcAnalysis, setAbcAnalysis] = useState(null);
+  const [capitalAnalysis, setCapitalAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [selectedPeriod, setSelectedPeriod] = useState('all');
