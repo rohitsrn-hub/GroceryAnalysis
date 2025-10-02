@@ -404,10 +404,294 @@ const Forecasting = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Current Data Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
-                <h4 className="font-semibold text-blue-800">Current Data Status</h4>
+                <Label htmlFor="forecast-month">Select Month</Label>
+                <Select value={forecastMonth} onValueChange={setForecastMonth}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <SelectItem key={i + 1} value={(i + 1).toString()}>
+                        {new Date(2024, i).toLocaleDateString('en-US', { month: 'long' })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-4">
+                <Label htmlFor="forecast-year">Select Year</Label>
+                <Select value={forecastYear} onValueChange={setForecastYear}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 5 }, (_, i) => {
+                      const year = new Date().getFullYear() + i;
+                      return (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {forecastMonth && forecastYear && (
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-blue-800 font-medium">
+                  Forecast Target: {new Date(parseInt(forecastYear), parseInt(forecastMonth) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </p>
+                <p className="text-blue-600 text-sm mt-1">
+                  This will generate demand predictions for all product categories for the selected month.
+                </p>
+              </div>
+            )}
+            
+            <div className="mt-6 flex justify-end">
+              <Button 
+                onClick={proceedToNextStep}
+                disabled={!forecastMonth || !forecastYear}
+                className="px-8"
+              >
+                Next: Choose Method
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 2: Method Selection */}
+      {step === 2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Brain className="h-5 w-5" />
+              <span>Select Forecasting Method</span>
+            </CardTitle>
+            <CardDescription>
+              Choose the forecasting approach based on your data availability and accuracy requirements
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                {
+                  id: 'trend',
+                  title: 'Simple Trend Analysis',
+                  icon: TrendingUp,
+                  accuracy: '70-75%',
+                  description: 'Linear regression based on recent sales trends',
+                  dataNeeded: '3 months of recent sales data',
+                  bestFor: 'Quick forecasts, stable products',
+                  color: 'blue'
+                },
+                {
+                  id: 'statistical',
+                  title: 'Statistical Forecasting',
+                  icon: Calculator,
+                  accuracy: '80-85%',
+                  description: 'Seasonal patterns with moving averages',
+                  dataNeeded: '3 recent months + historical seasonal data',
+                  bestFor: 'Seasonal products, medium-term planning',
+                  color: 'green'
+                },
+                {
+                  id: 'ai',
+                  title: 'AI-Powered Analysis',
+                  icon: Brain,
+                  accuracy: '85-90%',
+                  description: 'Advanced ML with market context integration',
+                  dataNeeded: 'Comprehensive historical + market data',
+                  bestFor: 'Strategic planning, complex patterns',
+                  color: 'purple'
+                }
+              ].map((method) => {
+                const Icon = method.icon;
+                const isSelected = forecastMethod === method.id;
+                
+                return (
+                  <Card 
+                    key={method.id}
+                    className={`cursor-pointer transition-all ${
+                      isSelected 
+                        ? `border-2 border-${method.color}-500 bg-${method.color}-50 shadow-md` 
+                        : 'border hover:border-gray-400 hover:shadow-sm'
+                    }`}
+                    onClick={() => setForecastMethod(method.id)}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className={`p-2 rounded-lg ${
+                          isSelected ? `bg-${method.color}-600` : 'bg-gray-100'
+                        }`}>
+                          <Icon className={`h-5 w-5 ${
+                            isSelected ? 'text-white' : 'text-gray-600'
+                          }`} />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">{method.title}</h3>
+                          <Badge className={`${
+                            method.color === 'blue' ? 'bg-blue-600' :
+                            method.color === 'green' ? 'bg-green-600' : 'bg-purple-600'
+                          }`}>
+                            {method.accuracy} Accuracy
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      <p className="text-gray-700 text-sm mb-4">{method.description}</p>
+                      
+                      <div className="space-y-2">
+                        <div className="text-xs">
+                          <span className="font-medium text-gray-600">Data Required:</span>
+                          <p className="text-gray-500">{method.dataNeeded}</p>
+                        </div>
+                        <div className="text-xs">
+                          <span className="font-medium text-gray-600">Best For:</span>
+                          <p className="text-gray-500">{method.bestFor}</p>
+                        </div>
+                      </div>
+                      
+                      {isSelected && (
+                        <CheckCircle className="h-6 w-6 text-green-600 mt-4" />
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+            
+            <div className="mt-6 flex justify-between">
+              <Button variant="outline" onClick={goBack}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              
+              <Button 
+                onClick={proceedToNextStep}
+                disabled={!forecastMethod}
+                className="px-8"
+              >
+                Next: Upload Data
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 3: Data Upload */}
+      {step === 3 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Upload className="h-5 w-5" />
+              <span>Upload Required Data</span>
+            </CardTitle>
+            <CardDescription>
+              Upload the following data files for {forecastMethod === 'trend' ? 'trend' : forecastMethod === 'statistical' ? 'statistical' : 'AI-powered'} forecasting of {' '}
+              {forecastMonth && forecastYear && new Date(parseInt(forecastYear), parseInt(forecastMonth) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {requiredDataUploads.map((requirement) => (
+                <Card key={requirement.id} className={`border ${
+                  requirement.required ? 'border-blue-200 bg-blue-50' : 'border-gray-200'
+                }`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h4 className="font-medium">{requirement.title}</h4>
+                          {requirement.required && (
+                            <Badge variant="destructive" className="text-xs">Required</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">{requirement.description}</p>
+                        
+                        {uploadedData[requirement.id] ? (
+                          <div className="flex items-center space-x-2">
+                            {uploadedData[requirement.id].status === 'success' ? (
+                              <>
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="text-green-700 text-sm">
+                                  ✅ {uploadedData[requirement.id].file} ({uploadedData[requirement.id].records} records)
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertTriangle className="h-5 w-5 text-red-600" />
+                                <span className="text-red-700 text-sm">
+                                  ❌ {uploadedData[requirement.id].error}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500">No file uploaded</div>
+                        )}
+                      </div>
+                      
+                      <div className="ml-4">
+                        <input
+                          type="file"
+                          accept=".xlsx,.xls"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              handleDataUpload(requirement.id, file);
+                            }
+                          }}
+                          className="hidden"
+                          id={`upload-${requirement.id}`}
+                        />
+                        <label
+                          htmlFor={`upload-${requirement.id}`}
+                          className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Choose File
+                        </label>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            {requiredDataUploads.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <Info className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p>No additional data upload required.</p>
+                <p className="text-sm">The forecast will use existing historical data in the system.</p>
+              </div>
+            )}
+            
+            <div className="mt-6 flex justify-between">
+              <Button variant="outline" onClick={goBack}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              
+              <Button 
+                onClick={proceedToNextStep}
+                className="px-8"
+                disabled={
+                  requiredDataUploads.filter(req => req.required).length > 0 &&
+                  requiredDataUploads.filter(req => req.required && uploadedData[req.id]?.status === 'success').length < requiredDataUploads.filter(req => req.required).length
+                }
+              >
+                Generate Forecast
+                <Zap className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
                 <div className="p-4 bg-white rounded-lg border border-blue-200">
                   <div className="space-y-2">
                     <p className="text-sm">
