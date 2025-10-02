@@ -42,12 +42,29 @@ class SalesAnalyticsAPITester:
                             print(f"   Message: {response_data['message']}")
                         if 'records_count' in response_data:
                             print(f"   Records: {response_data['records_count']}")
-                        if isinstance(response_data, list):
+                        # ABC Analysis specific output
+                        if 'abc_categories' in response_data:
+                            categories = response_data['abc_categories']
+                            total_items = sum(len(categories[cat]) for cat in categories)
+                            print(f"   ABC Items: A={len(categories.get('A', []))}, B={len(categories.get('B', []))}, C={len(categories.get('C', []))}, Total={total_items}")
+                        # Capital blocking specific output
+                        if 'capital_blocking_items' in response_data:
+                            items = response_data['capital_blocking_items']
+                            print(f"   Capital Blocking Items: {len(items)}")
+                            if items:
+                                total_blocked = sum(item.get('capital_blocked', 0) for item in items)
+                                print(f"   Total Capital Blocked: ₹{total_blocked:,.2f}")
+                        # Group analysis specific output
+                        if isinstance(response_data, list) and response_data and 'group' in response_data[0]:
+                            groups = [item['group'] for item in response_data]
+                            print(f"   Groups found: {', '.join(groups)}")
+                            print(f"   Total groups: {len(groups)}")
+                        elif isinstance(response_data, list):
                             print(f"   Items returned: {len(response_data)}")
                         elif 'forecasts' in response_data:
                             print(f"   Forecasts: {len(response_data['forecasts'])}")
-                except:
-                    print(f"   Response length: {len(response.text)} chars")
+                except Exception as e:
+                    print(f"   Response length: {len(response.text)} chars (Parse error: {str(e)})")
             else:
                 print(f"❌ Failed - Expected {expected_status}, got {response.status_code}")
                 try:
