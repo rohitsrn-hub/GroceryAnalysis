@@ -746,15 +746,16 @@ async def generate_comprehensive_report(format: str = Query("excel")):
             ws_rec.append([f"• {top_group['group']} is the top revenue generator"])
             ws_rec.append(["• Consider expanding high-margin groups"])
             
-            # Save to BytesIO
-            excel_buffer = io.BytesIO()
-            workbook.save(excel_buffer)
-            excel_buffer.seek(0)
+            # Save to temporary file for better download handling
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+            workbook.save(temp_file.name)
+            temp_file.close()
             
-            return StreamingResponse(
-                io.BytesIO(excel_buffer.read()),
+            return FileResponse(
+                temp_file.name,
                 media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                headers={"Content-Disposition": "attachment; filename=URC101-Comprehensive-Analysis-Report.xlsx"}
+                headers={"Content-Disposition": "attachment; filename=URC101-Comprehensive-Analysis-Report.xlsx"},
+                filename="URC101-Comprehensive-Analysis-Report.xlsx"
             )
             
         else:
