@@ -169,7 +169,7 @@ const Dashboard = ({ dashboardData, loading }) => {
               <XAxis type="number" />
               <YAxis dataKey="name" type="category" width={120} />
               <Tooltip formatter={(value, name) => [
-                name === 'sold' ? `${value} units` : `₹${value.toLocaleString()}`,
+                name === 'sold' ? `${formatTableNumber(value)} units` : `₹${formatTableNumber(value)}`,
                 name === 'sold' ? 'Units Sold' : 'Revenue'
               ]} />
               <Bar dataKey="sold" fill="#3B82F6" />
