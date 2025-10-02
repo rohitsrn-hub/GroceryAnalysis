@@ -611,13 +611,26 @@ const Analytics = () => {
               {/* Capital Blocking Items List */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
-                    <span>Capital Blocking Items Analysis</span>
-                  </CardTitle>
-                  <CardDescription>
-                    Items with high inventory value but slow sales velocity - immediate action required
-                  </CardDescription>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="flex items-center space-x-2">
+                        <AlertTriangle className="h-5 w-5 text-red-600" />
+                        <span>Capital Blocking Items Analysis</span>
+                      </CardTitle>
+                      <CardDescription>
+                        Items with high inventory value but slow sales velocity - immediate action required
+                      </CardDescription>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => exportToExcel('capital-blocking')}
+                      className="flex items-center space-x-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>Export</span>
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">
