@@ -230,7 +230,6 @@ const Analytics = () => {
 
       {/* Analytics Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex flex-wrap gap-3 mb-6">
             {[
               { id: 'performance', label: 'Performance Analysis', icon: TrendingUp, color: 'bg-blue-600 hover:bg-blue-700' },
