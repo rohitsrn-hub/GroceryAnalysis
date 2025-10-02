@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import "./App.css";
 import Dashboard from "./components/Dashboard";
 import DataUpload from "./components/DataUpload";
-import Analytics from "./components/Analytics";
+import AnalyticsSimple from "./components/AnalyticsSimple";
 import Forecasting from "./components/Forecasting";
 import { Toaster } from "./components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
