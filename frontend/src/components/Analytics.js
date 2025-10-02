@@ -112,7 +112,10 @@ const Analytics = () => {
   }
 
   const performanceChartData = filteredFastestItems.slice(0, 15).map(item => ({
-    name: item.item_name.substring(0, 25) + (item.item_name.length > 25 ? '...' : ''),
+    name: `${item.item_code || 'N/A'} - ${item.item_name.substring(0, 20)}${item.item_name.length > 20 ? '...' : ''}`,
+    shortName: item.item_code || 'N/A',
+    fullName: item.item_name,
+    itemCode: item.item_code,
     sold: item.total_sold,
     avgSales: item.avg_monthly_sales,
     revenue: item.total_revenue || 0,
