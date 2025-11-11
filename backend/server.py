@@ -703,7 +703,8 @@ async def upload_sales_data(file: UploadFile = File(...)):
         await db.upload_history.insert_one(upload_record.dict())
         raise
     except Exception as e:
-        logger.error(f"Error processing file {file.filename}: {str(e)}", exc_info=True)
+        # Use logging.exception to capture full stack trace
+        logger.exception(f"Upload failed for file {file.filename}")
         error_message = str(e)
         
         # Provide specific error messages for common issues
@@ -713,21 +714,27 @@ async def upload_sales_data(file: UploadFile = File(...)):
             error_message = f"No valid data rows found in '{file.filename}'. {error_message}"
         elif "openpyxl" in error_message or "xlrd" in error_message:
             error_message = f"Excel library error: {error_message}. The file may be corrupted or in an unsupported format."
+        elif "authentication" in error_message.lower() or "mongo" in error_message.lower():
+            error_message = "Database connection error. Please contact support."
+            logger.error("MongoDB connection issue during upload")
         
         # Log failed upload
         processing_time = (datetime.now() - start_time).total_seconds()
-        upload_record = UploadHistory(
-            id=upload_id,
-            filename=file.filename,
-            period_covered=period_info.get("period") if 'period_info' in locals() else None,
-            data_type=period_info.get("data_type") if 'period_info' in locals() else None,
-            records_count=0,
-            status="failed",
-            error_message=error_message,
-            file_size_kb=len(contents) / 1024 if 'contents' in locals() else 0,
-            processing_time_seconds=processing_time
-        )
-        await db.upload_history.insert_one(upload_record.dict())
+        try:
+            upload_record = UploadHistory(
+                id=upload_id,
+                filename=file.filename,
+                period_covered=period_info.get("period") if 'period_info' in locals() else None,
+                data_type=period_info.get("data_type") if 'period_info' in locals() else None,
+                records_count=0,
+                status="failed",
+                error_message=error_message,
+                file_size_kb=len(contents) / 1024 if 'contents' in locals() else 0,
+                processing_time_seconds=processing_time
+            )
+            await db.upload_history.insert_one(upload_record.dict())
+        except Exception as log_error:
+            logger.error(f"Failed to log upload history: {log_error}")
         
         raise HTTPException(
             status_code=400, 
