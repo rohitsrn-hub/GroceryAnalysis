@@ -144,7 +144,7 @@ def extract_group_from_pluno(pluno) -> str:
     
     return "Unknown"
 
-# Phase 1: Validation Utilities
+# Phase 1: Validation Utilities 
 async def check_duplicate_upload(period_covered: str) -> Optional[Dict]:
     """Check if data for this period already exists in sales_records
     
