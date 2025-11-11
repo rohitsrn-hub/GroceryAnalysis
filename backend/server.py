@@ -608,7 +608,10 @@ async def upload_sales_data(file: UploadFile = File(...)):
     start_time = datetime.now()
     upload_id = str(uuid.uuid4())
     
+    logger.info(f"Upload attempt: filename={file.filename}, upload_id={upload_id}")
+    
     if not file.filename.endswith(('.xlsx', '.xls')):
+        logger.warning(f"Invalid file type: {file.filename}")
         raise HTTPException(
             status_code=400, 
             detail="Only Excel files (.xlsx or .xls) are supported. Please upload a valid Excel file."
@@ -617,6 +620,7 @@ async def upload_sales_data(file: UploadFile = File(...)):
     try:
         contents = await file.read()
         file_size_kb = len(contents) / 1024
+        logger.info(f"File read successfully: size={file_size_kb:.2f}KB")
         
         # Check if file is not empty
         if len(contents) == 0:
