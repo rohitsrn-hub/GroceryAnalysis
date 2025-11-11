@@ -2112,23 +2112,42 @@ async def check_data_availability(periods: List[str]):
         logger.error(f"Error checking data availability: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error checking data availability: {str(e)}")
 
-# Include the router in the main app
-app.include_router(api_router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Configure logging
+# Configure logging FIRST (before CORS setup uses it)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# CORS Configuration - FIXED per security best practices
+raw_cors = os.environ.get("CORS_ORIGINS", "")
+if raw_cors.strip() == "":
+    allow_origins = []
+elif raw_cors.strip() == "*":
+    allow_origins = ["*"]
+else:
+    allow_origins = [o.strip() for o in raw_cors.split(",") if o.strip()]
+
+allow_credentials = os.environ.get("CORS_ALLOW_CREDENTIALS", "false").lower() in ("1", "true", "yes")
+
+# Safety: cannot use wildcard origin with credentials (browsers reject this)
+if allow_origins == ["*"] and allow_credentials:
+    logger.warning("CORS: wildcard origin with credentials is not allowed; disabling credentials.")
+    allow_credentials = False
+
+logger.info("CORS Configuration - allow_origins=%s allow_credentials=%s", allow_origins, allow_credentials)
+
+# Apply CORS middleware BEFORE including routes
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins or ["*"],
+    allow_credentials=allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include the router in the main app AFTER CORS middleware
+app.include_router(api_router)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
