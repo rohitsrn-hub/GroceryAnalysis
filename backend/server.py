@@ -1864,6 +1864,71 @@ async def get_upload_history(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching upload history: {str(e)}")
 
+@api_router.get("/available-data-periods")
+async def get_available_data_periods():
+    """Get list of all available data periods with upload info"""
+    try:
+        # Get all successful uploads with their data info
+        pipeline = [
+            {
+                "$match": {
+                    "status": "success"
+                }
+            },
+            {
+                "$project": {
+                    "upload_id": "$id",
+                    "upload_type": 1,
+                    "data_date": 1,
+                    "period_covered": 1,
+                    "data_type": 1,
+                    "records_count": 1,
+                    "upload_date": 1,
+                    "filename": 1
+                }
+            },
+            {
+                "$sort": {"upload_date": -1}
+            }
+        ]
+        
+        uploads = await db.upload_history.aggregate(pipeline).to_list(None)
+        
+        # Organize by daily and historical
+        daily_uploads = []
+        historical_uploads = []
+        
+        for upload in uploads:
+            if upload.get('upload_type') == 'daily' and upload.get('data_date'):
+                daily_uploads.append({
+                    "upload_id": upload['upload_id'],
+                    "date": upload['data_date'],
+                    "records_count": upload['records_count'],
+                    "upload_date": upload['upload_date'],
+                    "filename": upload['filename']
+                })
+            else:
+                historical_uploads.append({
+                    "upload_id": upload['upload_id'],
+                    "period": upload.get('period_covered'),
+                    "data_type": upload.get('data_type'),
+                    "records_count": upload['records_count'],
+                    "upload_date": upload['upload_date'],
+                    "filename": upload['filename']
+                })
+        
+        return {
+            "daily_uploads": daily_uploads,
+            "historical_uploads": historical_uploads,
+            "total_daily": len(daily_uploads),
+            "total_historical": len(historical_uploads)
+        }
+        
+    except Exception as e:
+        logger.exception("Error fetching available data periods")
+        raise HTTPException(status_code=500, detail=f"Error fetching data periods: {str(e)}")
+
+
 @api_router.get("/database-view")
 async def get_database_view(
     limit: int = Query(50, ge=1, le=500),
