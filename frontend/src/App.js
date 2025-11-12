@@ -217,6 +217,13 @@ function MainApp() {
               <FileSpreadsheet className="h-5 w-5" />
               <span>Forecasting</span>
             </TabsTrigger>
+            <TabsTrigger 
+              value="financial" 
+              className="flex items-center space-x-2 px-4 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-emerald-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
+            >
+              <DollarSign className="h-5 w-5" />
+              <span>Financial Health</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
