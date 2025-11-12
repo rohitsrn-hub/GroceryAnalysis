@@ -1082,17 +1082,17 @@ async def get_group_analysis():
             {
                 "$group": {
                     "_id": "$product_group",
-                    "total_revenue": {"$sum": "$r_amt"},
-                    "total_profit": {"$sum": "$profit"},
-                    "total_cost": {"$sum": "$w_amt"},
+                    "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+                    "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
+                    "total_cost": {"$sum": {"$ifNull": ["$w_amt", 0]}},
                     "item_count": {"$sum": 1},
                     "items": {
                         "$push": {
                             "pluno": "$pluno",
                             "item_name": "$item_name",
-                            "revenue": "$r_amt",
-                            "profit": "$profit",
-                            "qty": "$net_qty"
+                            "revenue": {"$ifNull": ["$r_amt", 0]},
+                            "profit": {"$ifNull": ["$profit", 0]},
+                            "qty": {"$ifNull": ["$net_qty", 0]}
                         }
                     }
                 }
@@ -1117,24 +1117,36 @@ async def get_group_analysis():
         group_analysis = []
         for group in results:
             # Get top 5 performers in this group
+            # Filter out items with invalid revenue/profit values
+            valid_items = [
+                item for item in group['items']
+                if isinstance(item.get('revenue'), (int, float)) and isinstance(item.get('profit'), (int, float))
+            ]
+            
             top_performers = sorted(
-                group['items'], 
+                valid_items, 
                 key=lambda x: x.get('revenue', 0) or 0, 
                 reverse=True
             )[:5]
             
+            # Ensure values are properly converted to float
+            total_revenue = float(group.get('total_revenue', 0) or 0)
+            total_profit = float(group.get('total_profit', 0) or 0)
+            profit_margin = float(group.get('profit_margin', 0) or 0)
+            
             group_analysis.append({
                 "group": group['_id'],
-                "total_revenue": group.get('total_revenue', 0) or 0,
-                "total_profit": group.get('total_profit', 0) or 0,
+                "total_revenue": total_revenue,
+                "total_profit": total_profit,
                 "item_count": group['item_count'],
                 "top_performers": top_performers,
-                "profit_margin": group.get('profit_margin', 0) or 0
+                "profit_margin": profit_margin
             })
         
         return group_analysis
         
     except Exception as e:
+        logger.exception("Error in group analysis")
         raise HTTPException(status_code=500, detail=f"Error in group analysis: {str(e)}")
 
 @api_router.get("/comprehensive-report")
