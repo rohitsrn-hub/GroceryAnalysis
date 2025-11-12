@@ -2416,6 +2416,208 @@ async def get_previous_bank_amount(date: str):
                 "$lt": target_date
             }
         })
+
+
+@api_router.post("/generate-daily-report")
+async def generate_daily_sales_report(
+    date: str,
+    liquor_sales: float,
+    previous_bank_amount: float,
+    previous_stock_value: Optional[float] = None,
+    current_stock_value: Optional[float] = None,
+    notes: Optional[str] = None
+):
+    """Generate PDF daily sales report"""
+    try:
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+        from io import BytesIO
+        
+        # First, create/update financial data
+        financial_response = await create_financial_data(
+            date=date,
+            liquor_sales=liquor_sales,
+            previous_bank_amount=previous_bank_amount,
+            previous_stock_value=previous_stock_value,
+            current_stock_value=current_stock_value,
+            notes=notes
+        )
+        
+        financial_data = financial_response["financial_data"]
+        
+        # Create PDF in memory
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4,
+                              rightMargin=72, leftMargin=72,
+                              topMargin=72, bottomMargin=18)
+        
+        # Container for elements
+        elements = []
+        
+        # Styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=20,
+            textColor=colors.HexColor('#1e40af'),
+            spaceAfter=30,
+            alignment=TA_CENTER,
+            fontName='Helvetica-Bold'
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor('#1e40af'),
+            spaceAfter=12,
+            spaceBefore=12,
+            fontName='Helvetica-Bold'
+        )
+        
+        # Title
+        report_date = datetime.strptime(date, "%Y-%m-%d")
+        title = Paragraph(f"Sale Summary for {report_date.strftime('%d %B %Y')}", title_style)
+        elements.append(title)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Sales Data Table
+        sales_heading = Paragraph("Daily Sales Breakdown", heading_style)
+        elements.append(sales_heading)
+        
+        sales_data = [
+            ['Description', 'Amount (₹)'],
+            ['Grocery Sales for the day', f"₹{financial_data['grocery_sales']:,.2f}"],
+            ['Liquor Sales for the day', f"₹{financial_data['liquor_sales']:,.2f}"],
+            ['Total Sales for the day (D)', f"₹{financial_data['total_sales']:,.2f}"],
+        ]
+        
+        sales_table = Table(sales_data, colWidths=[4*inch, 2*inch])
+        sales_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#eff6ff')),
+        ]))
+        
+        elements.append(sales_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Bank Data Table
+        previous_date = (report_date - timedelta(days=1)).strftime('%d %B %Y')
+        bank_heading = Paragraph("Bank Account Summary", heading_style)
+        elements.append(bank_heading)
+        
+        bank_data = [
+            ['Description', 'Amount (₹)'],
+            [f'Amount in Bank as on {previous_date} (Y)', f"₹{financial_data['previous_bank_amount']:,.2f}"],
+            [f'Total Amount in Bank on {report_date.strftime("%d %B %Y")} (Y+D)', f"₹{financial_data['current_bank_amount']:,.2f}"],
+        ]
+        
+        bank_table = Table(bank_data, colWidths=[4*inch, 2*inch])
+        bank_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#d1fae5')),
+        ]))
+        
+        elements.append(bank_table)
+        
+        # Stock Data (if provided)
+        if previous_stock_value is not None or current_stock_value is not None:
+            elements.append(Spacer(1, 0.3*inch))
+            stock_heading = Paragraph("Inventory Stock Valuation", heading_style)
+            elements.append(stock_heading)
+            
+            stock_data = [
+                ['Description', 'Value (₹)'],
+            ]
+            
+            if previous_stock_value is not None:
+                stock_data.append([f'Total Value of Grocery Stock on {previous_date}', f"₹{previous_stock_value:,.2f}"])
+            
+            if current_stock_value is not None:
+                stock_data.append([f'Total Value of Grocery Stock on {report_date.strftime("%d %B %Y")}', f"₹{current_stock_value:,.2f}"])
+            
+            stock_table = Table(stock_data, colWidths=[4*inch, 2*inch])
+            stock_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ]))
+            
+            elements.append(stock_table)
+        
+        # Notes section
+        if notes:
+            elements.append(Spacer(1, 0.3*inch))
+            notes_heading = Paragraph("Additional Notes", heading_style)
+            elements.append(notes_heading)
+            notes_para = Paragraph(notes, styles['Normal'])
+            elements.append(notes_para)
+        
+        # Footer
+        elements.append(Spacer(1, 0.5*inch))
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.grey,
+            alignment=TA_CENTER
+        )
+        footer_text = f"Generated on {datetime.now().strftime('%d %B %Y at %I:%M %p')}"
+        footer = Paragraph(footer_text, footer_style)
+        elements.append(footer)
+        
+        # Build PDF
+        doc.build(elements)
+        
+        # Get PDF data
+        pdf_data = buffer.getvalue()
+        buffer.close()
+        
+        # Return PDF as response
+        from fastapi.responses import Response
+        filename = f"daily_sales_report_{date}.pdf"
+        
+        return Response(
+            content=pdf_data,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except Exception as e:
+        logger.exception("Error generating daily sales report PDF")
+        raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
+
         
         if previous_financial and "current_bank_amount" in previous_financial:
             return {
