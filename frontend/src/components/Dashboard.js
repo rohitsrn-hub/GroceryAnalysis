@@ -88,6 +88,35 @@ const Dashboard = ({ dashboardData, loading }) => {
 
   return (
     <div className="space-y-6">
+      {/* Upload Today's Data Button - Prominent */}
+      <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-none">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold mb-2">Upload Today's Sales Data</h2>
+              <p className="text-blue-50 text-sm">
+                Upload your daily sales report for {new Date().toLocaleDateString('en-IN', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </p>
+            </div>
+            <button
+              onClick={() => window.location.href = '#upload-daily'}
+              className="bg-white text-blue-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-blue-50 transition-colors shadow-lg flex items-center space-x-2"
+              data-testid="upload-today-button"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span>Upload Today's Data</span>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Group Performance Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
