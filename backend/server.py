@@ -663,11 +663,21 @@ async def upload_sales_data(
             processing_time = (datetime.now() - start_time).total_seconds()
             
             # Log upload history
+            # Parse data_date if provided for daily uploads
+            parsed_data_date = None
+            if upload_type == "daily" and data_date:
+                try:
+                    parsed_data_date = datetime.strptime(data_date, "%Y-%m-%d")
+                except ValueError:
+                    logger.warning(f"Invalid data_date format: {data_date}")
+            
             upload_record = UploadHistory(
                 id=upload_id,
                 filename=file.filename,
                 period_covered=period_info["period"],
                 data_type=period_info["data_type"],
+                upload_type=upload_type,
+                data_date=parsed_data_date,
                 records_count=len(records),
                 status="success",
                 file_size_kb=file_size_kb,
@@ -682,6 +692,8 @@ async def upload_sales_data(
                 "inserted_ids": len(result.inserted_ids),
                 "status": "success",
                 "upload_id": upload_id,
+                "upload_type": upload_type,
+                "data_date": data_date,
                 "period_covered": period_info["period"],
                 "data_type": period_info["data_type"],
                 "duplicate_warning": existing is not None
