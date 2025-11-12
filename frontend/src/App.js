@@ -187,7 +187,7 @@ function MainApp() {
               className="flex items-center space-x-2 px-4 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
             >
               <Upload className="h-5 w-5" />
-              <span>Data Upload</span>
+              <span>Historical Data</span>
             </TabsTrigger>
             <TabsTrigger 
               value="history" 
