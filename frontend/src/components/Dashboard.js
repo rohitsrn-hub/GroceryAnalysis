@@ -358,6 +358,16 @@ const Dashboard = ({ dashboardData, loading }) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Daily Upload Modal */}
+      <DailyUploadModal
+        isOpen={showDailyUploadModal}
+        onClose={() => setShowDailyUploadModal(false)}
+        onSuccess={() => {
+          // Refresh data after successful upload
+          fetchAnalyticsData();
+        }}
+      />
     </div>
   );
 };
