@@ -106,7 +106,7 @@ const Dashboard = ({ dashboardData, loading }) => {
               </p>
             </div>
             <button
-              onClick={() => window.location.href = '#upload-daily'}
+              onClick={() => setShowDailyUploadModal(true)}
               className="bg-white text-blue-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-blue-50 transition-colors shadow-lg flex items-center space-x-2"
               data-testid="upload-today-button"
             >
