@@ -64,14 +64,22 @@ export const formatTableNumber = (num) => {
   const isNegative = num < 0;
   
   if (absNum >= 1000) {
-    const numStr = absNum.toString();
-    const lastThree = numStr.slice(-3);
-    const otherNumbers = numStr.slice(0, -3);
-    const formatted = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + lastThree;
-    return isNegative ? '-' + formatted : formatted;
+    // Separate integer and decimal parts
+    const parts = absNum.toFixed(2).split('.');
+    const integerPart = parts[0];
+    const decimalPart = parts[1];
+    
+    // Format integer part with Indian comma placement
+    const lastThree = integerPart.slice(-3);
+    const otherNumbers = integerPart.slice(0, -3);
+    const formatted = otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + (otherNumbers ? ',' : '') + lastThree;
+    
+    // Combine with decimal part
+    const result = formatted + (decimalPart && decimalPart !== '00' ? '.' + decimalPart : '');
+    return isNegative ? '-' + result : result;
   }
   
-  return num.toString();
+  return absNum.toFixed(2);
 };
 
 /**
