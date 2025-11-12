@@ -605,12 +605,16 @@ def process_excel_data(file_content: bytes, filename: str, period_info: Optional
 
 # API Routes
 @api_router.post("/upload-sales-data")
-async def upload_sales_data(file: UploadFile = File(...)):
+async def upload_sales_data(
+    file: UploadFile = File(...),
+    upload_type: str = "historical",  # "daily" or "historical"
+    data_date: Optional[str] = None  # Format: "YYYY-MM-DD" for daily uploads
+):
     """Upload and process sales data from Excel file with history logging"""
     start_time = datetime.now()
     upload_id = str(uuid.uuid4())
     
-    logger.info(f"Upload attempt: filename={file.filename}, upload_id={upload_id}")
+    logger.info(f"Upload attempt: filename={file.filename}, upload_id={upload_id}, type={upload_type}, data_date={data_date}")
     
     if not file.filename.endswith(('.xlsx', '.xls')):
         logger.warning(f"Invalid file type: {file.filename}")
