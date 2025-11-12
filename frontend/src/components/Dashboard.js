@@ -7,6 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { TrendingUp, TrendingDown, Package, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { formatIndianNumber, formatTableNumber, formatPercentage } from "../utils/numberUtils";
+import DailyUploadModal from "./DailyUploadModal";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -18,6 +19,7 @@ const Dashboard = ({ dashboardData, loading }) => {
   const [groupAnalysis, setGroupAnalysis] = useState([]);
   const [inventoryAnalysis, setInventoryAnalysis] = useState(null);
   const [loadingData, setLoadingData] = useState(true);
+  const [showDailyUploadModal, setShowDailyUploadModal] = useState(false);
 
   useEffect(() => {
     fetchAnalyticsData();
