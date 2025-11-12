@@ -249,6 +249,12 @@ function MainApp() {
           <TabsContent value="forecasting" className="space-y-6">
             <Forecasting />
           </TabsContent>
+
+
+          <TabsContent value="financial" className="space-y-6">
+            <FinancialHealth />
+          </TabsContent>
+
         </Tabs>
       </div>
       
