@@ -103,6 +103,8 @@ class UploadHistory(BaseModel):
     upload_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     period_covered: Optional[str] = None  # "2024-08" or "2024"
     data_type: Optional[str] = None  # "monthly" or "yearly"
+    upload_type: str = "historical"  # "daily" or "historical"
+    data_date: Optional[datetime] = None  # The actual date this data represents
     records_count: int = 0
     status: str  # "success", "failed", "partial"
     error_message: Optional[str] = None
