@@ -233,8 +233,11 @@ const DataUpload = ({ onUploadSuccess }) => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Upload className="h-5 w-5" />
-            <span>Upload Sales Data</span>
+            <span>Upload Historical Data</span>
           </CardTitle>
+          <CardDescription>
+            Upload historical sales data for months or years. For today's data, use the "Upload Today's Data" button on the dashboard.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {/* Dropzone */}
