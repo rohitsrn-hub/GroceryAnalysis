@@ -112,6 +112,23 @@ class UploadHistory(BaseModel):
     file_size_kb: Optional[float] = None
     processing_time_seconds: Optional[float] = None
 
+
+# Phase 2: Financial Health Models
+class FinancialData(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0))
+    grocery_sales: float = 0.0
+    liquor_sales: float = 0.0
+    total_sales: float = 0.0
+    previous_bank_amount: float = 0.0
+    current_bank_amount: float = 0.0
+    previous_stock_value: Optional[float] = None
+    current_stock_value: Optional[float] = None
+    notes: Optional[str] = None
+    created_by: str = "system"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 # Helper Functions
 def prepare_for_mongo(data):
     """Convert problematic types for MongoDB storage"""
