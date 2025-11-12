@@ -2235,6 +2235,209 @@ async def check_data_availability(periods: List[str]):
         logger.error(f"Error checking data availability: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error checking data availability: {str(e)}")
 
+
+# ============================================================================
+# Phase 2: Financial Health Tracking Endpoints
+# ============================================================================
+
+@api_router.post("/financial-data")
+async def create_financial_data(
+    date: str,  # Format: "YYYY-MM-DD"
+    liquor_sales: float,
+    previous_bank_amount: float,
+    previous_stock_value: Optional[float] = None,
+    current_stock_value: Optional[float] = None,
+    notes: Optional[str] = None
+):
+    """Create or update financial data for a specific date"""
+    try:
+        # Parse date
+        target_date = datetime.strptime(date, "%Y-%m-%d")
+        
+        # Calculate grocery sales from that day's upload
+        grocery_sales = 0.0
+        daily_upload = await db.upload_history.find_one({
+            "upload_type": "daily",
+            "data_date": {
+                "$gte": target_date,
+                "$lt": target_date + timedelta(days=1)
+            },
+            "status": "success"
+        })
+        
+        if daily_upload:
+            # Get total sales from the uploaded records
+            pipeline = [
+                {
+                    "$match": {
+                        "upload_batch_id": daily_upload["id"]
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": None,
+                        "total_sales": {"$sum": {"$ifNull": ["$r_amt", 0]}}
+                    }
+                }
+            ]
+            result = await db.sales_records.aggregate(pipeline).to_list(1)
+            if result:
+                grocery_sales = float(result[0].get("total_sales", 0))
+        
+        # Calculate totals
+        total_sales = grocery_sales + liquor_sales
+        current_bank_amount = previous_bank_amount + total_sales
+        
+        # Check if financial data already exists for this date
+        existing = await db.financial_data.find_one({
+            "date": {
+                "$gte": target_date,
+                "$lt": target_date + timedelta(days=1)
+            }
+        })
+        
+        financial_record = FinancialData(
+            id=existing["id"] if existing else str(uuid.uuid4()),
+            date=target_date,
+            grocery_sales=grocery_sales,
+            liquor_sales=liquor_sales,
+            total_sales=total_sales,
+            previous_bank_amount=previous_bank_amount,
+            current_bank_amount=current_bank_amount,
+            previous_stock_value=previous_stock_value,
+            current_stock_value=current_stock_value,
+            notes=notes
+        )
+        
+        if existing:
+            # Update existing record
+            await db.financial_data.update_one(
+                {"id": existing["id"]},
+                {"$set": financial_record.dict()}
+            )
+            message = "Financial data updated successfully"
+        else:
+            # Insert new record
+            await db.financial_data.insert_one(financial_record.dict())
+            message = "Financial data created successfully"
+        
+        logger.info(f"Financial data for {date}: Grocery=₹{grocery_sales:.2f}, Liquor=₹{liquor_sales:.2f}, Total=₹{total_sales:.2f}")
+        
+        return {
+            "message": message,
+            "financial_data": financial_record.dict(),
+            "status": "success"
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
+    except Exception as e:
+        logger.exception("Error creating financial data")
+        raise HTTPException(status_code=500, detail=f"Error creating financial data: {str(e)}")
+
+@api_router.get("/financial-data/{date}")
+async def get_financial_data(date: str):
+    """Get financial data for a specific date"""
+    try:
+        target_date = datetime.strptime(date, "%Y-%m-%d")
+        
+        financial_data = await db.financial_data.find_one({
+            "date": {
+                "$gte": target_date,
+                "$lt": target_date + timedelta(days=1)
+            }
+        })
+        
+        if not financial_data:
+            # Return default/empty data if not found
+            return {
+                "date": date,
+                "exists": False,
+                "grocery_sales": 0.0,
+                "liquor_sales": 0.0,
+                "total_sales": 0.0,
+                "previous_bank_amount": 0.0,
+                "current_bank_amount": 0.0
+            }
+        
+        return {
+            "exists": True,
+            **financial_data
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
+    except Exception as e:
+        logger.exception("Error fetching financial data")
+        raise HTTPException(status_code=500, detail=f"Error fetching financial data: {str(e)}")
+
+@api_router.get("/financial-data-range")
+async def get_financial_data_range(
+    start_date: str,
+    end_date: str,
+    limit: int = Query(100, ge=1, le=1000)
+):
+    """Get financial data for a date range"""
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+        
+        financial_records = await db.financial_data.find({
+            "date": {
+                "$gte": start,
+                "$lte": end
+            }
+        }).sort("date", -1).limit(limit).to_list(limit)
+        
+        return {
+            "start_date": start_date,
+            "end_date": end_date,
+            "count": len(financial_records),
+            "records": financial_records
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
+    except Exception as e:
+        logger.exception("Error fetching financial data range")
+        raise HTTPException(status_code=500, detail=f"Error fetching financial data range: {str(e)}")
+
+@api_router.get("/previous-bank-amount")
+async def get_previous_bank_amount(date: str):
+    """Get the bank amount from the previous day for form pre-fill"""
+    try:
+        target_date = datetime.strptime(date, "%Y-%m-%d")
+        previous_date = target_date - timedelta(days=1)
+        
+        # Try to find financial data from previous day
+        previous_financial = await db.financial_data.find_one({
+            "date": {
+                "$gte": previous_date,
+                "$lt": target_date
+            }
+        })
+        
+        if previous_financial and "current_bank_amount" in previous_financial:
+            return {
+                "previous_date": previous_date.strftime("%Y-%m-%d"),
+                "bank_amount": previous_financial["current_bank_amount"],
+                "found": True
+            }
+        
+        # If not found, return null/not found
+        return {
+            "previous_date": previous_date.strftime("%Y-%m-%d"),
+            "bank_amount": None,
+            "found": False
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
+    except Exception as e:
+        logger.exception("Error fetching previous bank amount")
+        raise HTTPException(status_code=500, detail=f"Error fetching previous bank amount: {str(e)}")
+
+
 # Configure logging FIRST (before CORS setup uses it)
 logging.basicConfig(
     level=logging.INFO,
