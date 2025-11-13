@@ -672,13 +672,21 @@ async def upload_sales_data(
             existing = await check_duplicate_upload(period_info["period"])
         
         if existing:
-                logger.warning(f"Duplicate upload blocked for period {period_info['period']}")
                 upload_date_str = existing.get('upload_date')
                 date_info = f" (uploaded on {upload_date_str})" if upload_date_str else ""
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Data for period '{period_info['period']}' already exists in the database{date_info}. Found {existing['records_count']} existing records. Please use UNDO on the previous upload or reset database to re-upload."
-                )
+                
+                if upload_type == "daily":
+                    # More specific error for daily uploads
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Data for date '{data_date}' has already been uploaded{date_info}. Found {existing['records_count']} existing records. Please use UNDO on the previous upload from the Upload History tab if you want to re-upload."
+                    )
+                else:
+                    # Error for historical uploads
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Data for period '{period_info['period']}' already exists in the database{date_info}. Found {existing['records_count']} existing records. Please use UNDO on the previous upload or reset database to re-upload."
+                    )
         
         # Process the data with normalized period information
         records = process_excel_data(contents, file.filename, period_info)
