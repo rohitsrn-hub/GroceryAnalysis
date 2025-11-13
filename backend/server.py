@@ -2416,7 +2416,26 @@ async def get_previous_bank_amount(date: str):
                 "$lt": target_date
             }
         })
-
+        
+        if previous_financial and "current_bank_amount" in previous_financial:
+            return {
+                "previous_date": previous_date.strftime("%Y-%m-%d"),
+                "bank_amount": previous_financial["current_bank_amount"],
+                "found": True
+            }
+        
+        # If not found, return null/not found
+        return {
+            "previous_date": previous_date.strftime("%Y-%m-%d"),
+            "bank_amount": None,
+            "found": False
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
+    except Exception as e:
+        logger.exception("Error fetching previous bank amount")
+        raise HTTPException(status_code=500, detail=f"Error fetching previous bank amount: {str(e)}")
 
 @api_router.post("/generate-daily-report")
 async def generate_daily_sales_report(
