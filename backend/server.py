@@ -652,10 +652,26 @@ async def upload_sales_data(
         # Extract period from filename
         period_info = extract_period_from_filename(file.filename)
         
-        # Check for duplicate upload
-        if period_info["period"]:
-            existing = await check_duplicate_upload(period_info["period"])
+        # Check for duplicate upload - different logic for daily vs historical
+        existing = None
+        if upload_type == "daily" and data_date:
+            # For daily uploads, check if data for this specific date already exists
+            parsed_data_date = datetime.strptime(data_date, "%Y-%m-%d")
+            existing = await db.upload_history.find_one({
+                "upload_type": "daily",
+                "data_date": {
+                    "$gte": parsed_data_date,
+                    "$lt": parsed_data_date + timedelta(days=1)
+                },
+                "status": "success"
+            })
             if existing:
+                logger.warning(f"Duplicate daily upload blocked for date {data_date}")
+        elif upload_type == "historical" and period_info["period"]:
+            # For historical uploads, check by month/year period
+            existing = await check_duplicate_upload(period_info["period"])
+        
+        if existing:
                 logger.warning(f"Duplicate upload blocked for period {period_info['period']}")
                 upload_date_str = existing.get('upload_date')
                 date_info = f" (uploaded on {upload_date_str})" if upload_date_str else ""
