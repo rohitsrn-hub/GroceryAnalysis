@@ -58,8 +58,6 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-      formData.append('upload_type', 'daily');
-      formData.append('data_date', selectedDate);
 
       const response = await fetch(`${API}/upload-sales-data?upload_type=daily&data_date=${selectedDate}`, {
         method: 'POST',
@@ -67,11 +65,27 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          // If JSON parsing fails, get the text
+          const errorText = await response.text();
+          console.error('Upload error response:', errorText);
+          throw new Error(errorText || 'Upload failed');
+        }
         throw new Error(errorData.detail || 'Upload failed');
       }
 
-      const result = await response.json();
+      let result;
+      try {
+        result = await response.json();
+      } catch (e) {
+        // If JSON parsing fails
+        const responseText = await response.text();
+        console.error('Response parsing error:', responseText);
+        throw new Error('Invalid response from server');
+      }
       toast.success(`Successfully uploaded ${result.records_count} records for ${new Date(selectedDate).toLocaleDateString()}`);
       
       setSelectedFile(null);
