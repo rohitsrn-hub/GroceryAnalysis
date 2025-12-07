@@ -24,28 +24,52 @@ const AnalyticsFixed = () => {
   const [loading, setLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState('all');
   const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const [availablePeriods, setAvailablePeriods] = useState([]);
   const [activeTab, setActiveTab] = useState('performance');
+  const [performanceMetric, setPerformanceMetric] = useState('quantity'); // 'quantity', 'revenue', or 'profit'
 
   useEffect(() => {
+    fetchAvailablePeriods();
     fetchAnalyticsData();
   }, []);
 
   useEffect(() => {
-    // Re-fetch data when group selection changes
+    // Re-fetch data when group or period selection changes
     fetchAnalyticsData();
-  }, [selectedGroup]);
+  }, [selectedGroup, selectedPeriod]);
+
+  const fetchAvailablePeriods = async () => {
+    try {
+      const response = await fetch(`${API}/available-data-periods`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailablePeriods(data.periods || []);
+      }
+    } catch (error) {
+      console.error('Error fetching available periods:', error);
+    }
+  };
 
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
       console.log('Fetching analytics data...');
       
+      // Build query params for group and period filtering
+      const buildQueryParams = (baseHasParams = false) => {
+        const params = [];
+        if (selectedGroup !== 'all') params.push(`group=${selectedGroup}`);
+        if (selectedPeriod !== 'all') params.push(`period=${selectedPeriod}`);
+        if (params.length === 0) return '';
+        return (baseHasParams ? '&' : '?') + params.join('&');
+      };
+
       const [fastestResponse, groupResponse, inventoryResponse, abcResponse, capitalResponse] = await Promise.all([
-        fetch(`${API}/fastest-selling-items?limit=20${selectedGroup !== 'all' ? `&group=${selectedGroup}` : ''}`),
-        fetch(`${API}/group-analysis`),
+        fetch(`${API}/fastest-selling-items?limit=20${buildQueryParams(true)}`),
+        fetch(`${API}/group-analysis${buildQueryParams()}`),
         fetch(`${API}/inventory-analysis`),
-        fetch(`${API}/abc-analysis${selectedGroup !== 'all' ? `?group=${selectedGroup}` : ''}`),
-        fetch(`${API}/capital-blocking-analysis${selectedGroup !== 'all' ? `?group=${selectedGroup}` : ''}`)
+        fetch(`${API}/abc-analysis${buildQueryParams()}`),
+        fetch(`${API}/capital-blocking-analysis${buildQueryParams()}`)
       ]);
 
       console.log('API responses received:', {
@@ -137,14 +161,37 @@ const AnalyticsFixed = () => {
     );
   }
 
-  const performanceChartData = filteredFastestItems.slice(0, 15).map(item => ({
+  // Filter items to exclude zero/negative values for the selected metric
+  const performanceFilteredItems = filteredFastestItems.filter(item => {
+    if (performanceMetric === 'quantity') {
+      return (item.total_sold || 0) > 0;
+    } else if (performanceMetric === 'revenue') {
+      return (item.total_revenue || 0) > 0;
+    } else {
+      return (item.total_profit || 0) > 0;
+    }
+  });
+
+  // Sort items based on selected performance metric
+  const sortedPerformanceItems = [...performanceFilteredItems].sort((a, b) => {
+    if (performanceMetric === 'quantity') {
+      return (b.total_sold || 0) - (a.total_sold || 0);
+    } else if (performanceMetric === 'revenue') {
+      return (b.total_revenue || 0) - (a.total_revenue || 0);
+    } else {
+      return (b.total_profit || 0) - (a.total_profit || 0);
+    }
+  });
+
+  const performanceChartData = sortedPerformanceItems.slice(0, 15).map(item => ({
     name: `${item.item_code || 'N/A'} - ${item.item_name.substring(0, 20)}${item.item_name.length > 20 ? '...' : ''}`,
     shortName: item.item_code || 'N/A',
     fullName: item.item_name,
     itemCode: item.item_code,
-    sold: item.total_sold,
-    avgSales: item.avg_monthly_sales,
+    sold: item.total_sold || 0,
+    avgSales: item.avg_monthly_sales || 0,
     revenue: item.total_revenue || 0,
+    profit: item.total_profit || 0,
     group: item.group
   }));
 
@@ -197,14 +244,16 @@ const AnalyticsFixed = () => {
             <div className="flex items-center space-x-2">
               <Calendar className="h-4 w-4 text-gray-500" />
               <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-48">
                   <SelectValue placeholder="Select Period" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Periods</SelectItem>
-                  <SelectItem value="2024">2024</SelectItem>
-                  <SelectItem value="2023">2023</SelectItem>
-                  <SelectItem value="2022">2022</SelectItem>
+                  {availablePeriods.map(period => (
+                    <SelectItem key={period} value={period}>
+                      {period}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -243,14 +292,26 @@ const AnalyticsFixed = () => {
 
         {/* Performance Analysis Tab */}
         <TabsContent value="performance" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Top Performers by Quantity</CardTitle>
-                    <CardDescription>Items ranked by total units sold with item codes for identification</CardDescription>
-                  </div>
+          {/* Performance Metric Selector */}
+          <Card className="bg-gradient-to-r from-blue-50 to-indigo-50">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-1">Performance Analysis View</h3>
+                  <p className="text-sm text-gray-600">Select the primary metric to analyze top performers</p>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm font-medium text-gray-700">View Top Performers by:</span>
+                  <select
+                    value={performanceMetric}
+                    onChange={(e) => setPerformanceMetric(e.target.value)}
+                    className="px-4 py-2 border-2 border-blue-300 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    data-testid="performance-metric-selector"
+                  >
+                    <option value="quantity">Quantity Sold</option>
+                    <option value="revenue">Revenue Generated</option>
+                    <option value="profit">Profit Earned</option>
+                  </select>
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -261,6 +322,23 @@ const AnalyticsFixed = () => {
                     <span>Export</span>
                   </Button>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Three Performance Graphs */}
+          <div className="grid grid-cols-1 gap-6">
+            {/* Primary Metric Graph */}
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  {performanceMetric === 'quantity' && 'Top Performers by Quantity Sold'}
+                  {performanceMetric === 'revenue' && 'Top Performers by Revenue Generated'}
+                  {performanceMetric === 'profit' && 'Top Performers by Profit Earned'}
+                </CardTitle>
+                <CardDescription>
+                  Items ranked by {performanceMetric === 'quantity' ? 'units sold' : performanceMetric === 'revenue' ? 'revenue generated' : 'profit earned'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={400}>
@@ -275,14 +353,12 @@ const AnalyticsFixed = () => {
                     />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value, name) => [
-                        name === 'sold' ? `${formatTableNumber(value)} units` : 
-                        name === 'revenue' ? `₹${formatTableNumber(value)}` : 
-                        `${value.toFixed(1)}`,
-                        name === 'sold' ? 'Units Sold' : 
-                        name === 'revenue' ? 'Revenue' : 
-                        'Avg Monthly Sales'
-                      ]}
+                      formatter={(value) => {
+                        if (performanceMetric === 'quantity') return [`${formatTableNumber(value)} units`, 'Units Sold'];
+                        if (performanceMetric === 'revenue') return [`₹${formatTableNumber(value)}`, 'Revenue'];
+                        if (performanceMetric === 'profit') return [`₹${formatTableNumber(value)}`, 'Profit'];
+                        return [value, ''];
+                      }}
                       labelFormatter={(label, payload) => {
                         if (payload && payload[0]) {
                           return `${payload[0].payload.fullName} (${payload[0].payload.itemCode})`;
@@ -290,43 +366,111 @@ const AnalyticsFixed = () => {
                         return '';
                       }}
                     />
-                    <Bar dataKey="sold" fill="#3B82F6" />
+                    <Bar 
+                      dataKey={performanceMetric === 'quantity' ? 'sold' : performanceMetric} 
+                      fill={performanceMetric === 'quantity' ? '#3B82F6' : performanceMetric === 'revenue' ? '#10B981' : '#F59E0B'} 
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Revenue Performance</CardTitle>
-                <CardDescription>Revenue generated by top items showing business impact</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={performanceChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="shortName" 
-                      angle={-45} 
-                      textAnchor="end" 
-                      height={100}
-                      fontSize={12}
-                    />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value) => [`₹${formatTableNumber(value)}`, 'Revenue']}
-                      labelFormatter={(label, payload) => {
-                        if (payload && payload[0]) {
-                          return `${payload[0].payload.fullName} (${payload[0].payload.itemCode})`;
-                        }
-                        return '';
-                      }}
-                    />
-                    <Bar dataKey="revenue" fill="#10B981" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
+            {/* Secondary and Tertiary Metrics */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Second Graph */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    {performanceMetric === 'quantity' && 'Their Revenue Performance'}
+                    {performanceMetric === 'revenue' && 'Their Quantity Performance'}
+                    {performanceMetric === 'profit' && 'Their Quantity Performance'}
+                  </CardTitle>
+                  <CardDescription>
+                    {performanceMetric === 'quantity' && 'Revenue generated by top quantity sellers'}
+                    {performanceMetric === 'revenue' && 'Units sold by top revenue generators'}
+                    {performanceMetric === 'profit' && 'Units sold by top profit earners'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <BarChart data={performanceChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="shortName" 
+                        angle={-45} 
+                        textAnchor="end" 
+                        height={100}
+                        fontSize={12}
+                      />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value) => {
+                          if (performanceMetric === 'quantity') return [`₹${formatTableNumber(value)}`, 'Revenue'];
+                          return [`${formatTableNumber(value)} units`, 'Units Sold'];
+                        }}
+                        labelFormatter={(label, payload) => {
+                          if (payload && payload[0]) {
+                            return `${payload[0].payload.fullName} (${payload[0].payload.itemCode})`;
+                          }
+                          return '';
+                        }}
+                      />
+                      <Bar 
+                        dataKey={performanceMetric === 'quantity' ? 'revenue' : 'sold'} 
+                        fill={performanceMetric === 'quantity' ? '#10B981' : '#3B82F6'} 
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Third Graph */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    {performanceMetric === 'quantity' && 'Their Profit Performance'}
+                    {performanceMetric === 'revenue' && 'Their Profit Performance'}
+                    {performanceMetric === 'profit' && 'Their Revenue Performance'}
+                  </CardTitle>
+                  <CardDescription>
+                    {performanceMetric === 'quantity' && 'Profit earned by top quantity sellers'}
+                    {performanceMetric === 'revenue' && 'Profit earned by top revenue generators'}
+                    {performanceMetric === 'profit' && 'Revenue generated by top profit earners'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <BarChart data={performanceChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="shortName" 
+                        angle={-45} 
+                        textAnchor="end" 
+                        height={100}
+                        fontSize={12}
+                      />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value) => {
+                          if (performanceMetric === 'profit') return [`₹${formatTableNumber(value)}`, 'Revenue'];
+                          return [`₹${formatTableNumber(value)}`, 'Profit'];
+                        }}
+                        labelFormatter={(label, payload) => {
+                          if (payload && payload[0]) {
+                            return `${payload[0].payload.fullName} (${payload[0].payload.itemCode})`;
+                          }
+                          return '';
+                        }}
+                      />
+                      <Bar 
+                        dataKey={performanceMetric === 'profit' ? 'revenue' : 'profit'} 
+                        fill={performanceMetric === 'profit' ? '#10B981' : '#F59E0B'} 
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </TabsContent>
 

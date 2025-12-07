@@ -24,17 +24,19 @@ const DatabaseView = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [groupFilter, setGroupFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("");
+  const [gpIndexNoFilter, setGpIndexNoFilter] = useState("");
+  const [aggregated, setAggregated] = useState(false);
 
   useEffect(() => {
     fetchRecords();
-  }, [page, groupFilter, periodFilter]);
+  }, [page, groupFilter, periodFilter, gpIndexNoFilter, aggregated]);
 
   // Reset page when filters change
   useEffect(() => {
     if (page !== 0) {
       setPage(0);
     }
-  }, [groupFilter, periodFilter, searchTerm]);
+  }, [groupFilter, periodFilter, searchTerm, gpIndexNoFilter, aggregated]);
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -47,6 +49,8 @@ const DatabaseView = () => {
       if (searchTerm) params.append("search", searchTerm);
       if (groupFilter !== "all") params.append("group_filter", groupFilter);
       if (periodFilter && periodFilter !== "all-periods") params.append("period_filter", periodFilter);
+      if (gpIndexNoFilter) params.append("gp_index_no", gpIndexNoFilter);
+      if (aggregated) params.append("aggregated", "true");
 
       const response = await fetch(`${API}/database-view?${params}`);
       if (!response.ok) throw new Error("Failed to fetch records");
@@ -235,7 +239,31 @@ const DatabaseView = () => {
               </Select>
             </div>
 
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm font-medium mb-2 block flex items-center">
+                <Filter className="h-4 w-4 mr-1" />
+                Item Code (Gp_Index_No)
+              </label>
+              <Input
+                placeholder="e.g., 1/001009S"
+                value={gpIndexNoFilter}
+                onChange={(e) => setGpIndexNoFilter(e.target.value)}
+              />
+            </div>
+
             <div className="flex gap-2 items-end">
+              <div className="flex items-center space-x-2 px-4 py-2 border rounded-md">
+                <input
+                  type="checkbox"
+                  id="aggregated"
+                  checked={aggregated}
+                  onChange={(e) => setAggregated(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded focus:ring-cyan-500"
+                />
+                <label htmlFor="aggregated" className="text-sm font-medium cursor-pointer">
+                  Aggregated View
+                </label>
+              </div>
               <Button onClick={fetchRecords} variant="outline">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
@@ -268,21 +296,21 @@ const DatabaseView = () => {
                       <TableHead>Item Code</TableHead>
                       <TableHead>Item Name</TableHead>
                       <TableHead>Group</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">W. Rate</TableHead>
-                      <TableHead className="text-right">R. Rate</TableHead>
-                      <TableHead className="text-right">W. Amt</TableHead>
-                      <TableHead className="text-right">R. Amt</TableHead>
-                      <TableHead className="text-right">Profit</TableHead>
-                      <TableHead className="text-right">Stock</TableHead>
-                      <TableHead>Period</TableHead>
+                      <TableHead className="text-right">{aggregated ? "Total Qty" : "Qty"}</TableHead>
+                      {!aggregated && <TableHead className="text-right">W. Rate</TableHead>}
+                      {!aggregated && <TableHead className="text-right">R. Rate</TableHead>}
+                      <TableHead className="text-right">{aggregated ? "Total W. Amt" : "W. Amt"}</TableHead>
+                      <TableHead className="text-right">{aggregated ? "Total R. Amt" : "R. Amt"}</TableHead>
+                      <TableHead className="text-right">{aggregated ? "Total Profit" : "Profit"}</TableHead>
+                      {!aggregated && <TableHead className="text-right">Stock</TableHead>}
+                      <TableHead>{aggregated ? "Periods" : "Period"}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {records.map((record, index) => (
-                      <TableRow key={record.id || index}>
+                      <TableRow key={record.id || record._id || index}>
                         <TableCell className="font-mono text-xs">
-                          {record.pluno || "N/A"}
+                          {aggregated ? record._id : (record.pluno || record.gp_index_no || "N/A")}
                         </TableCell>
                         <TableCell className="max-w-xs">
                           <div className="truncate" title={record.item_name}>
@@ -296,30 +324,42 @@ const DatabaseView = () => {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {record.net_qty || 0}
+                          {aggregated ? (record.total_qty || 0) : (record.net_qty || 0)}
+                        </TableCell>
+                        {!aggregated && (
+                          <TableCell className="text-right font-mono text-sm">
+                            ₹{(record.w_rate || 0).toFixed(2)}
+                          </TableCell>
+                        )}
+                        {!aggregated && (
+                          <TableCell className="text-right font-mono text-sm">
+                            ₹{(record.r_rate || 0).toFixed(2)}
+                          </TableCell>
+                        )}
+                        <TableCell className="text-right font-mono text-sm">
+                          ₹{aggregated ? (record.total_w_amt || 0).toFixed(2) : (record.w_amt || 0).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          ₹{(record.w_rate || 0).toFixed(2)}
+                          ₹{aggregated ? (record.total_r_amt || 0).toFixed(2) : (record.r_amt || 0).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          ₹{(record.r_rate || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          ₹{(record.w_amt || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          ₹{(record.r_amt || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          <span className={record.profit > 0 ? "text-green-600" : "text-red-600"}>
-                            ₹{(record.profit || 0).toFixed(2)}
+                          <span className={(aggregated ? record.total_profit : record.profit) > 0 ? "text-green-600" : "text-red-600"}>
+                            ₹{aggregated ? (record.total_profit || 0).toFixed(2) : (record.profit || 0).toFixed(2)}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
-                          {record.closing_stock || 0}
-                        </TableCell>
+                        {!aggregated && (
+                          <TableCell className="text-right font-mono text-sm">
+                            {record.closing_stock || 0}
+                          </TableCell>
+                        )}
                         <TableCell>
-                          <Badge className="text-xs">{record.data_period || "N/A"}</Badge>
+                          {aggregated ? (
+                            <div className="text-xs text-gray-600">
+                              {record.periods?.length || 0} periods
+                            </div>
+                          ) : (
+                            <Badge className="text-xs">{record.data_period || "N/A"}</Badge>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

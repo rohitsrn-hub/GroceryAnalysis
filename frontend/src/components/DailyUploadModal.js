@@ -58,8 +58,10 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
+      formData.append('upload_type', 'daily');
+      formData.append('data_date', selectedDate);
 
-      const response = await fetch(`${API}/upload-sales-data?upload_type=daily&data_date=${selectedDate}`, {
+      const response = await fetch(`${API}/upload-sales-data`, {
         method: 'POST',
         body: formData,
       });

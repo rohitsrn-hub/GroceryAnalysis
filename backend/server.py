@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import FastAPI, APIRouter, UploadFile, File, HTTPException, Query, Form, Request
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -8,7 +8,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import pandas as pd
 import numpy as np
 from io import BytesIO
@@ -29,6 +29,63 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Note: Grocery app uses URCloh1GrocerySales database
+# Liquor app uses URCloh1LiquorSales database
+# This provides complete data separation without collection prefixes
+
+# Helper function for Indian Number System formatting
+def format_indian_number(number, currency=False, use_rs_prefix=False):
+    """Format number in Indian Number System (Lakhs, Crores)"""
+    if number is None or number == 0:
+        return "Rs 0" if use_rs_prefix else "₹0" if currency else "0"
+    
+    # Handle negative numbers
+    is_negative = number < 0
+    number = abs(number)
+    
+    # Convert to string with 2 decimal places
+    num_str = f"{number:.2f}"
+    
+    # Split into integer and decimal parts
+    parts = num_str.split('.')
+    integer_part = parts[0]
+    decimal_part = parts[1] if len(parts) > 1 else "00"
+    
+    # Format in Indian style
+    if len(integer_part) <= 3:
+        formatted = integer_part
+    else:
+        # Last 3 digits
+        last_three = integer_part[-3:]
+        remaining = integer_part[:-3]
+        
+        # Add commas every 2 digits from right to left
+        groups = []
+        while remaining:
+            if len(remaining) > 2:
+                groups.append(remaining[-2:])
+                remaining = remaining[:-2]
+            else:
+                groups.append(remaining)
+                remaining = ""
+        
+        groups.reverse()
+        formatted = ','.join(groups) + ',' + last_three
+    
+    # Add decimal part
+    result = formatted + '.' + decimal_part
+    
+    # Add negative sign if needed
+    if is_negative:
+        result = '-' + result
+    
+    # Add currency symbol
+    if currency:
+        prefix = "Rs " if use_rs_prefix else "₹"
+        result = prefix + result
+    
+    return result
+
 # Create the main app without a prefix
 app = FastAPI()
 
@@ -42,6 +99,7 @@ class SalesRecord(BaseModel):
     gp_index_no: Optional[str] = None
     pluno: Optional[str] = None
     item_name: Optional[str] = None
+    upload_source: str = "analytics"  # "analytics" or "forecast" - forecast data excluded from analytics
     w_rate: Optional[float] = None  # Wholesale Rate
     r_rate: Optional[float] = None  # Retail Rate
     qty: Optional[int] = None  # Quantity Sold
@@ -111,6 +169,8 @@ class UploadHistory(BaseModel):
     uploaded_by: str = "system"  # Can be extended for multi-user
     file_size_kb: Optional[float] = None
     processing_time_seconds: Optional[float] = None
+    net_amt: Optional[float] = None  # R_Amt from Report Total row for daily uploads
+    w_amt: Optional[float] = None  # W_Amt from Report Total row for daily uploads
 
 
 # Phase 2: Financial Health Models
@@ -357,8 +417,352 @@ def extract_period_from_filename(filename: str) -> Dict[str, Any]:
     
     return result
 
-def process_excel_data(file_content: bytes, filename: str, period_info: Optional[Dict[str, Any]] = None) -> List[Dict]:
-    """Process uploaded Excel file and return structured data with normalized period"""
+def format_indian_currency(amount: float, use_symbol: bool = True) -> str:
+    """Format number in Indian currency format with Rs. prefix
+    
+    Args:
+        amount: The amount to format
+        use_symbol: If True, use 'Rs. ', otherwise no prefix
+    """
+    try:
+        # Handle negative numbers
+        is_negative = amount < 0
+        amount = abs(amount)
+        
+        # Split into integer and decimal parts
+        amount_str = f"{amount:.2f}"
+        integer_part, decimal_part = amount_str.split('.')
+        
+        # Indian numbering: last 3 digits, then groups of 2
+        if len(integer_part) <= 3:
+            formatted = integer_part
+        else:
+            # Last 3 digits
+            last_three = integer_part[-3:]
+            # Remaining digits in groups of 2
+            remaining = integer_part[:-3]
+            # Add commas every 2 digits from right to left
+            formatted_remaining = ''
+            for i in range(len(remaining) - 1, -1, -2):
+                if i == 0:
+                    formatted_remaining = remaining[0] + formatted_remaining
+                else:
+                    formatted_remaining = ',' + remaining[i-1:i+1] + formatted_remaining
+            formatted = formatted_remaining.lstrip(',') + ',' + last_three
+        
+        # Add decimal part
+        if use_symbol:
+            result = f"Rs. {formatted}.{decimal_part}"
+        else:
+            result = f"{formatted}.{decimal_part}"
+        
+        # Add negative sign if needed
+        if is_negative:
+            result = '-' + result
+            
+        return result
+    except Exception as e:
+        logger.error(f"Error formatting currency: {str(e)}")
+        return f"Rs. {amount:,.2f}"
+
+
+def extract_net_amt_from_summary(df: pd.DataFrame) -> Optional[float]:
+    """Extract Net Amt value from TReport Total row's R_Amt column"""
+    try:
+        # First, find the R_Amt column index
+        r_amt_col_idx = None
+        column_names = [str(col).strip().lower() for col in df.columns]
+        
+        for idx, col_name in enumerate(column_names):
+            if 'r_amt' in col_name or 'r amt' in col_name:
+                r_amt_col_idx = idx
+                logger.info(f"Found R_Amt column at index {r_amt_col_idx}: '{df.columns[idx]}'")
+                break
+        
+        if r_amt_col_idx is None:
+            logger.warning("R_Amt column not found in Excel sheet")
+            return None
+        
+        # Log rows around 704-710 (Excel rows 706-712) for debugging
+        logger.info(f"DataFrame has {len(df)} total rows. Checking rows 700-710 for Report Total...")
+        for check_idx in range(max(0, 700), min(len(df), 711)):
+            first_col_val = str(df.iloc[check_idx, 0]).strip() if pd.notna(df.iloc[check_idx, 0]) else ""
+            if check_idx >= 700:  # Log all rows from 700 onwards
+                logger.info(f"  Pandas row {check_idx} (Excel ~{check_idx+2}), Col 0: '{first_col_val}'")
+        
+        # Now look for "Report Total" row - check ALL columns to be thorough
+        for idx, row in df.iterrows():
+            # Check ALL columns for the row label (not just first 5)
+            for col_idx in range(len(row)):
+                cell_value = str(row.iloc[col_idx]).strip() if pd.notna(row.iloc[col_idx]) else ""
+                cell_value_lower = cell_value.lower()
+                
+                # Look for variations of "Report Total" (case-insensitive)
+                if ('report total' in cell_value_lower) or \
+                   ('report' in cell_value_lower and 'total' in cell_value_lower) or \
+                   (cell_value_lower.replace(' ', '') == 'reporttotal'):
+                    
+                    logger.info(f"Found Report Total row at pandas index {idx} (Excel row ~{idx+2}), column {col_idx}: '{cell_value}'")
+                    
+                    # Extract R_Amt value from this row
+                    if r_amt_col_idx < len(row):
+                        r_amt_value = row.iloc[r_amt_col_idx]
+                        logger.debug(f"R_Amt value in Report Total row: {r_amt_value}, type: {type(r_amt_value)}")
+                        
+                        if pd.notna(r_amt_value):
+                            try:
+                                # Handle both numeric and string values
+                                if isinstance(r_amt_value, (int, float)):
+                                    net_amt = float(r_amt_value)
+                                else:
+                                    # Clean string: remove commas, spaces, currency symbols
+                                    cleaned = str(r_amt_value).replace(',', '').replace(' ', '').replace('₹', '').replace('Rs.', '').strip()
+                                    net_amt = float(cleaned)
+                                
+                                if net_amt > 0:  # Sanity check
+                                    logger.info(f"✓ Successfully extracted Net Amt from Report Total R_Amt: Rs. {net_amt:,.2f}")
+                                    return net_amt
+                                else:
+                                    logger.warning(f"Report Total R_Amt value is not positive: {net_amt}")
+                            except (ValueError, TypeError) as e:
+                                logger.warning(f"Failed to convert Report Total R_Amt to float: '{r_amt_value}' - {str(e)}")
+                    
+                    # If we found the row but couldn't extract, log for debugging
+                    logger.warning(f"Found Report Total row but couldn't extract R_Amt value")
+                    break
+        
+        # Fallback: Try looking for "Net Amt" in Summary Details (old method)
+        logger.info("Report Total not found, trying Net Amt in Summary Details...")
+        for idx, row in df.iterrows():
+            for col_idx in range(min(5, len(row))):
+                cell_value = str(row.iloc[col_idx]).strip().lower() if pd.notna(row.iloc[col_idx]) else ""
+                
+                if "net amt" in cell_value or "net amount" in cell_value:
+                    logger.info(f"Found 'Net Amt' label at row {idx}, column {col_idx}")
+                    
+                    # Try column E (index 4)
+                    if len(row) > 4 and pd.notna(row.iloc[4]):
+                        try:
+                            col_e_value = row.iloc[4]
+                            if isinstance(col_e_value, (int, float)):
+                                net_amt = float(col_e_value)
+                            else:
+                                cleaned = str(col_e_value).replace(',', '').replace(' ', '').replace('₹', '').replace('Rs.', '').strip()
+                                net_amt = float(cleaned)
+                            
+                            if net_amt > 0:
+                                logger.info(f"✓ Successfully extracted Net Amt from Summary Details column E: Rs. {net_amt:,.2f}")
+                                return net_amt
+                        except (ValueError, TypeError) as e:
+                            logger.debug(f"Failed to convert Net Amt column E: {str(e)}")
+                    
+                    # Try other columns in same row
+                    for value_col_idx in range(len(row)):
+                        if pd.notna(row.iloc[value_col_idx]):
+                            try:
+                                cell_val = row.iloc[value_col_idx]
+                                if isinstance(cell_val, (int, float)):
+                                    test_val = float(cell_val)
+                                else:
+                                    cleaned = str(cell_val).replace(',', '').replace(' ', '').replace('₹', '').replace('Rs.', '').strip()
+                                    test_val = float(cleaned)
+                                
+                                if test_val > 1000:
+                                    logger.info(f"✓ Found Net Amt at column {value_col_idx}: Rs. {test_val:,.2f}")
+                                    return test_val
+                            except (ValueError, TypeError):
+                                continue
+                    break
+        
+        logger.warning("Net Amt not found in TReport Total or Summary Details - will calculate from records")
+        return None
+    except Exception as e:
+        logger.error(f"Error extracting Net Amt: {str(e)}", exc_info=True)
+        return None
+
+
+def extract_report_total_from_embedded_text(df: pd.DataFrame) -> Optional[Dict[str, float]]:
+    """Search for Report Total embedded within cell text (handles malformed Excel files)
+    
+    Some Excel exports concatenate multiple rows into single cells with _x000D_ or tab characters.
+    This function searches all cells for "Report Total" pattern and extracts R_Amt value.
+    
+    Expected format: "Report Total\t\t\t\t\t\t2,920\t4\t2916\t233,715.34\t224,581.18\t..."
+    Where R_Amt is typically the 4th numeric value (after qty, refund_qty, net_qty)
+    
+    Returns:
+        Dictionary with 'r_amt' and 'w_amt' if found, None otherwise
+    """
+    import re
+    
+    logger.info("Searching for embedded Report Total in all cells...")
+    
+    # Search through all cells for "Report Total" pattern
+    for row_idx in range(len(df)):
+        for col_idx in range(len(df.columns)):
+            cell_value = df.iloc[row_idx, col_idx]
+            
+            if pd.isna(cell_value):
+                continue
+            
+            cell_str = str(cell_value)
+            
+            # Check if this cell contains "Report Total"
+            if 'report total' in cell_str.lower():
+                logger.info(f"Found 'Report Total' embedded in cell at row {row_idx}, col {col_idx}")
+                logger.debug(f"Cell content preview: {cell_str[:200]}...")
+                
+                # Split by newlines/carriage returns to get individual lines
+                lines = re.split(r'[\r\n]+|_x000D_', cell_str)
+                for line in lines:
+                    line_lower = line.lower()
+                    if 'report total' in line_lower:
+                        logger.debug(f"Report Total line found: {line[:200]}")
+                        
+                        # Split by single tabs (not tab+)
+                        parts = line.split('\t')
+                        
+                        # Extract all numeric values
+                        numeric_values = []
+                        for i, part in enumerate(parts):
+                            # Clean the part - remove commas, quotes, apostrophes
+                            cleaned = part.replace(',', '').replace("'", '').replace('"', '').strip()
+                            if cleaned and cleaned != '_x000D_':
+                                try:
+                                    val = float(cleaned)
+                                    numeric_values.append((i, val))
+                                except (ValueError, TypeError):
+                                    continue
+                        
+                        logger.info(f"Found {len(numeric_values)} numeric values in Report Total line")
+                        
+                        # In the standard format:
+                        # Report Total\t\t\t\t\t\t2,920\t4\t2916\t233,715.34\t224,581.18\t'9,134.16\t0.00
+                        # Position: [empty tabs] [qty] [refund] [net_qty] [R_AMT] [W_AMT] [profit] [other]
+                        
+                        # The R_Amt is typically the 4th numeric value (after qty, refund_qty, net_qty)
+                        # It's also typically > 10,000 for a day's sales
+                        
+                        # Filter to amounts that are likely R_Amt or W_Amt (>10,000 and have decimals)
+                        amount_values = [(idx, val) for idx, val in numeric_values if val > 10000]
+                        
+                        logger.info(f"Found {len(amount_values)} amount values (>10000): {amount_values}")
+                        
+                        if amount_values:
+                            # The first amount value is R_Amt
+                            r_amt = amount_values[0][1] if len(amount_values) >= 1 else None
+                            # The second amount value is W_Amt
+                            w_amt = amount_values[1][1] if len(amount_values) >= 2 else None
+                            
+                            logger.info(f"✓ Extracted from embedded text - R_Amt: {r_amt}, W_Amt: {w_amt}")
+                            return {'r_amt': r_amt, 'w_amt': w_amt}
+    
+    logger.warning("Could not find Report Total in embedded text")
+    return None
+
+
+def identify_special_rows(df: pd.DataFrame) -> Dict[str, int]:
+    """Identify special rows like Group Total, Report Total, Summary Details
+    
+    Returns:
+        Dictionary with row indices: {'group_totals': [idx1, idx2], 'report_total': idx, 'summary_start': idx}
+    """
+    special_rows = {
+        'group_totals': [],
+        'report_total': None,
+        'summary_start': None
+    }
+    
+    # Check first column (S.No) for special text
+    first_col = df.iloc[:, 0]
+    
+    for idx, value in enumerate(first_col):
+        if pd.isna(value):
+            continue
+        
+        value_str = str(value).strip().lower()
+        
+        # Check for Group Total
+        if 'group total' in value_str and 'report' not in value_str:
+            special_rows['group_totals'].append(idx)
+            logger.info(f"Found Group Total at row {idx} (Excel row {idx+2})")
+        
+        # Check for Report Total
+        elif 'report total' in value_str:
+            special_rows['report_total'] = idx
+            logger.info(f"Found Report Total at row {idx} (Excel row {idx+2})")
+        
+        # Check for Summary Details
+        elif 'summary details' in value_str or ('summary' in value_str and '*' in value_str):
+            special_rows['summary_start'] = idx
+            logger.info(f"Found Summary Details section at row {idx} (Excel row {idx+2})")
+    
+    return special_rows
+
+
+def extract_report_total_amounts(df: pd.DataFrame, report_total_idx: int) -> Dict[str, Optional[float]]:
+    """Extract R_Amt and W_Amt values from Report Total row
+    
+    Returns:
+        Dictionary with 'r_amt' and 'w_amt' values
+    """
+    result = {'r_amt': None, 'w_amt': None}
+    
+    try:
+        if report_total_idx is None:
+            return result
+        
+        # Find R_Amt column index
+        r_amt_col_idx = None
+        w_amt_col_idx = None
+        
+        for idx, col in enumerate(df.columns):
+            col_lower = str(col).lower()
+            if 'r_amt' in col_lower or 'r amt' in col_lower:
+                r_amt_col_idx = idx
+            elif 'w_amt' in col_lower or 'w amt' in col_lower:
+                w_amt_col_idx = idx
+        
+        # Get Report Total row
+        report_total_row = df.iloc[report_total_idx]
+        
+        # Extract R_Amt
+        if r_amt_col_idx is not None:
+            r_amt_value = report_total_row.iloc[r_amt_col_idx]
+            if pd.notna(r_amt_value):
+                result['r_amt'] = float(r_amt_value)
+                logger.info(f"✓ Extracted Report Total R_Amt: Rs. {result['r_amt']:,.2f}")
+        else:
+            logger.warning("R_Amt column not found for Report Total extraction")
+        
+        # Extract W_Amt
+        if w_amt_col_idx is not None:
+            w_amt_value = report_total_row.iloc[w_amt_col_idx]
+            if pd.notna(w_amt_value):
+                result['w_amt'] = float(w_amt_value)
+                logger.info(f"✓ Extracted Report Total W_Amt: Rs. {result['w_amt']:,.2f}")
+        else:
+            logger.warning("W_Amt column not found for Report Total extraction")
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error extracting Report Total amounts: {str(e)}")
+        return result
+
+
+def process_excel_data(file_content: bytes, filename: str, period_info: Optional[Dict[str, Any]] = None) -> tuple[List[Dict], Optional[float]]:
+    """Process uploaded Excel file (daily/monthly format) and return structured data
+    
+    Daily/Monthly Excel Format:
+    - Headers: S.No, Gp_Index_No, Item_Name, W_Rate, R_Rate, Qty, R_Amt, W_Amt, Profit, O_B, Closing_Stock
+    - S.No can be numbers or #Number format
+    - Gp_Index_No format: "Group Number/Item Number" (e.g., "I/123")
+    - Special rows in S.No column: "Group Total", "Report Total", "Summary Details"
+    - Report Total row contains the actual total we need
+    
+    Returns:
+        tuple: (records list, net_amt from Report Total row)
+    """
     try:
         # Determine engine based on file extension
         file_extension = filename.lower().split('.')[-1]
@@ -396,6 +800,23 @@ def process_excel_data(file_content: bytes, filename: str, period_info: Optional
         # Log initial dataframe shape
         logger.info(f"Processing file {filename}: {len(df)} rows, {len(df.columns)} columns")
         logger.info(f"Columns found: {df.columns.tolist()}")
+        
+        # Identify special rows (Group Total, Report Total, Summary Details)
+        special_rows = identify_special_rows(df)
+        
+        # Extract R_Amt and W_Amt from Report Total row
+        report_total_amounts = extract_report_total_amounts(df, special_rows['report_total'])
+        net_amt_from_report_total = report_total_amounts['r_amt']
+        w_amt_from_report_total = report_total_amounts['w_amt']
+        
+        # If Report Total not found in standard location, search for it in embedded text
+        if net_amt_from_report_total is None:
+            logger.info("Report Total not found in standard location, searching embedded text...")
+            embedded_amounts = extract_report_total_from_embedded_text(df)
+            if embedded_amounts:
+                net_amt_from_report_total = embedded_amounts.get('r_amt')
+                w_amt_from_report_total = embedded_amounts.get('w_amt')
+                logger.info(f"✓ Using Report Total from embedded text: R_Amt={net_amt_from_report_total}, W_Amt={w_amt_from_report_total}")
         
         # Standardize column names (handle both underscore and space-separated formats)
         column_mapping = {
@@ -507,10 +928,30 @@ def process_excel_data(file_content: bytes, filename: str, period_info: Optional
         skipped_rows = []
         skipped_count = 0
         
+        # Create set of special row indices to skip
+        special_row_indices = set(special_rows['group_totals'])
+        if special_rows['report_total'] is not None:
+            special_row_indices.add(special_rows['report_total'])
+        if special_rows['summary_start'] is not None:
+            # Skip all rows from summary section onwards
+            for i in range(special_rows['summary_start'], len(df)):
+                special_row_indices.add(i)
+        
         for idx, row in df.iterrows():
-            # Skip empty rows or rows with invalid data
+            # Skip special rows (Group Total, Report Total, Summary Details section)
+            if idx in special_row_indices:
+                skipped_count += 1
+                s_no_value = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ""
+                if len(skipped_rows) < 10:
+                    skipped_rows.append(f"Row {idx + 2}: '{s_no_value}' - Special row (Group/Report Total or Summary)")
+                continue
+            
+            # Get item details
             item_name = str(row.get('item_name', '')).strip()
-            pluno = str(row.get('pluno', '')).strip()
+            gp_index_no = str(row.get('gp_index_no', '')).strip()
+            
+            # Use gp_index_no as the primary identifier (not pluno for daily data)
+            pluno = gp_index_no
             
             # Skip rows with problematic data or round off amounts
             skip_reason = None
@@ -539,8 +980,11 @@ def process_excel_data(file_content: bytes, filename: str, period_info: Optional
             
             if skip_reason:
                 skipped_count += 1
-                if len(skipped_rows) < 5:  # Only log first 5 for debugging
-                    skipped_rows.append(f"Row {idx + 2}: {item_name[:30]} - {skip_reason}")
+                if len(skipped_rows) < 10:
+                    if gp_index_no:
+                        skipped_rows.append(f"Row {idx + 2}: GP#{gp_index_no}, {item_name[:30]} - {skip_reason}")
+                    else:
+                        skipped_rows.append(f"Row {idx + 2}: {item_name[:30]} - {skip_reason}")
                 continue
                 
             def safe_float(value):
@@ -611,7 +1055,32 @@ def process_excel_data(file_content: bytes, filename: str, period_info: Optional
                 detail=f"No valid records found in the file. Total rows: {len(df)}, Skipped: {skipped_count}. Check data format and ensure items have valid names and product codes. Sample issues: {'; '.join(skipped_rows[:3]) if skipped_rows else 'No specific issues logged'}"
             )
         
-        return records
+        # Use Net Amt from Report Total row if available, otherwise sum from records
+        if net_amt_from_report_total is not None:
+            net_amt = net_amt_from_report_total
+            logger.info(f"Using Net Amt from Report Total row: Rs. {net_amt:,.2f}")
+        else:
+            # Fallback: Calculate by summing R_Amt from all processed records
+            net_amt = 0.0
+            for record in records:
+                if 'r_amt' in record and record['r_amt'] is not None:
+                    try:
+                        net_amt += float(record['r_amt'])
+                    except (ValueError, TypeError):
+                        continue
+            logger.info(f"Report Total not found, calculated Net Amt from {len(records)} records: Rs. {net_amt:,.2f}")
+        
+        # Calculate W_Amt fallback if not in Report Total
+        if w_amt_from_report_total is None:
+            w_amt_from_report_total = 0.0
+            for record in records:
+                if 'w_amt' in record and record['w_amt'] is not None:
+                    try:
+                        w_amt_from_report_total += float(record['w_amt'])
+                    except (ValueError, TypeError):
+                        continue
+        
+        return records, net_amt, w_amt_from_report_total
         
     except HTTPException:
         # Re-raise HTTP exceptions with details
@@ -624,14 +1093,15 @@ def process_excel_data(file_content: bytes, filename: str, period_info: Optional
 @api_router.post("/upload-sales-data")
 async def upload_sales_data(
     file: UploadFile = File(...),
-    upload_type: str = "historical",  # "daily" or "historical"
-    data_date: Optional[str] = None  # Format: "YYYY-MM-DD" for daily uploads
+    upload_type: str = Form("historical"),  # "daily" or "historical"
+    data_date: Optional[str] = Form(None),  # Format: "YYYY-MM-DD" for daily uploads
+    upload_source: str = Form("analytics")  # "analytics" or "forecast"
 ):
     """Upload and process sales data from Excel file with history logging"""
     start_time = datetime.now()
     upload_id = str(uuid.uuid4())
     
-    logger.info(f"Upload attempt: filename={file.filename}, upload_id={upload_id}, type={upload_type}, data_date={data_date}")
+    logger.info(f"Upload attempt: filename={file.filename}, upload_id={upload_id}, type={upload_type}, data_date={data_date}, source={upload_source}")
     
     if not file.filename.endswith(('.xlsx', '.xls')):
         logger.warning(f"Invalid file type: {file.filename}")
@@ -689,13 +1159,15 @@ async def upload_sales_data(
                     )
         
         # Process the data with normalized period information
-        records = process_excel_data(contents, file.filename, period_info)
+        records, net_amt, w_amt = process_excel_data(contents, file.filename, period_info)
         
         if records:
             # Add upload batch tracking to each record
             for record in records:
                 record['upload_batch_id'] = upload_id
                 record['upload_date'] = datetime.now(timezone.utc)
+                # Mark source based on upload_source parameter
+                record['upload_source'] = upload_source
             
             # Insert into MongoDB
             result = await db.sales_records.insert_many([SalesRecord(**record).dict() for record in records])
@@ -722,7 +1194,9 @@ async def upload_sales_data(
                 records_count=len(records),
                 status="success",
                 file_size_kb=file_size_kb,
-                processing_time_seconds=processing_time
+                processing_time_seconds=processing_time,
+                net_amt=net_amt,
+                w_amt=w_amt
             )
             await db.upload_history.insert_one(upload_record.dict())
             
@@ -734,10 +1208,12 @@ async def upload_sales_data(
                 "status": "success",
                 "upload_id": upload_id,
                 "upload_type": upload_type,
+                "upload_source": upload_source,
                 "data_date": data_date,
                 "period_covered": period_info["period"],
                 "data_type": period_info["data_type"],
-                "duplicate_warning": existing is not None
+                "duplicate_warning": existing is not None,
+                "net_amt": net_amt
             }
         else:
             raise HTTPException(
@@ -801,13 +1277,29 @@ async def upload_sales_data(
         )
 
 @api_router.get("/fastest-selling-items")
-async def get_fastest_selling_items(limit: int = Query(10, ge=1, le=50), group: Optional[str] = Query(None)):
+async def get_fastest_selling_items(
+    limit: int = Query(10, ge=1, le=50),
+    group: Optional[str] = Query(None),
+    period: Optional[str] = Query(None)
+):
     """Get fastest selling items with seasonal patterns"""
     try:
-        # Build match filter
-        match_filter = {"net_qty": {"$ne": None, "$exists": True}}
+        # Build match filter - exclude forecast data
+        match_filter = {
+            "upload_source": {"$ne": "forecast"},  # Exclude forecast data
+            "net_qty": {"$ne": None, "$exists": True}
+        }
         if group and group != "all":
             match_filter["product_group"] = group
+        if period and period != "all":
+            if "Current Year" in period:
+                year = period.split(" ")[0]
+                match_filter["data_period"] = {
+                    "$regex": f"({year}|{year[2:]})", 
+                    "$options": "i"
+                }
+            else:
+                match_filter["data_period"] = period
             
         pipeline = [
             {"$match": match_filter},
@@ -820,6 +1312,7 @@ async def get_fastest_selling_items(limit: int = Query(10, ge=1, le=50), group: 
                     },
                     "total_sold": {"$sum": "$net_qty"},
                     "total_revenue": {"$sum": "$r_amt"},
+                    "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
                     "periods": {"$push": {"period": "$data_period", "qty": "$net_qty"}}
                 }
             },
@@ -843,7 +1336,8 @@ async def get_fastest_selling_items(limit: int = Query(10, ge=1, le=50), group: 
                 "avg_monthly_sales": item['total_sold'] / max(len(item['periods']), 1),
                 "group": item['_id']['group'],
                 "seasonal_pattern": seasonal_pattern,
-                "total_revenue": item.get('total_revenue', 0)
+                "total_revenue": item.get('total_revenue', 0),
+                "total_profit": item.get('total_profit', 0)
             })
         
         return fastest_items
@@ -852,13 +1346,21 @@ async def get_fastest_selling_items(limit: int = Query(10, ge=1, le=50), group: 
         raise HTTPException(status_code=500, detail=f"Error fetching fastest selling items: {str(e)}")
 
 @api_router.get("/abc-analysis")
-async def get_abc_analysis(group: Optional[str] = Query(None)):
+async def get_abc_analysis(
+    group: Optional[str] = Query(None),
+    period: Optional[str] = Query(None)
+):
     """Perform ABC analysis - 80/20 rule for inventory classification"""
     try:
-        # Build match filter
-        match_filter = {"net_qty": {"$ne": None, "$exists": True, "$gt": 0}}
+        # Build match filter - exclude forecast data
+        match_filter = {
+            "upload_source": {"$ne": "forecast"},  # Exclude forecast data
+            "net_qty": {"$ne": None, "$exists": True, "$gt": 0}
+        }
         if group and group != "all":
             match_filter["product_group"] = group
+        if period and period != "all":
+            match_filter["data_period"] = period
             
         # Get all items with revenue data
         pipeline = [
@@ -948,12 +1450,17 @@ async def get_abc_analysis(group: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=f"Error in ABC analysis: {str(e)}")
 
 @api_router.get("/capital-blocking-analysis")
-async def get_capital_blocking_analysis(group: Optional[str] = Query(None)):
+async def get_capital_blocking_analysis(
+    group: Optional[str] = Query(None),
+    period: Optional[str] = Query(None)
+):
     """Identify slow moving items with high inventory causing capital blocking"""
     try:
-        match_filter = {}
+        match_filter = {"upload_source": {"$ne": "forecast"}}  # Exclude forecast data
         if group and group != "all":
             match_filter["product_group"] = group
+        if period and period != "all":
+            match_filter["data_period"] = period
             
         pipeline = [
             {"$match": match_filter},
@@ -1028,6 +1535,10 @@ async def get_capital_blocking_analysis(group: Optional[str] = Query(None)):
                 
             item['risk_level'] = risk_level
         
+        # Sort by risk level criticality: CRITICAL -> HIGH -> MEDIUM -> LOW
+        risk_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+        results.sort(key=lambda x: (risk_order.get(x['risk_level'], 999), -x['capital_blocked']))
+        
         return {
             "capital_blocking_items": results,
             "summary": {
@@ -1042,12 +1553,24 @@ async def get_capital_blocking_analysis(group: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=f"Error in capital blocking analysis: {str(e)}")
 
 @api_router.get("/inventory-analysis")
-async def get_inventory_analysis():
+async def get_inventory_analysis(period: Optional[str] = Query(None)):
     """Analyze inventory for slow moving and dead stock"""
     try:
+        # Build match filter
+        match_filter = {"upload_source": {"$ne": "forecast"}}
+        if period and period != "all":
+            if "Current Year" in period:
+                year = period.split(" ")[0]
+                match_filter["data_period"] = {
+                    "$regex": f"({year}|{year[2:]})", 
+                    "$options": "i"
+                }
+            else:
+                match_filter["data_period"] = period
+        
         # Get items with poor performance vs cost
         pipeline_high_cost = [
-            {"$match": {"w_rate": {"$gt": 0}}},
+            {"$match": {**match_filter, "w_rate": {"$gt": 0}}},
             {
                 "$group": {
                     "_id": {"pluno": "$pluno", "item_name": "$item_name"},
@@ -1073,6 +1596,7 @@ async def get_inventory_analysis():
         
         # Dead inventory (no sales but has closing stock)
         pipeline_dead = [
+            {"$match": match_filter},
             {
                 "$group": {
                     "_id": {"pluno": "$pluno", "item_name": "$item_name", "group": "$product_group"},
@@ -1102,6 +1626,7 @@ async def get_inventory_analysis():
         
         # Slow moving (low sales)
         pipeline_slow = [
+            {"$match": match_filter},
             {
                 "$group": {
                     "_id": {"pluno": "$pluno", "item_name": "$item_name"},
@@ -1134,10 +1659,23 @@ async def get_inventory_analysis():
         raise HTTPException(status_code=500, detail=f"Error in inventory analysis: {str(e)}")
 
 @api_router.get("/group-analysis")
-async def get_group_analysis():
+async def get_group_analysis(period: Optional[str] = Query(None)):
     """Analyze performance by product groups"""
     try:
+        # Build match filter
+        match_filter = {"upload_source": {"$ne": "forecast"}}  # Exclude forecast data
+        if period and period != "all":
+            if "Current Year" in period:
+                year = period.split(" ")[0]
+                match_filter["data_period"] = {
+                    "$regex": f"({year}|{year[2:]})", 
+                    "$options": "i"
+                }
+            else:
+                match_filter["data_period"] = period
+            
         pipeline = [
+            {"$match": match_filter},
             {
                 "$group": {
                     "_id": "$product_group",
@@ -1210,14 +1748,69 @@ async def get_group_analysis():
 
 @api_router.get("/comprehensive-report")
 async def generate_comprehensive_report(format: str = Query("excel")):
-    """Generate comprehensive business analysis report"""
+    """Generate comprehensive business analysis report using existing API calculations"""
     try:
-        # Gather all analytics data
-        dashboard_summary = await get_dashboard_summary()
-        abc_analysis = await get_abc_analysis(None)
-        capital_analysis = await get_capital_blocking_analysis(None)
+        # Use existing API endpoints to get pre-calculated data
+        dashboard_summary = await get_dashboard_summary(period=None)
+        
+        # Get ABC analysis using existing endpoint
+        abc_response = await get_abc_analysis(None)
+        abc_analysis = abc_response if isinstance(abc_response, dict) else {}
+        
+        # Get capital blocking analysis using existing endpoint
+        capital_response = await get_capital_blocking_analysis(None)
+        capital_analysis = capital_response if isinstance(capital_response, dict) else {}
+        
+        # Get group analysis
         group_analysis = await get_group_analysis()
-        fastest_items = await get_fastest_selling_items(20)
+        
+        # Get fastest selling items (manually since we can't call with Query params)
+        fastest_pipeline = [
+            {"$match": {"upload_source": {"$ne": "forecast"}}},
+            {"$group": {
+                "_id": {"item_code": "$pluno", "item_name": "$item_name", "group": "$group"},
+                "total_sold": {"$sum": "$net_qty"},
+                "total_revenue": {"$sum": "$net_amt"},
+                "total_profit": {"$sum": "$profit"}
+            }},
+            {"$sort": {"total_sold": -1}},
+            {"$limit": 20}
+        ]
+        fastest_raw = await db.sales_records.aggregate(fastest_pipeline).to_list(None)
+        
+        # Calculate number of months in data
+        date_pipeline = [
+            {"$match": {"upload_source": {"$ne": "forecast"}}},
+            {"$group": {"_id": "$data_period"}},
+            {"$count": "total_months"}
+        ]
+        month_count_result = await db.sales_records.aggregate(date_pipeline).to_list(None)
+        num_months = month_count_result[0]["total_months"] if month_count_result else 1
+        
+        fastest_items = [{
+            "item_code": item["_id"].get("item_code", ""),
+            "item_name": item["_id"].get("item_name", "Unknown"),
+            "group": item["_id"].get("group", "N/A"),
+            "total_sold": item.get("total_sold", 0),
+            "total_revenue": item.get("total_revenue", 0),
+            "total_profit": item.get("total_profit", 0),
+            "avg_monthly_sales": item.get("total_sold", 0) / max(num_months, 1),
+            "profit_margin": (item.get("total_profit", 0) / item.get("total_revenue", 1) * 100) if item.get("total_revenue", 0) > 0 else 0
+        } for item in fastest_raw]
+        
+        # Get slowest selling items (capital blockers)
+        slowest_pipeline = [
+            {"$match": {"upload_source": {"$ne": "forecast"}, "closing_stock": {"$gt": 0}}},
+            {"$group": {
+                "_id": {"item_code": "$pluno", "item_name": "$item_name", "group": "$group"},
+                "total_sold": {"$sum": "$net_qty"},
+                "avg_closing_stock": {"$avg": "$closing_stock"},
+                "capital_blocked": {"$sum": {"$multiply": ["$closing_stock", "$w_rate"]}}
+            }},
+            {"$sort": {"total_sold": 1}},
+            {"$limit": 20}
+        ]
+        slowest_items = await db.sales_records.aggregate(slowest_pipeline).to_list(None)
         
         if format == "excel":
             # Create comprehensive Excel report
@@ -1231,36 +1824,54 @@ async def generate_comprehensive_report(format: str = Query("excel")):
             ws_summary.append(["Generated on:", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
             ws_summary.append([""])
             ws_summary.append(["KEY METRICS"])
-            ws_summary.append(["Total Revenue", f"₹{dashboard_summary['total_revenue']:,.2f}"])
-            ws_summary.append(["Total Profit", f"₹{dashboard_summary['total_profit']:,.2f}"])
+            ws_summary.append(["Total Revenue", format_indian_number(dashboard_summary['total_revenue'], currency=True)])
+            ws_summary.append(["Total Profit", format_indian_number(dashboard_summary['total_profit'], currency=True)])
             ws_summary.append(["Profit Margin", f"{dashboard_summary['profit_margin']:.2f}%"])
             ws_summary.append(["Total Items Sold", f"{dashboard_summary['total_items_sold']:,}"])
             ws_summary.append(["Total Records", f"{dashboard_summary['total_records']:,}"])
             
             # ABC Analysis Sheet
             ws_abc = workbook.create_sheet("ABC Analysis")
-            ws_abc.append(["Category", "Items", "% of Items", "Revenue", "% of Revenue"])
-            for category in ['A', 'B', 'C']:
-                cat_data = abc_analysis['summary'][f'category_{category}']
-                ws_abc.append([
-                    f"Category {category}",
-                    cat_data['item_count'],
-                    f"{cat_data['percentage_items']:.1f}%",
-                    f"₹{cat_data['revenue']:,.2f}",
-                    f"{(cat_data['revenue']/abc_analysis['summary']['total_revenue'])*100:.1f}%"
-                ])
+            ws_abc.append(["Category", "Items", "% of Items", "Revenue", "% of Revenue", "Recommendation"])
+            
+            if abc_analysis and 'summary' in abc_analysis:
+                summary = abc_analysis['summary']
+                total_rev = summary.get('total_revenue', 0)
+                
+                categories_data = [
+                    ('A', summary.get('category_A', {}), "FOCUS: Ensure consistent stock availability"),
+                    ('B', summary.get('category_B', {}), "MONITOR: Balance stock levels carefully"),
+                    ('C', summary.get('category_C', {}), "REVIEW: Consider reducing inventory or discontinuing")
+                ]
+                
+                for cat_name, cat_data, recommendation in categories_data:
+                    item_count = cat_data.get('item_count', 0)
+                    revenue = cat_data.get('revenue', 0)
+                    pct_items = cat_data.get('percentage_items', 0)
+                    revenue_pct = (revenue/total_rev)*100 if total_rev > 0 else 0
+                    
+                    ws_abc.append([
+                        f"Category {cat_name}",
+                        item_count,
+                        f"{pct_items:.1f}%",
+                        format_indian_number(revenue, currency=True),
+                        f"{revenue_pct:.1f}%",
+                        recommendation
+                    ])
+            else:
+                ws_abc.append(["No ABC analysis data available", "", "", "", "", ""])
             
             # Capital Blocking Sheet
             ws_capital = workbook.create_sheet("Capital Blocking")
             ws_capital.append(["Item Code", "Item Name", "Group", "Capital Blocked", "Risk Level", "Days to Sell"])
             for item in capital_analysis['capital_blocking_items'][:50]:
                 ws_capital.append([
-                    item['_id']['pluno'],
-                    item['_id']['item_name'],
-                    item['_id']['group'],
-                    f"₹{item['capital_blocked']:,.2f}",
-                    item['risk_level'],
-                    item['days_to_sell'] if item['days_to_sell'] != 9999 else "∞"
+                    item.get('_id', {}).get('pluno', 'N/A'),
+                    item.get('_id', {}).get('item_name', 'Unknown'),
+                    item.get('_id', {}).get('group', 'N/A'),
+                    format_indian_number(item.get('capital_blocked', 0), currency=True),
+                    item.get('risk_level', 'N/A'),
+                    item.get('days_to_sell', 'N/A') if item.get('days_to_sell', 'N/A') != 9999 else "∞"
                 ])
             
             # Group Performance Sheet
@@ -1270,41 +1881,168 @@ async def generate_comprehensive_report(format: str = Query("excel")):
                 ws_groups.append([
                     group['group'],
                     group['item_count'],
-                    f"₹{group['total_revenue']:,.2f}",
-                    f"₹{group['total_profit']:,.2f}",
+                    format_indian_number(group['total_revenue'], currency=True),
+                    format_indian_number(group['total_profit'], currency=True),
                     f"{group['profit_margin']:.2f}%"
                 ])
             
-            # Top Performers Sheet
+            # Top Performers Sheet with actionable insights
             ws_top = workbook.create_sheet("Top Performers")
-            ws_top.append(["Rank", "Item Code", "Item Name", "Group", "Units Sold", "Revenue", "Monthly Avg"])
+            ws_top.append(["Rank", "Item Code", "Item Name", "Group", "Units Sold", "Revenue", "Profit", "Margin %", "Monthly Avg", "Stock Status"])
             for i, item in enumerate(fastest_items, 1):
+                # Determine stock recommendation
+                monthly_avg = item['avg_monthly_sales']
+                if monthly_avg > 100:
+                    stock_status = "HIGH PRIORITY: Maintain 20+ days stock"
+                elif monthly_avg > 50:
+                    stock_status = "IMPORTANT: Maintain 15 days stock"
+                else:
+                    stock_status = "MONITOR: Maintain 10 days stock"
+                
                 ws_top.append([
                     i,
                     item['item_code'],
                     item['item_name'],
                     item['group'],
-                    item['total_sold'],
-                    f"₹{item['total_revenue']:,.2f}",
-                    f"{item['avg_monthly_sales']:.1f}"
+                    f"{item['total_sold']:,.0f}",
+                    format_indian_number(item['total_revenue'], currency=True),
+                    format_indian_number(item['total_profit'], currency=True),
+                    f"{item['profit_margin']:.2f}%",
+                    f"{monthly_avg:.1f}",
+                    stock_status
                 ])
             
-            # Recommendations Sheet
-            ws_rec = workbook.create_sheet("Recommendations")
-            ws_rec.append(["STRATEGIC RECOMMENDATIONS"])
+            # Add Slow Movers Sheet for liquidation planning
+            ws_slow = workbook.create_sheet("Items to Liquidate")
+            ws_slow.append(["Rank", "Item Code", "Item Name", "Group", "Units Sold (Total)", "Avg Stock", "Capital Blocked", "Action Required"])
+            for i, item in enumerate(slowest_items, 1):
+                capital_blocked = item.get('capital_blocked', 0)
+                action = "URGENT: Discount & Clear" if capital_blocked > 10000 else "Plan Clearance Sale"
+                
+                ws_slow.append([
+                    i,
+                    item['_id'].get('item_code', 'N/A'),
+                    item['_id'].get('item_name', 'Unknown'),
+                    item['_id'].get('group', 'N/A'),
+                    f"{item.get('total_sold', 0):,.0f}",
+                    f"{item.get('avg_closing_stock', 0):.1f}",
+                    format_indian_number(capital_blocked, currency=True),
+                    action
+                ])
+            
+            # Smart Recommendations Sheet
+            ws_rec = workbook.create_sheet("Smart Recommendations")
+            ws_rec.append(["STRATEGIC INVENTORY & PROCUREMENT RECOMMENDATIONS"])
+            ws_rec.append(["Generated on:", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
             ws_rec.append([""])
-            ws_rec.append(["1. CAPITAL OPTIMIZATION"])
-            ws_rec.append([f"• {capital_analysis['summary']['critical_items']} items require immediate liquidation"])
-            ws_rec.append([f"• Total blocked capital: ₹{capital_analysis['summary']['total_capital_blocked']:,.2f}"])
+            
+            # 1. IMMEDIATE ACTIONS (Capital Optimization)
+            ws_rec.append(["1. IMMEDIATE ACTIONS - CAPITAL OPTIMIZATION"])
             ws_rec.append([""])
-            ws_rec.append(["2. INVENTORY FOCUS"])
-            ws_rec.append([f"• Focus on Category A items ({abc_analysis['summary']['category_A']['item_count']} items generating 80% revenue)"])
-            ws_rec.append([f"• Review Category C items ({abc_analysis['summary']['category_C']['item_count']} items generating only 5% revenue)"])
+            if capital_analysis and 'summary' in capital_analysis:
+                critical_count = capital_analysis['summary'].get('critical_items', 0)
+                total_blocked = capital_analysis['summary'].get('total_capital_blocked', 0)
+                ws_rec.append([f"⚠️ URGENT: {critical_count} items blocking excessive capital"])
+                ws_rec.append([f"   Total Capital Blocked: {format_indian_number(total_blocked, currency=True)}"])
+                ws_rec.append([""])
+                ws_rec.append(["   ACTION PLAN:"])
+                ws_rec.append(["   • Offer discounts (10-15%) on slow-moving high-value items"])
+                ws_rec.append(["   • Create combo offers with fast-moving items"])
+                ws_rec.append(["   • Stop new procurement for these items until stock reduces by 70%"])
+                ws_rec.append(["   • Potential capital recovery: {}".format(format_indian_number(total_blocked * 0.7, currency=True))])
             ws_rec.append([""])
-            ws_rec.append(["3. GROUP PERFORMANCE"])
-            top_group = max(group_analysis, key=lambda x: x['total_revenue'])
-            ws_rec.append([f"• {top_group['group']} is the top revenue generator"])
-            ws_rec.append(["• Consider expanding high-margin groups"])
+            
+            # 2. PROCUREMENT STRATEGY (ABC-based)
+            ws_rec.append(["2. SMART PROCUREMENT STRATEGY (Next 3 Months)"])
+            ws_rec.append([""])
+            if abc_analysis and 'summary' in abc_analysis:
+                cat_a = abc_analysis['summary'].get('category_A', {})
+                cat_b = abc_analysis['summary'].get('category_B', {})
+                cat_c = abc_analysis['summary'].get('category_C', {})
+                
+                ws_rec.append([f"📈 CATEGORY A ({cat_a.get('item_count', 0)} items - {cat_a.get('percentage_items', 0):.1f}% of inventory)"])
+                ws_rec.append([f"   Current Revenue Contribution: {format_indian_number(cat_a.get('revenue', 0), currency=True)} (80% of total)"])
+                ws_rec.append(["   PROCUREMENT ACTION:"])
+                ws_rec.append(["   • Maintain 15-20 days of safety stock at all times"])
+                ws_rec.append(["   • Weekly monitoring and procurement trigger"])
+                ws_rec.append(["   • Negotiate better rates due to high volume"])
+                ws_rec.append(["   • Expected profit increase: 2-3% through better pricing"])
+                ws_rec.append([""])
+                
+                ws_rec.append([f"📊 CATEGORY B ({cat_b.get('item_count', 0)} items - {cat_b.get('percentage_items', 0):.1f}% of inventory)"])
+                ws_rec.append([f"   Current Revenue Contribution: {format_indian_number(cat_b.get('revenue', 0), currency=True)}"])
+                ws_rec.append(["   PROCUREMENT ACTION:"])
+                ws_rec.append(["   • Maintain 10-12 days of stock"])
+                ws_rec.append(["   • Bi-weekly review and procurement"])
+                ws_rec.append(["   • Monitor for potential upgrade to Category A"])
+                ws_rec.append([""])
+                
+                ws_rec.append([f"📉 CATEGORY C ({cat_c.get('item_count', 0)} items - {cat_c.get('percentage_items', 0):.1f}% of inventory)"])
+                ws_rec.append([f"   Current Revenue Contribution: {format_indian_number(cat_c.get('revenue', 0), currency=True)} (only 5% of total)"])
+                ws_rec.append(["   PROCUREMENT ACTION:"])
+                ws_rec.append(["   • REDUCE to 5-7 days stock or minimum order quantity"])
+                ws_rec.append(["   • Consider discontinuing bottom 50% of items"])
+                ws_rec.append(["   • Free up capital for Category A items"])
+                ws_rec.append([f"   • Potential capital saving: {format_indian_number(cat_c.get('revenue', 0) * 0.3, currency=True)}"])
+            ws_rec.append([""])
+            
+            # 3. GROUP-WISE STRATEGY
+            ws_rec.append(["3. PRODUCT GROUP OPTIMIZATION"])
+            ws_rec.append([""])
+            if group_analysis and len(group_analysis) > 0:
+                # Sort by profit margin
+                sorted_groups = sorted(group_analysis, key=lambda x: x.get('profit_margin', 0), reverse=True)
+                top_margin_group = sorted_groups[0] if sorted_groups else None
+                top_revenue_group = max(group_analysis, key=lambda x: x.get('total_revenue', 0))
+                
+                if top_revenue_group:
+                    ws_rec.append([f"💰 TOP REVENUE GROUP: {top_revenue_group['group']}"])
+                    ws_rec.append([f"   Revenue: {format_indian_number(top_revenue_group['total_revenue'], currency=True)}"])
+                    ws_rec.append([f"   Profit: {format_indian_number(top_revenue_group['total_profit'], currency=True)} ({top_revenue_group['profit_margin']:.2f}%)"])
+                    ws_rec.append(["   STRATEGY: Expand product range, secure better supplier terms"])
+                    ws_rec.append([""])
+                
+                if top_margin_group and top_margin_group != top_revenue_group:
+                    ws_rec.append([f"⭐ HIGHEST MARGIN GROUP: {top_margin_group['group']}"])
+                    ws_rec.append([f"   Margin: {top_margin_group['profit_margin']:.2f}%"])
+                    ws_rec.append([f"   Revenue: {format_indian_number(top_margin_group['total_revenue'], currency=True)}"])
+                    ws_rec.append(["   STRATEGY: Increase visibility and promotional efforts"])
+                    ws_rec.append([""])
+            
+            # 4. PROFITABILITY BOOST
+            ws_rec.append(["4. PROFIT MAXIMIZATION PLAN"])
+            ws_rec.append([""])
+            current_profit = dashboard_summary.get('total_profit', 0)
+            current_margin = dashboard_summary.get('profit_margin', 0)
+            
+            ws_rec.append([f"Current Profit: {format_indian_number(current_profit, currency=True)} ({current_margin:.2f}%)"])
+            ws_rec.append([""])
+            ws_rec.append(["ACTIONS TO INCREASE PROFIT BY 15-20%:"])
+            ws_rec.append([""])
+            ws_rec.append(["✓ REDUCE CAPITAL BLOCKING (3-5% profit boost)"])
+            ws_rec.append(["  • Liquidate slow-moving inventory"])
+            ws_rec.append(["  • Redeploy capital to high-margin items"])
+            ws_rec.append([f"  • Estimated additional profit: {format_indian_number(current_profit * 0.04, currency=True)}"])
+            ws_rec.append([""])
+            ws_rec.append(["✓ FOCUS ON CATEGORY A (5-7% profit boost)"])
+            ws_rec.append(["  • Never run out of stock on top performers"])
+            ws_rec.append(["  • Negotiate volume discounts (0.5-1% cost reduction)"])
+            ws_rec.append([f"  • Estimated additional profit: {format_indian_number(current_profit * 0.06, currency=True)}"])
+            ws_rec.append([""])
+            ws_rec.append(["✓ OPTIMIZE CATEGORY C (2-3% profit boost)"])
+            ws_rec.append(["  • Reduce 50% of Category C inventory"])
+            ws_rec.append(["  • Eliminate holding costs and wastage"])
+            ws_rec.append([f"  • Estimated additional profit: {format_indian_number(current_profit * 0.025, currency=True)}"])
+            ws_rec.append([""])
+            ws_rec.append(["✓ IMPROVE HIGH-MARGIN GROUPS (3-5% profit boost)"])
+            ws_rec.append(["  • Increase stock and visibility of high-margin items"])
+            ws_rec.append(["  • Better merchandising and placement"])
+            ws_rec.append([f"  • Estimated additional profit: {format_indian_number(current_profit * 0.04, currency=True)}"])
+            ws_rec.append([""])
+            total_potential = current_profit * 0.18
+            ws_rec.append([f"🎯 TOTAL POTENTIAL PROFIT INCREASE: {format_indian_number(total_potential, currency=True)}"])
+            ws_rec.append([f"   New Projected Profit: {format_indian_number(current_profit + total_potential, currency=True)}"])
+            ws_rec.append([f"   New Projected Margin: {((current_profit + total_potential) / dashboard_summary.get('total_revenue', 1) * 100):.2f}%"])
             
             # Save to temporary file for better download handling
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
@@ -1319,54 +2057,258 @@ async def generate_comprehensive_report(format: str = Query("excel")):
             )
             
         elif format == "pdf":
-            # Create HTML content for PDF conversion
+            # Create comprehensive HTML content matching Excel report
+            
+            # Prepare data safely
+            abc_summary = abc_analysis.get('summary', {}) if abc_analysis else {}
+            cat_a = abc_summary.get('category_A', {'item_count': 0, 'revenue': 0, 'percentage_items': 0})
+            cat_b = abc_summary.get('category_B', {'item_count': 0, 'revenue': 0, 'percentage_items': 0})
+            cat_c = abc_summary.get('category_C', {'item_count': 0, 'revenue': 0, 'percentage_items': 0})
+            
+            capital_summary = capital_analysis.get('summary', {}) if capital_analysis else {}
+            critical_items = capital_summary.get('critical_items', 0)
+            total_blocked = capital_summary.get('total_capital_blocked', 0)
+            
+            current_profit = dashboard_summary.get('total_profit', 0)
+            current_revenue = dashboard_summary.get('total_revenue', 1)
+            current_margin = dashboard_summary.get('profit_margin', 0)
+            
+            # Build Top Performers HTML
+            top_performers_html = ""
+            for i, item in enumerate(fastest_items[:10], 1):
+                top_performers_html += f"""
+                <tr>
+                    <td>{i}</td>
+                    <td>{item['item_code']}</td>
+                    <td>{item['item_name']}</td>
+                    <td>{item['group']}</td>
+                    <td>{item['total_sold']:,.0f}</td>
+                    <td>{format_indian_number(item['total_revenue'], currency=True, use_rs_prefix=True)}</td>
+                    <td>{format_indian_number(item['total_profit'], currency=True, use_rs_prefix=True)}</td>
+                    <td>{item['profit_margin']:.2f}%</td>
+                </tr>
+                """
+            
+            # Build Group Performance HTML
+            group_html = ""
+            for group in group_analysis[:10]:
+                group_html += f"""
+                <tr>
+                    <td>{group['group']}</td>
+                    <td>{group['item_count']}</td>
+                    <td>{format_indian_number(group['total_revenue'], currency=True, use_rs_prefix=True)}</td>
+                    <td>{format_indian_number(group['total_profit'], currency=True, use_rs_prefix=True)}</td>
+                    <td>{group['profit_margin']:.2f}%</td>
+                </tr>
+                """
+            
             html_content = f"""
             <!DOCTYPE html>
             <html>
             <head>
                 <title>URC 101 Area - Comprehensive Sales Analysis Report</title>
                 <style>
-                    body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                    .header {{ text-align: center; margin-bottom: 30px; }}
-                    .section {{ margin-bottom: 30px; }}
-                    .table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
-                    .table th, .table td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-                    .table th {{ background-color: #f2f2f2; }}
-                    .metric {{ background-color: #f8f9fa; padding: 15px; margin: 10px 0; border-left: 4px solid #007bff; }}
+                    body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
+                    .header {{ text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; }}
+                    .section {{ margin-bottom: 30px; page-break-inside: avoid; }}
+                    .section-title {{ color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-bottom: 20px; }}
+                    .table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; font-size: 13px; }}
+                    .table th, .table td {{ border: 1px solid #ddd; padding: 10px; text-align: left; }}
+                    .table th {{ background-color: #667eea; color: white; font-weight: bold; }}
+                    .table tr:nth-child(even) {{ background-color: #f8f9fa; }}
+                    .metric {{ background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #667eea; }}
+                    .metric-value {{ font-size: 24px; font-weight: bold; color: #667eea; }}
+                    .recommendation {{ background-color: #fff3cd; padding: 12px; margin: 8px 0; border-left: 4px solid #ffc107; border-radius: 5px; }}
+                    .urgent {{ background-color: #f8d7da; border-left-color: #dc3545; }}
+                    .success {{ background-color: #d4edda; border-left-color: #28a745; }}
+                    .info {{ background-color: #d1ecf1; border-left-color: #17a2b8; }}
+                    ul {{ list-style-type: none; padding-left: 0; }}
+                    li {{ padding: 8px 0; padding-left: 25px; position: relative; }}
+                    li:before {{ content: "►"; position: absolute; left: 0; color: #667eea; }}
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <h1>URC 101 Area - Comprehensive Sales Analysis Report</h1>
-                    <p>Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+                    <h1>🏪 URC 101 Area - Comprehensive Sales Analysis Report</h1>
+                    <p style="margin: 5px 0;">Generated on: {datetime.now().strftime("%d %B %Y, %H:%M:%S")}</p>
+                    <p style="margin: 5px 0; font-size: 14px;">Strategic Inventory & Procurement Intelligence</p>
                 </div>
                 
+                <!-- EXECUTIVE SUMMARY -->
                 <div class="section">
-                    <h2>Executive Summary</h2>
-                    <div class="metric">Total Revenue: ₹{dashboard_summary['total_revenue']:,.2f}</div>
-                    <div class="metric">Total Profit: ₹{dashboard_summary['total_profit']:,.2f}</div>
-                    <div class="metric">Profit Margin: {dashboard_summary['profit_margin']:.2f}%</div>
-                    <div class="metric">Items Sold: {dashboard_summary['total_items_sold']:,}</div>
+                    <h2 class="section-title">📊 Executive Summary</h2>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="metric">
+                            <div>Total Revenue</div>
+                            <div class="metric-value">{format_indian_number(dashboard_summary.get('total_revenue', 0), currency=True, use_rs_prefix=True)}</div>
+                        </div>
+                        <div class="metric">
+                            <div>Total Profit</div>
+                            <div class="metric-value">{format_indian_number(current_profit, currency=True, use_rs_prefix=True)}</div>
+                        </div>
+                        <div class="metric">
+                            <div>Profit Margin</div>
+                            <div class="metric-value">{current_margin:.2f}%</div>
+                        </div>
+                        <div class="metric">
+                            <div>Items Sold</div>
+                            <div class="metric-value">{dashboard_summary.get('total_items_sold', 0):,}</div>
+                        </div>
+                    </div>
                 </div>
                 
+                <!-- ABC ANALYSIS -->
                 <div class="section">
-                    <h2>ABC Analysis Summary</h2>
+                    <h2 class="section-title">📈 ABC Analysis - Inventory Classification</h2>
                     <table class="table">
-                        <tr><th>Category</th><th>Items</th><th>% of Items</th><th>Revenue</th><th>% of Revenue</th></tr>
-                        <tr><td>Category A (Fast Moving)</td><td>{abc_analysis['summary']['category_A']['item_count']}</td><td>{abc_analysis['summary']['category_A']['percentage_items']:.1f}%</td><td>₹{abc_analysis['summary']['category_A']['revenue']:,.2f}</td><td>80%</td></tr>
-                        <tr><td>Category B (Medium Moving)</td><td>{abc_analysis['summary']['category_B']['item_count']}</td><td>{abc_analysis['summary']['category_B']['percentage_items']:.1f}%</td><td>₹{abc_analysis['summary']['category_B']['revenue']:,.2f}</td><td>15%</td></tr>
-                        <tr><td>Category C (Slow Moving)</td><td>{abc_analysis['summary']['category_C']['item_count']}</td><td>{abc_analysis['summary']['category_C']['percentage_items']:.1f}%</td><td>₹{abc_analysis['summary']['category_C']['revenue']:,.2f}</td><td>5%</td></tr>
+                        <tr>
+                            <th>Category</th>
+                            <th>Items</th>
+                            <th>% of Items</th>
+                            <th>Revenue</th>
+                            <th>% of Revenue</th>
+                            <th>Strategy</th>
+                        </tr>
+                        <tr style="background-color: #d4edda;">
+                            <td><strong>Category A (High Value)</strong></td>
+                            <td>{cat_a.get('item_count', 0)}</td>
+                            <td>{cat_a.get('percentage_items', 0):.1f}%</td>
+                            <td>{format_indian_number(cat_a.get('revenue', 0), currency=True, use_rs_prefix=True)}</td>
+                            <td>~80%</td>
+                            <td>FOCUS: Ensure consistent stock</td>
+                        </tr>
+                        <tr style="background-color: #fff3cd;">
+                            <td><strong>Category B (Medium Value)</strong></td>
+                            <td>{cat_b.get('item_count', 0)}</td>
+                            <td>{cat_b.get('percentage_items', 0):.1f}%</td>
+                            <td>{format_indian_number(cat_b.get('revenue', 0), currency=True, use_rs_prefix=True)}</td>
+                            <td>~15%</td>
+                            <td>MONITOR: Balance stock levels</td>
+                        </tr>
+                        <tr style="background-color: #f8d7da;">
+                            <td><strong>Category C (Low Value)</strong></td>
+                            <td>{cat_c.get('item_count', 0)}</td>
+                            <td>{cat_c.get('percentage_items', 0):.1f}%</td>
+                            <td>{format_indian_number(cat_c.get('revenue', 0), currency=True, use_rs_prefix=True)}</td>
+                            <td>~5%</td>
+                            <td>REVIEW: Reduce or discontinue</td>
+                        </tr>
                     </table>
                 </div>
                 
+                <!-- TOP PERFORMERS -->
                 <div class="section">
-                    <h2>Strategic Recommendations</h2>
-                    <ul>
-                        <li>Focus on Category A items ({abc_analysis['summary']['category_A']['item_count']} items generating 80% revenue)</li>
-                        <li>Review Category C items ({abc_analysis['summary']['category_C']['item_count']} items generating only 5% revenue)</li>
-                        <li>{capital_analysis['summary']['critical_items']} items require immediate liquidation</li>
-                        <li>Total blocked capital: ₹{capital_analysis['summary']['total_capital_blocked']:,.2f}</li>
-                    </ul>
+                    <h2 class="section-title">⭐ Top 10 Performing Items</h2>
+                    <table class="table">
+                        <tr>
+                            <th>#</th>
+                            <th>Item Code</th>
+                            <th>Item Name</th>
+                            <th>Group</th>
+                            <th>Units Sold</th>
+                            <th>Revenue</th>
+                            <th>Profit</th>
+                            <th>Margin %</th>
+                        </tr>
+                        {top_performers_html}
+                    </table>
+                </div>
+                
+                <!-- GROUP PERFORMANCE -->
+                <div class="section">
+                    <h2 class="section-title">🏷️ Product Group Performance</h2>
+                    <table class="table">
+                        <tr>
+                            <th>Group</th>
+                            <th>Items</th>
+                            <th>Revenue</th>
+                            <th>Profit</th>
+                            <th>Margin %</th>
+                        </tr>
+                        {group_html}
+                    </table>
+                </div>
+                
+                <!-- SMART RECOMMENDATIONS -->
+                <div class="section">
+                    <h2 class="section-title">💡 Strategic Recommendations & Action Plan</h2>
+                    
+                    <h3 style="color: #dc3545; margin-top: 20px;">⚠️ 1. IMMEDIATE ACTIONS - Capital Optimization</h3>
+                    <div class="recommendation urgent">
+                        <strong>URGENT:</strong> {critical_items} items blocking excessive capital<br>
+                        <strong>Total Capital Blocked:</strong> {format_indian_number(total_blocked, currency=True, use_rs_prefix=True)}<br>
+                        <strong>Potential Recovery:</strong> {format_indian_number(total_blocked * 0.7, currency=True, use_rs_prefix=True)}
+                    </div>
+                    <div class="recommendation">
+                        <strong>ACTION PLAN:</strong>
+                        <ul>
+                            <li>Offer 10-15% discounts on slow-moving high-value items</li>
+                            <li>Create combo offers with fast-moving products</li>
+                            <li>Stop new procurement until stock reduces by 70%</li>
+                        </ul>
+                    </div>
+                    
+                    <h3 style="color: #28a745; margin-top: 20px;">📈 2. PROCUREMENT STRATEGY (Next 3 Months)</h3>
+                    
+                    <div class="recommendation success">
+                        <strong>CATEGORY A ({cat_a.get('item_count', 0)} items):</strong><br>
+                        Revenue Contribution: {format_indian_number(cat_a.get('revenue', 0), currency=True, use_rs_prefix=True)} (80% of total)<br>
+                        <strong>Actions:</strong>
+                        <ul>
+                            <li>Maintain 15-20 days safety stock</li>
+                            <li>Weekly monitoring and procurement</li>
+                            <li>Negotiate volume discounts (2-3% cost reduction possible)</li>
+                            <li>Expected profit increase: 2-3%</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="recommendation info">
+                        <strong>CATEGORY B ({cat_b.get('item_count', 0)} items):</strong><br>
+                        Revenue Contribution: {format_indian_number(cat_b.get('revenue', 0), currency=True, use_rs_prefix=True)}<br>
+                        <strong>Actions:</strong>
+                        <ul>
+                            <li>Maintain 10-12 days stock</li>
+                            <li>Bi-weekly review and procurement</li>
+                            <li>Monitor for upgrade to Category A potential</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="recommendation urgent">
+                        <strong>CATEGORY C ({cat_c.get('item_count', 0)} items):</strong><br>
+                        Revenue Contribution: {format_indian_number(cat_c.get('revenue', 0), currency=True, use_rs_prefix=True)} (only 5% of total)<br>
+                        <strong>Actions:</strong>
+                        <ul>
+                            <li>REDUCE to 5-7 days stock or minimum order quantity</li>
+                            <li>Consider discontinuing bottom 50% items</li>
+                            <li>Free up capital for Category A expansion</li>
+                            <li>Potential capital saving: {format_indian_number(cat_c.get('revenue', 0) * 0.3, currency=True, use_rs_prefix=True)}</li>
+                        </ul>
+                    </div>
+                    
+                    <h3 style="color: #667eea; margin-top: 20px;">🎯 3. PROFIT MAXIMIZATION PLAN</h3>
+                    <div class="recommendation" style="background-color: #e7f3ff; border-left-color: #667eea;">
+                        <strong>Current Performance:</strong><br>
+                        Profit: {format_indian_number(current_profit, currency=True, use_rs_prefix=True)} | Margin: {current_margin:.2f}%
+                        <br><br>
+                        <strong>PROJECTED PROFIT INCREASE: 15-20%</strong>
+                        <ul>
+                            <li><strong>Reduce Capital Blocking (3-5% boost):</strong> Liquidate slow movers → Est. {format_indian_number(current_profit * 0.04, currency=True, use_rs_prefix=True)}</li>
+                            <li><strong>Focus on Category A (5-7% boost):</strong> Never stock out, volume discounts → Est. {format_indian_number(current_profit * 0.06, currency=True, use_rs_prefix=True)}</li>
+                            <li><strong>Optimize Category C (2-3% boost):</strong> Reduce inventory, cut holding costs → Est. {format_indian_number(current_profit * 0.025, currency=True, use_rs_prefix=True)}</li>
+                            <li><strong>High-Margin Groups (3-5% boost):</strong> Better merchandising → Est. {format_indian_number(current_profit * 0.04, currency=True, use_rs_prefix=True)}</li>
+                        </ul>
+                        <br>
+                        <div style="background-color: #28a745; color: white; padding: 15px; border-radius: 5px; text-align: center; margin-top: 15px;">
+                            <strong style="font-size: 18px;">🎯 TOTAL POTENTIAL PROFIT INCREASE</strong><br>
+                            <span style="font-size: 28px; font-weight: bold;">{format_indian_number(current_profit * 0.18, currency=True, use_rs_prefix=True)}</span><br>
+                            <span style="font-size: 14px;">New Projected Profit: {format_indian_number(current_profit * 1.18, currency=True, use_rs_prefix=True)} | New Margin: {((current_profit * 1.18) / current_revenue * 100):.2f}%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 40px; padding: 20px; background-color: #f8f9fa; border-radius: 10px;">
+                    <p style="color: #667eea; font-size: 14px; margin: 5px 0;"><strong>Report Generated by URC 101 Analytics System</strong></p>
+                    <p style="color: #6c757d; font-size: 12px; margin: 5px 0;">For queries, contact your system administrator</p>
                 </div>
             </body>
             </html>
@@ -1388,6 +2330,9 @@ async def generate_comprehensive_report(format: str = Query("excel")):
             return {"message": "Invalid format. Use 'excel' or 'pdf'."}
             
     except Exception as e:
+        import traceback
+        logger.error(f"Error generating comprehensive report: {str(e)}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
 
 @api_router.get("/export-data/{analysis_type}")
@@ -1780,58 +2725,334 @@ async def clear_all_data():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error clearing data: {str(e)}")
 
-@api_router.get("/dashboard-summary")
-async def get_dashboard_summary():
-    """Get overall dashboard summary statistics"""
+@api_router.get("/daily-sales-trend")
+async def get_daily_sales_trend(period: Optional[str] = Query(None)):
+    """Get daily sales data for current quarter (3 months) or specific period"""
     try:
-        # Total records
-        total_records = await db.sales_records.count_documents({})
+        from datetime import datetime, timedelta
         
-        # Total revenue and profit
+        # Determine current quarter
+        now = datetime.now()
+        current_month = now.month
+        
+        # Calculate quarter start month (1=Jan-Mar, 4=Apr-Jun, 7=Jul-Sep, 10=Oct-Dec)
+        quarter_start_month = ((current_month - 1) // 3) * 3 + 1
+        quarter_start_date = datetime(now.year, quarter_start_month, 1)
+        
+        # Build query filter
+        query_filter = {
+            "upload_type": "daily",
+            "status": "success",
+            "data_date": {
+                "$gte": quarter_start_date,
+                "$lt": now + timedelta(days=1)  # Include today
+            }
+        }
+        
+        # If period is specified, filter by that period
+        if period and period != "all":
+            # Check for "Current Year" special case
+            if "Current Year" in period:
+                year = int(period.split(" ")[0])
+                query_filter["data_date"] = {
+                    "$gte": datetime(year, 1, 1),
+                    "$lt": datetime(year + 1, 1, 1)
+                }
+            # Convert period to date range
+            elif len(period) == 7 and '-' in period:  # Format: 2025-11
+                year, month = period.split('-')
+                period_start = datetime(int(year), int(month), 1)
+                # Calculate last day of month
+                if int(month) == 12:
+                    period_end = datetime(int(year) + 1, 1, 1)
+                else:
+                    period_end = datetime(int(year), int(month) + 1, 1)
+                query_filter["data_date"] = {"$gte": period_start, "$lt": period_end}
+            elif len(period) == 4:  # Format: 2025 (full year)
+                year = int(period)
+                query_filter["data_date"] = {
+                    "$gte": datetime(year, 1, 1),
+                    "$lt": datetime(year + 1, 1, 1)
+                }
+        
+        # Query upload_history for daily uploads
+        daily_uploads = await db.upload_history.find(query_filter).sort("data_date", 1).to_list(None)
+        
+        # Format data by month
+        monthly_data = {}
+        for upload in daily_uploads:
+            upload_date = upload.get('data_date')
+            if upload_date:
+                month_key = upload_date.strftime('%Y-%m')
+                month_name = upload_date.strftime('%B')
+                date_str = upload_date.strftime('%Y-%m-%d')
+                
+                if month_key not in monthly_data:
+                    monthly_data[month_key] = {
+                        'month_name': month_name,
+                        'month_key': month_key,
+                        'data': []
+                    }
+                
+                # Get net amount (total sales for that day)
+                net_amount = upload.get('net_amt', 0)
+                
+                monthly_data[month_key]['data'].append({
+                    'date': date_str,
+                    'sales': float(net_amount) if net_amount else 0,
+                    'day': upload_date.day
+                })
+        
+        # Convert to list and sort by month
+        result = []
+        for month_key in sorted(monthly_data.keys()):
+            result.append(monthly_data[month_key])
+        
+        return {
+            "quarter_start": quarter_start_date.strftime('%Y-%m-%d'),
+            "current_date": now.strftime('%Y-%m-%d'),
+            "months": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching daily sales trend: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching daily sales trend: {str(e)}")
+
+@api_router.get("/dashboard-summary")
+async def get_dashboard_summary(period: Optional[str] = Query(None)):
+    """Get overall dashboard summary statistics with averages"""
+    try:
+        # Base filter to exclude forecast data
+        analytics_filter = {"upload_source": {"$ne": "forecast"}}
+        
+        # Add period filter if specified
+        if period and period != "all":
+            # Check if this is a "Current Year" request
+            if "Current Year" in period:
+                # Extract year from period (e.g., "2025 - Current Year" -> "2025")
+                year = period.split(" ")[0]
+                # Match all periods containing this year (both "2025" and "25" formats)
+                analytics_filter["data_period"] = {
+                    "$regex": f"({year}|{year[2:]})", 
+                    "$options": "i"
+                }
+            else:
+                analytics_filter["data_period"] = period
+        
+        # Total records
+        total_records = await db.sales_records.count_documents(analytics_filter)
+        
+        # Get distinct years for average calculations
+        distinct_periods = await db.sales_records.distinct("data_period", analytics_filter)
+        years = set()
+        for data_period in distinct_periods:
+            if data_period:
+                # Extract year from period (could be "2024", "2024-11", etc.)
+                year_str = str(data_period).split('-')[0]
+                try:
+                    years.add(int(year_str))
+                except:
+                    pass
+        num_years = len(years) if years else 1
+        start_year = min(years) if years else datetime.now().year
+        
+        # Get the earliest month for start year
+        earliest_period_query = await db.sales_records.find(
+            analytics_filter
+        ).sort("data_period", 1).limit(1).to_list(1)
+        
+        start_month = "Jan"
+        if earliest_period_query:
+            earliest_period = earliest_period_query[0].get("data_period", "")
+            if earliest_period and '-' in str(earliest_period):
+                # Format is "2022-01" or similar
+                month_num = int(str(earliest_period).split('-')[1])
+                months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                start_month = months[month_num - 1] if 1 <= month_num <= 12 else "Jan"
+            elif earliest_period:
+                start_month = "Jan"  # If only year, assume January
+        
+        # Total revenue, profit, and items sold
+        # Build match conditions for revenue pipeline
+        revenue_match_conditions = [
+            {"upload_source": {"$ne": "forecast"}},
+            {"r_amt": {"$ne": None, "$exists": True, "$gt": 0}},
+            {"profit": {"$ne": None, "$exists": True}},
+            {"net_qty": {"$ne": None, "$exists": True}}
+        ]
+        
+        # Add period filter if specified
+        if period and period != "all":
+            if "Current Year" in period:
+                year = period.split(" ")[0]
+                revenue_match_conditions.append({
+                    "data_period": {
+                        "$regex": f"({year}|{year[2:]})", 
+                        "$options": "i"
+                    }
+                })
+            else:
+                revenue_match_conditions.append({"data_period": period})
+        
         revenue_pipeline = [
             {
                 "$match": {
-                    "$and": [
-                        {"r_amt": {"$ne": None, "$exists": True, "$gt": 0}},
-                        {"profit": {"$ne": None, "$exists": True}},
-                        {"net_qty": {"$ne": None, "$exists": True}}
-                    ]
+                    "$and": revenue_match_conditions
+                }
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "total_revenue": {"$sum": "$r_amt"},
+                    "total_profit": {"$sum": "$profit"},
+                    "total_items_sold": {"$sum": "$net_qty"}
+                }
+            }
+        ]
+        
+        revenue_result = await db.sales_records.aggregate(revenue_pipeline).to_list(1)
+        
+        revenue_data = revenue_result[0] if revenue_result else {
+            "total_revenue": 0,
+            "total_profit": 0,
+            "total_items_sold": 0
+        }
+        
+        total_revenue = revenue_data.get("total_revenue", 0) or 0
+        total_profit = revenue_data.get("total_profit", 0) or 0
+        
+        # Calculate average yearly values
+        avg_yearly_revenue = total_revenue / num_years
+        avg_yearly_profit = total_profit / num_years
+        
+        # Calculate profit margin and percentage
+        if total_revenue > 0:
+            profit_margin = (total_profit / total_revenue) * 100
+        else:
+            profit_margin = 0.0
+        
+        # Current Stock Value - Get from most recent financial report
+        # This value is manually entered when generating daily financial reports
+        latest_financial_report = await db.financial_data.find_one(
+            {"current_stock_value": {"$ne": None, "$exists": True}},
+            sort=[("date", -1)]
+        )
+        
+        current_stock_value = 0
+        if latest_financial_report:
+            current_stock_value = latest_financial_report.get("current_stock_value", 0) or 0
+        
+        avg_yearly_stock_value = current_stock_value / num_years
+        
+        # C Category Stock Value (need ABC analysis first)
+        # Get ABC analysis to identify C category items
+        abc_match_conditions = [
+            {"upload_source": {"$ne": "forecast"}},
+            {"r_amt": {"$ne": None, "$exists": True}}
+        ]
+        
+        # Add period filter if specified
+        if period and period != "all":
+            if "Current Year" in period:
+                year = period.split(" ")[0]
+                abc_match_conditions.append({
+                    "data_period": {
+                        "$regex": f"({year}|{year[2:]})", 
+                        "$options": "i"
+                    }
+                })
+            else:
+                abc_match_conditions.append({"data_period": period})
+        
+        abc_pipeline = [
+            {
+                "$match": {
+                    "$and": abc_match_conditions
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$pluno",
+                    "item_name": {"$first": "$item_name"},
+                    "total_revenue": {"$sum": "$r_amt"}
+                }
+            },
+            {"$sort": {"total_revenue": -1}}
+        ]
+        
+        abc_items = await db.sales_records.aggregate(abc_pipeline).to_list(None)
+        
+        # Calculate cumulative revenue
+        total_abc_revenue = sum(item["total_revenue"] for item in abc_items)
+        cumulative = 0
+        c_category_plu_codes = []
+        
+        for item in abc_items:
+            cumulative += item["total_revenue"]
+            percentage = (cumulative / total_abc_revenue * 100) if total_abc_revenue > 0 else 0
+            
+            # C category: bottom 50% of items (>95% revenue)
+            if percentage > 95:
+                c_category_plu_codes.append(item["_id"])
+        
+        # Calculate C category stock value
+        c_stock_match_conditions = [
+            {"upload_source": {"$ne": "forecast"}},
+            {"pluno": {"$in": c_category_plu_codes}},
+            {"closing_stock": {"$ne": None, "$exists": True, "$gt": 0}},
+            {"w_rate": {"$ne": None, "$exists": True}}
+        ]
+        
+        # Add period filter if specified
+        if period and period != "all":
+            if "Current Year" in period:
+                year = period.split(" ")[0]
+                c_stock_match_conditions.append({
+                    "data_period": {
+                        "$regex": f"({year}|{year[2:]})", 
+                        "$options": "i"
+                    }
+                })
+            else:
+                c_stock_match_conditions.append({"data_period": period})
+        
+        c_stock_pipeline = [
+            {
+                "$match": {
+                    "$and": c_stock_match_conditions
+                }
+            },
+            {
+                "$sort": {"data_period": -1}
+            },
+            {
+                "$group": {
+                    "_id": "$pluno",
+                    "latest_closing_stock": {"$first": "$closing_stock"},
+                    "latest_w_rate": {"$first": "$w_rate"}
                 }
             },
             {
                 "$addFields": {
-                    "clean_r_amt": {
-                        "$cond": {
-                            "if": {"$type": "$r_amt"},
-                            "then": "$r_amt",
-                            "else": 0
-                        }
-                    },
-                    "clean_profit": {
-                        "$cond": {
-                            "if": {"$type": "$profit"},
-                            "then": "$profit",
-                            "else": 0
-                        }
+                    "stock_value": {
+                        "$multiply": [
+                            {"$ifNull": ["$latest_closing_stock", 0]},
+                            {"$ifNull": ["$latest_w_rate", 0]}
+                        ]
                     }
                 }
             },
             {
                 "$group": {
                     "_id": None,
-                    "total_revenue": {"$sum": "$clean_r_amt"},
-                    "total_profit": {"$sum": "$clean_profit"},
-                    "total_items_sold": {"$sum": {"$ifNull": ["$net_qty", 0]}}
+                    "total_c_stock_value": {"$sum": "$stock_value"}
                 }
             }
         ]
         
-        revenue_result = await db.sales_records.aggregate(revenue_pipeline).to_list(1)
-        revenue_data = revenue_result[0] if revenue_result else {
-            "total_revenue": 0,
-            "total_profit": 0,
-            "total_items_sold": 0
-        }
+        c_stock_result = await db.sales_records.aggregate(c_stock_pipeline).to_list(1)
+        c_category_stock_value = c_stock_result[0].get("total_c_stock_value", 0) if c_stock_result else 0
+        avg_yearly_c_stock_value = c_category_stock_value / num_years
         
         # Group distribution
         group_pipeline = [
@@ -1844,27 +3065,61 @@ async def get_dashboard_summary():
         ]
         
         group_distribution = await db.sales_records.aggregate(group_pipeline).to_list(None)
-        
-        total_revenue = revenue_data.get("total_revenue", 0) or 0
-        total_profit = revenue_data.get("total_profit", 0) or 0
-        
-        # Calculate profit margin safely
-        if total_revenue > 0:
-            profit_margin = (total_profit / total_revenue) * 100
-        else:
-            profit_margin = 0.0
             
         return {
             "total_records": total_records,
             "total_revenue": total_revenue,
+            "avg_yearly_revenue": avg_yearly_revenue,
             "total_profit": total_profit,
+            "avg_yearly_profit": avg_yearly_profit,
+            "profit_margin": profit_margin,
+            "profit_percentage": profit_margin,  # Same as profit_margin
             "total_items_sold": revenue_data.get("total_items_sold", 0) or 0,
-            "group_distribution": group_distribution,
-            "profit_margin": profit_margin
+            "current_stock_value": current_stock_value,
+            "avg_yearly_stock_value": avg_yearly_stock_value,
+            "c_category_stock_value": c_category_stock_value,
+            "avg_yearly_c_stock_value": avg_yearly_c_stock_value,
+            "num_years": num_years,
+            "start_year": start_year,
+            "start_month": start_month,
+            "data_from": f"{start_month} {start_year}",
+            "group_distribution": group_distribution
         }
         
     except Exception as e:
+        logger.error(f"Error getting dashboard summary: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting dashboard summary: {str(e)}")
+
+@api_router.get("/available-periods")
+async def get_available_periods():
+    """Get list of all unique data periods available in the database"""
+    try:
+        # Get distinct periods from sales_records, excluding forecast data
+        periods = await db.sales_records.distinct(
+            "data_period",
+            {"upload_source": {"$ne": "forecast"}}
+        )
+        
+        # Filter out None values and sort
+        periods = [p for p in periods if p is not None]
+        periods.sort(reverse=True)  # Most recent first
+        
+        # Check if there's any data for current year (2025)
+        current_year = datetime.now().year
+        has_current_year_data = any(
+            str(current_year) in str(p) or str(current_year)[2:] in str(p) 
+            for p in periods
+        )
+        
+        # Add "Current Year" option at the beginning if current year data exists
+        if has_current_year_data:
+            periods.insert(0, f"{current_year} - Current Year")
+        
+        return periods
+        
+    except Exception as e:
+        logger.error(f"Error getting available periods: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting available periods: {str(e)}")
 
 # ============================================================================
 # PHASE 1: UPLOAD HISTORY & DATABASE VIEW ENDPOINTS
@@ -1875,7 +3130,8 @@ async def get_upload_history(
     limit: int = Query(50, ge=1, le=200),
     skip: int = Query(0, ge=0),
     status_filter: Optional[str] = Query(None),
-    period_filter: Optional[str] = Query(None)
+    period_filter: Optional[str] = Query(None),
+    data_date: Optional[str] = Query(None)
 ):
     """Get upload history with optional filtering"""
     try:
@@ -1885,6 +3141,14 @@ async def get_upload_history(
             filter_query["status"] = status_filter
         if period_filter:
             filter_query["period_covered"] = {"$regex": period_filter, "$options": "i"}
+        
+        # Filter by specific data_date if provided
+        if data_date:
+            target_date = datetime.strptime(data_date, "%Y-%m-%d")
+            filter_query["data_date"] = {
+                "$gte": target_date,
+                "$lt": target_date + timedelta(days=1)
+            }
         
         # Get total count
         total = await db.upload_history.count_documents(filter_query)
@@ -1900,6 +3164,7 @@ async def get_upload_history(
             "total": total,
             "limit": limit,
             "skip": skip,
+            "uploads": history,  # Also return as "uploads" for compatibility
             "results": history
         }
     except Exception as e:
@@ -1907,9 +3172,19 @@ async def get_upload_history(
 
 @api_router.get("/available-data-periods")
 async def get_available_data_periods():
-    """Get list of all available data periods with upload info"""
+    """Get list of all available data periods from sales records"""
     try:
-        # Get all successful uploads with their data info
+        # Get unique data_period values from sales_records, sorted in descending order
+        periods = await db.sales_records.distinct(
+            "data_period",
+            {"upload_source": {"$ne": "forecast"}, "data_period": {"$ne": None, "$exists": True}}
+        )
+        
+        # Sort periods in descending order (newest first)
+        # Assuming format like "2025-01", "2024-12", etc.
+        periods_sorted = sorted(periods, reverse=True)
+        
+        # Also get upload info for context
         pipeline = [
             {
                 "$match": {
@@ -1959,10 +3234,12 @@ async def get_available_data_periods():
                 })
         
         return {
+            "periods": periods_sorted,  # NEW: List of unique period strings
             "daily_uploads": daily_uploads,
             "historical_uploads": historical_uploads,
             "total_daily": len(daily_uploads),
-            "total_historical": len(historical_uploads)
+            "total_historical": len(historical_uploads),
+            "total_periods": len(periods_sorted)
         }
         
     except Exception as e:
@@ -1977,10 +3254,24 @@ async def get_database_view(
     search: Optional[str] = Query(None),
     group_filter: Optional[str] = Query(None),
     period_filter: Optional[str] = Query(None),
+    gp_index_no: Optional[str] = Query(None),
+    aggregated: bool = Query(False),
     sort_by: str = Query("upload_date"),
     sort_order: int = Query(-1)
 ):
-    """Get paginated view of sales database with filters"""
+    """Get paginated view of sales database with filters and aggregation
+    
+    Args:
+        limit: Maximum records per page
+        skip: Number of records to skip
+        search: Search in item names
+        group_filter: Filter by product group
+        period_filter: Filter by data_period
+        gp_index_no: Filter by Gp_Index_No (supports partial match)
+        aggregated: If True, aggregate by gp_index_no and sum quantities
+        sort_by: Field to sort by
+        sort_order: Sort order (1 for ascending, -1 for descending)
+    """
     try:
         # Build filter query
         filter_query = {}
@@ -1994,15 +3285,54 @@ async def get_database_view(
         if period_filter:
             filter_query["data_period"] = {"$regex": period_filter, "$options": "i"}
         
-        # Get total count
-        total = await db.sales_records.count_documents(filter_query)
+        if gp_index_no:
+            filter_query["gp_index_no"] = {"$regex": gp_index_no, "$options": "i"}
         
-        # Get paginated results
-        records = await db.sales_records.find(filter_query, {"_id": 0})\
-            .sort(sort_by, sort_order)\
-            .skip(skip)\
-            .limit(limit)\
-            .to_list(limit)
+        if aggregated:
+            # Aggregated view: group by gp_index_no and sum quantities
+            pipeline = [
+                {"$match": filter_query},
+                {
+                    "$group": {
+                        "_id": "$gp_index_no",
+                        "gp_index_no": {"$first": "$gp_index_no"},
+                        "item_name": {"$first": "$item_name"},
+                        "product_group": {"$first": "$product_group"},
+                        "total_qty": {"$sum": {"$ifNull": ["$qty", 0]}},
+                        "total_net_qty": {"$sum": {"$ifNull": ["$net_qty", 0]}},
+                        "total_r_amt": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+                        "total_w_amt": {"$sum": {"$ifNull": ["$w_amt", 0]}},
+                        "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
+                        "avg_closing_stock": {"$avg": {"$ifNull": ["$closing_stock", 0]}},
+                        "periods": {"$addToSet": "$data_period"},
+                        "record_count": {"$sum": 1}
+                    }
+                },
+                {"$sort": {(sort_by if sort_by in ["gp_index_no", "item_name", "product_group", "total_qty", "total_net_qty", "total_r_amt", "total_w_amt", "total_profit"] else "total_r_amt"): sort_order}},
+                {"$skip": skip},
+                {"$limit": limit}
+            ]
+            
+            # Get total count for aggregated results
+            count_pipeline = [
+                {"$match": filter_query},
+                {"$group": {"_id": "$gp_index_no"}},
+                {"$count": "total"}
+            ]
+            count_result = await db.sales_records.aggregate(count_pipeline).to_list(1)
+            total = count_result[0]["total"] if count_result else 0
+            
+            # Get aggregated records
+            records = await db.sales_records.aggregate(pipeline).to_list(limit)
+        else:
+            # Regular view: get individual records
+            total = await db.sales_records.count_documents(filter_query)
+            
+            records = await db.sales_records.find(filter_query, {"_id": 0})\
+                .sort(sort_by, sort_order)\
+                .skip(skip)\
+                .limit(limit)\
+                .to_list(limit)
         
         # Get unique periods in database
         periods_pipeline = [
@@ -2269,6 +3599,7 @@ async def create_financial_data(
     date: str,  # Format: "YYYY-MM-DD"
     liquor_sales: float,
     previous_bank_amount: float,
+    grocery_sales_override: Optional[float] = None,
     previous_stock_value: Optional[float] = None,
     current_stock_value: Optional[float] = None,
     notes: Optional[str] = None
@@ -2278,35 +3609,48 @@ async def create_financial_data(
         # Parse date
         target_date = datetime.strptime(date, "%Y-%m-%d")
         
-        # Calculate grocery sales from that day's upload
+        # Calculate grocery sales from that day's upload OR use override from image
         grocery_sales = 0.0
-        daily_upload = await db.upload_history.find_one({
-            "upload_type": "daily",
-            "data_date": {
-                "$gte": target_date,
-                "$lt": target_date + timedelta(days=1)
-            },
-            "status": "success"
-        })
         
-        if daily_upload:
-            # Get total sales from the uploaded records
-            pipeline = [
-                {
-                    "$match": {
-                        "upload_batch_id": daily_upload["id"]
-                    }
+        if grocery_sales_override is not None:
+            # Use the override value from image extraction
+            grocery_sales = grocery_sales_override
+            logger.info(f"Using grocery sales from image: ₹{grocery_sales:,.2f}")
+        else:
+            # Original logic - get from uploaded data
+            daily_upload = await db.upload_history.find_one({
+                "upload_type": "daily",
+                "data_date": {
+                    "$gte": target_date,
+                    "$lt": target_date + timedelta(days=1)
                 },
-                {
-                    "$group": {
-                        "_id": None,
-                        "total_sales": {"$sum": {"$ifNull": ["$r_amt", 0]}}
-                    }
-                }
-            ]
-            result = await db.sales_records.aggregate(pipeline).to_list(1)
-            if result:
-                grocery_sales = float(result[0].get("total_sales", 0))
+                "status": "success"
+            })
+            
+            if daily_upload:
+                # Use net_amt from Summary Details if available, otherwise calculate from records
+                if daily_upload.get("net_amt") is not None:
+                    grocery_sales = float(daily_upload["net_amt"])
+                    logger.info(f"Using Net Amt from Summary Details: ₹{grocery_sales:,.2f}")
+                else:
+                    # Fallback: Calculate from uploaded records (old method)
+                    logger.warning("Net Amt not found in upload history, calculating from records")
+                    pipeline = [
+                        {
+                            "$match": {
+                                "upload_batch_id": daily_upload["id"]
+                            }
+                        },
+                        {
+                            "$group": {
+                                "_id": None,
+                                "total_sales": {"$sum": {"$ifNull": ["$r_amt", 0]}}
+                            }
+                        }
+                    ]
+                    result = await db.sales_records.aggregate(pipeline).to_list(1)
+                    if result:
+                        grocery_sales = float(result[0].get("total_sales", 0))
         
         # Calculate totals
         total_sales = grocery_sales + liquor_sales
@@ -2413,6 +3757,14 @@ async def get_financial_data_range(
             }
         }).sort("date", -1).limit(limit).to_list(limit)
         
+        # Convert ObjectId to string
+        for record in financial_records:
+            if "_id" in record:
+                record["_id"] = str(record["_id"])
+            # Convert datetime to ISO string
+            if "date" in record and isinstance(record["date"], datetime):
+                record["date"] = record["date"].isoformat()
+        
         return {
             "start_date": start_date,
             "end_date": end_date,
@@ -2426,9 +3778,162 @@ async def get_financial_data_range(
         logger.exception("Error fetching financial data range")
         raise HTTPException(status_code=500, detail=f"Error fetching financial data range: {str(e)}")
 
+@api_router.put("/financial-data/{record_id}")
+async def update_financial_data(
+    record_id: str,
+    liquor_sales: float,
+    previous_bank_amount: float,
+    previous_stock_value: Optional[float] = None,
+    current_stock_value: Optional[float] = None,
+    notes: Optional[str] = None
+):
+    """Update an existing financial data record"""
+    try:
+        # Find the existing record
+        existing = await db.financial_data.find_one({"id": record_id})
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Financial record not found")
+        
+        # Get the date from existing record
+        target_date = existing["date"]
+        
+        # Recalculate grocery sales from that day's upload
+        grocery_sales = 0.0
+        daily_upload = await db.upload_history.find_one({
+            "upload_type": "daily",
+            "data_date": {
+                "$gte": target_date,
+                "$lt": target_date + timedelta(days=1)
+            },
+            "status": "success"
+        })
+        
+        if daily_upload:
+            if daily_upload.get("net_amt") is not None:
+                grocery_sales = float(daily_upload["net_amt"])
+            else:
+                pipeline = [
+                    {"$match": {"upload_batch_id": daily_upload["id"]}},
+                    {"$group": {"_id": None, "total_sales": {"$sum": {"$ifNull": ["$r_amt", 0]}}}}
+                ]
+                result = await db.sales_records.aggregate(pipeline).to_list(1)
+                if result:
+                    grocery_sales = float(result[0].get("total_sales", 0))
+        
+        # Calculate totals
+        total_sales = grocery_sales + liquor_sales
+        current_bank_amount = previous_bank_amount + total_sales
+        
+        # Update the record
+        update_data = {
+            "grocery_sales": grocery_sales,
+            "liquor_sales": liquor_sales,
+            "total_sales": total_sales,
+            "previous_bank_amount": previous_bank_amount,
+            "current_bank_amount": current_bank_amount,
+            "previous_stock_value": previous_stock_value,
+            "current_stock_value": current_stock_value,
+            "notes": notes,
+            "updated_at": datetime.now(timezone.utc)
+        }
+        
+        await db.financial_data.update_one(
+            {"id": record_id},
+            {"$set": update_data}
+        )
+        
+        # Get updated record
+        updated_record = await db.financial_data.find_one({"id": record_id}, {"_id": 0})
+        
+        logger.info(f"Updated financial data for {target_date.strftime('%Y-%m-%d')}")
+        
+        return {
+            "message": "Financial data updated successfully",
+            "financial_data": updated_record
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error updating financial data")
+        raise HTTPException(status_code=500, detail=f"Error updating financial data: {str(e)}")
+
+@api_router.delete("/financial-data/{record_id}")
+async def delete_financial_data(record_id: str):
+    """Delete a financial data record"""
+    try:
+        # Find the existing record
+        existing = await db.financial_data.find_one({"id": record_id})
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Financial record not found")
+        
+        # Delete the record
+        result = await db.financial_data.delete_one({"id": record_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Financial record not found")
+        
+        date_str = existing["date"].strftime("%Y-%m-%d")
+        logger.info(f"Deleted financial data for {date_str}")
+        
+        return {
+            "message": f"Financial data for {date_str} deleted successfully",
+            "deleted_id": record_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error deleting financial data")
+        raise HTTPException(status_code=500, detail=f"Error deleting financial data: {str(e)}")
+
+@api_router.get("/previous-financial-data")
+async def get_previous_financial_data(date: str):
+    """Get the financial data from the previous day for form pre-fill"""
+    try:
+        target_date = datetime.strptime(date, "%Y-%m-%d")
+        previous_date = target_date - timedelta(days=1)
+        
+        # Try to find financial data from previous day
+        previous_financial = await db.financial_data.find_one({
+            "date": {
+                "$gte": previous_date,
+                "$lt": target_date
+            }
+        }, sort=[("date", -1)])
+        
+        if previous_financial:
+            # Return the calculated values from previous day's report
+            # These become "previous" values for today's report
+            previous_bank_amount = previous_financial.get("current_bank_amount")
+            previous_stock_value = previous_financial.get("current_stock_value")
+            
+            return {
+                "previous_date": previous_date.strftime("%Y-%m-%d"),
+                "bank_amount": previous_bank_amount,
+                "stock_value": previous_stock_value,
+                "found": True
+            }
+        
+        # If not found, return null/not found
+        return {
+            "previous_date": previous_date.strftime("%Y-%m-%d"),
+            "bank_amount": None,
+            "stock_value": None,
+            "found": False
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
+    except Exception as e:
+        logger.exception("Error fetching previous financial data")
+        raise HTTPException(status_code=500, detail=f"Error fetching previous financial data: {str(e)}")
+
 @api_router.get("/previous-bank-amount")
 async def get_previous_bank_amount(date: str):
-    """Get the bank amount from the previous day for form pre-fill"""
+    """Get the bank amount from the previous day for form pre-fill (legacy endpoint)"""
     try:
         target_date = datetime.strptime(date, "%Y-%m-%d")
         previous_date = target_date - timedelta(days=1)
@@ -2461,11 +3966,111 @@ async def get_previous_bank_amount(date: str):
         logger.exception("Error fetching previous bank amount")
         raise HTTPException(status_code=500, detail=f"Error fetching previous bank amount: {str(e)}")
 
+@api_router.post("/extract-canteen-summary")
+async def extract_canteen_summary(file: UploadFile = File(...)):
+    """Extract grocery and liquor sales from CSD canteen summary image"""
+    try:
+        import base64
+        from openai import OpenAI
+        
+        logger.info(f"Received image upload: {file.filename}, type: {file.content_type}")
+        
+        # Read the uploaded image
+        contents = await file.read()
+        logger.info(f"Image size: {len(contents)} bytes")
+        
+        # Convert to base64 for AI processing
+        base64_image = base64.b64encode(contents).decode('utf-8')
+        
+        # Get API key (try Emergent LLM key first, then fallback to OpenAI key)
+        api_key = os.environ.get('EMERGENT_LLM_KEY') or os.environ.get('OPENAI_API_KEY')
+        if not api_key:
+            raise HTTPException(status_code=500, detail="API key not configured. Set EMERGENT_LLM_KEY or OPENAI_API_KEY environment variable.")
+        
+        # Determine base URL based on key type
+        base_url = None
+        if api_key.startswith('sk-emergent-'):
+            # Emergent LLM key - use Emergent proxy
+            base_url = "https://api.emergentagi.com/v1"
+        
+        prompt = """Analyze this Canteen Summary image and extract the following data:
+1. Today's Bill Amount - Grocery (look for "Today's Bill Amount" row, Grocery column)
+2. Today's Bill Amount - Liquor (look for "Today's Bill Amount" row, Liquor column)
+
+Return ONLY a JSON object with these exact fields:
+{
+  "grocery_sales": <number>,
+  "liquor_sales": <number>
+}
+
+Remove commas and currency symbols from numbers. Return only the JSON, nothing else."""
+
+        logger.info("Calling OpenAI API with vision...")
+        
+        # Create OpenAI client
+        client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+        
+        # Call GPT-4o with vision
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a data extraction assistant. Extract numerical data from images accurately."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{file.content_type or 'image/jpeg'};base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=1024
+        )
+        
+        response_text = response.choices[0].message.content
+        logger.info(f"Received response from LLM: {response_text[:200]}...")
+        
+        # Extract JSON from response
+        import re
+        json_match = re.search(r'\{[^}]+\}', response_text)
+        if json_match:
+            extracted_data = json.loads(json_match.group())
+        else:
+            extracted_data = json.loads(response_text)
+        
+        logger.info(f"✓ Successfully extracted canteen data: {extracted_data}")
+        
+        return {
+            "success": True,
+            "data": {
+                "grocery_sales": float(extracted_data.get("grocery_sales", 0)),
+                "liquor_sales": float(extracted_data.get("liquor_sales", 0))
+            }
+        }
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parsing error: {str(e)}, Response: {response_text}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse AI response: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error extracting canteen summary: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to extract data from image: {str(e)}")
+
 @api_router.post("/generate-daily-report")
 async def generate_daily_sales_report(
     date: str,
     liquor_sales: float,
     previous_bank_amount: float,
+    grocery_sales: Optional[float] = None,
     previous_stock_value: Optional[float] = None,
     current_stock_value: Optional[float] = None,
     notes: Optional[str] = None
@@ -2480,13 +4085,49 @@ async def generate_daily_sales_report(
         from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
         from io import BytesIO
         
-        # First, create/update financial data
+        # Calculate current stock value before creating financial data
+        report_date = datetime.strptime(date, "%Y-%m-%d")
+        calculated_stock_value = None
+        
+        # Get today's W_Amt from upload history to calculate stock value
+        todays_w_amt = 0.0
+        daily_upload = await db.upload_history.find_one({
+            "upload_type": "daily",
+            "data_date": {
+                "$gte": report_date,
+                "$lt": report_date + timedelta(days=1)
+            },
+            "status": "success"
+        })
+        
+        if daily_upload:
+            # Use W_Amt from Report Total if available
+            if daily_upload.get("w_amt") is not None:
+                todays_w_amt = float(daily_upload["w_amt"])
+                logger.info(f"Using W_Amt from Report Total for stock calculation: Rs. {todays_w_amt:,.2f}")
+        
+        # Calculate stock value: Previous Stock - Today's Cost
+        logger.info(f"Stock calculation inputs - previous_stock_value: {previous_stock_value}, current_stock_value: {current_stock_value}, todays_w_amt: {todays_w_amt}")
+        
+        if current_stock_value is not None:
+            # User provided value - use it directly
+            calculated_stock_value = current_stock_value
+            logger.info(f"Using user-provided current stock value: {calculated_stock_value}")
+        elif previous_stock_value is not None and todays_w_amt > 0:
+            # Calculate: Previous Stock - Today's Cost
+            calculated_stock_value = previous_stock_value - todays_w_amt
+            logger.info(f"✓ Calculated stock value: {previous_stock_value} - {todays_w_amt} = {calculated_stock_value}")
+        else:
+            logger.info(f"No stock calculation - previous_stock_value: {previous_stock_value}, todays_w_amt: {todays_w_amt}")
+        
+        # Create/update financial data with calculated stock value
         financial_response = await create_financial_data(
             date=date,
             liquor_sales=liquor_sales,
             previous_bank_amount=previous_bank_amount,
+            grocery_sales_override=grocery_sales,  # Allow override from image
             previous_stock_value=previous_stock_value,
-            current_stock_value=current_stock_value,
+            current_stock_value=calculated_stock_value,  # Use calculated value
             notes=notes
         )
         
@@ -2534,10 +4175,10 @@ async def generate_daily_sales_report(
         elements.append(sales_heading)
         
         sales_data = [
-            ['Description', 'Amount (₹)'],
-            ['Grocery Sales for the day', f"₹{financial_data['grocery_sales']:,.2f}"],
-            ['Liquor Sales for the day', f"₹{financial_data['liquor_sales']:,.2f}"],
-            ['Total Sales for the day (D)', f"₹{financial_data['total_sales']:,.2f}"],
+            ['Description', 'Amount'],
+            ['Grocery Sales for the day', format_indian_currency(financial_data['grocery_sales'])],
+            ['Liquor Sales for the day', format_indian_currency(financial_data['liquor_sales'])],
+            ['Total Sales for the day (D)', format_indian_currency(financial_data['total_sales'])],
         ]
         
         sales_table = Table(sales_data, colWidths=[4*inch, 2*inch])
@@ -2564,9 +4205,9 @@ async def generate_daily_sales_report(
         elements.append(bank_heading)
         
         bank_data = [
-            ['Description', 'Amount (₹)'],
-            [f'Amount in Bank as on {previous_date} (Y)', f"₹{financial_data['previous_bank_amount']:,.2f}"],
-            [f'Total Amount in Bank on {report_date.strftime("%d %B %Y")} (Y+D)', f"₹{financial_data['current_bank_amount']:,.2f}"],
+            ['Description', 'Amount'],
+            [f'Amount in Bank as on {previous_date} (Y)', format_indian_currency(financial_data['previous_bank_amount'])],
+            [f'Total Amount in Bank on {report_date.strftime("%d %B %Y")} (Y+D)', format_indian_currency(financial_data['current_bank_amount'])],
         ]
         
         bank_table = Table(bank_data, colWidths=[4*inch, 2*inch])
@@ -2593,14 +4234,22 @@ async def generate_daily_sales_report(
             elements.append(stock_heading)
             
             stock_data = [
-                ['Description', 'Value (₹)'],
+                ['Description', 'Value'],
             ]
             
             if previous_stock_value is not None:
-                stock_data.append([f'Total Value of Grocery Stock on {previous_date}', f"₹{previous_stock_value:,.2f}"])
+                stock_data.append([f'Total Value of Grocery Stock on {previous_date}', format_indian_currency(previous_stock_value)])
             
-            if current_stock_value is not None:
-                stock_data.append([f'Total Value of Grocery Stock on {report_date.strftime("%d %B %Y")}', f"₹{current_stock_value:,.2f}"])
+            # Add Today's Cost line if we calculated stock value
+            if todays_w_amt > 0 and calculated_stock_value is not None:
+                stock_data.append([f"Today's Cost of Goods Sold (W_Amt)", format_indian_currency(todays_w_amt)])
+            
+            # Add calculated current stock value
+            if calculated_stock_value is not None:
+                stock_data.append([
+                    f'Total Value of Grocery Stock on {report_date.strftime("%d %B %Y")}',
+                    format_indian_currency(calculated_stock_value)
+                ])
             
             stock_table = Table(stock_data, colWidths=[4*inch, 2*inch])
             stock_table.setStyle(TableStyle([
@@ -2613,6 +4262,8 @@ async def generate_daily_sales_report(
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.white),
                 ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#fef3c7')),
             ]))
             
             elements.append(stock_table)

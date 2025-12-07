@@ -215,6 +215,7 @@ const Forecasting = () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('upload_source', 'forecast');  // Mark as forecast data
 
       const response = await fetch(`${API}/upload-sales-data`, {
         method: 'POST',

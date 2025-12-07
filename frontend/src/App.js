@@ -11,7 +11,7 @@ import FinancialHealth from "./components/FinancialHealth";
 import { Toaster } from "./components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
-import { BarChart3, Upload, TrendingUp, FileSpreadsheet, Building2, Download, Clock, Database, DollarSign } from "lucide-react";
+import { BarChart3, Upload, TrendingUp, FileSpreadsheet, Building2, Download, Clock, Database, DollarSign, RefreshCw } from "lucide-react";
 import { formatIndianNumber, formatPercentage } from "./utils/numberUtils";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -21,12 +21,21 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshingStock, setRefreshingStock] = useState(false);
+  const [dashboardPeriod, setDashboardPeriod] = useState(`${new Date().getFullYear()} - Current Year`);
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [reportFormat, setReportFormat] = useState('excel');
+  const [reportPeriodType, setReportPeriodType] = useState('all');
+  const [reportCustomFrom, setReportCustomFrom] = useState('');
+  const [reportCustomTo, setReportCustomTo] = useState('');
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (period = `${new Date().getFullYear()} - Current Year`) => {
     try {
       setLoading(true);
+      // Add period parameter to the API call
+      const periodParam = period && period !== 'all' ? `&period=${period}` : '';
       // Add timestamp and cache control to prevent caching
-      const response = await fetch(`${API}/dashboard-summary?t=${Date.now()}`, {
+      const response = await fetch(`${API}/dashboard-summary?t=${Date.now()}${periodParam}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -44,8 +53,29 @@ function MainApp() {
     }
   };
 
+  const handleRefreshStock = async () => {
+    setRefreshingStock(true);
+    try {
+      const cacheBuster = new Date().getTime();
+      const periodParam = dashboardPeriod && dashboardPeriod !== 'all' ? `&period=${dashboardPeriod}` : '';
+      const response = await fetch(`${API}/dashboard-summary?t=${cacheBuster}${periodParam}`);
+      const data = await response.json();
+      setDashboardData(data);
+    } catch (error) {
+      console.error("Error refreshing stock data:", error);
+    } finally {
+      setTimeout(() => setRefreshingStock(false), 500);
+    }
+  };
+
+  const handlePeriodChange = (period) => {
+    setDashboardPeriod(period);
+    fetchDashboardData(period);
+  };
+
   useEffect(() => {
-    fetchDashboardData();
+    // Fetch with current year on initial load
+    fetchDashboardData(`${new Date().getFullYear()} - Current Year`);
   }, []);
 
   const handleDataUpload = async () => {
@@ -53,6 +83,33 @@ function MainApp() {
     console.log('Refreshing dashboard data...');
     await fetchDashboardData();
     console.log('Dashboard data refreshed');
+  };
+
+  const handleGenerateReport = () => {
+    let url = `${API}/comprehensive-report?format=${reportFormat}`;
+    
+    if (reportPeriodType === 'all') {
+      // No period filter - all data
+    } else if (reportPeriodType === 'current') {
+      url += `&period=${dashboardPeriod}`;
+    } else if (reportPeriodType === 'custom') {
+      if (!reportCustomFrom || !reportCustomTo) {
+        alert('Please select both From and To dates');
+        return;
+      }
+      url += `&from_date=${reportCustomFrom}&to_date=${reportCustomTo}`;
+    } else {
+      // Specific period selected
+      url += `&period=${reportPeriodType}`;
+    }
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `URC101-Report-${reportPeriodType}.${reportFormat === 'excel' ? 'xlsx' : 'html'}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setShowReportDialog(false);
   };
 
   return (
@@ -75,12 +132,8 @@ function MainApp() {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = `${API}/comprehensive-report?format=excel`;
-                    link.download = 'URC101-Comprehensive-Analysis-Report.xlsx';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                    setReportFormat('excel');
+                    setShowReportDialog(true);
                   }}
                   className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
                 >
@@ -90,12 +143,8 @@ function MainApp() {
                 
                 <button
                   onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = `${API}/comprehensive-report?format=pdf`;
-                    link.download = 'URC101-Comprehensive-Analysis-Report.html';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+                    setReportFormat('pdf');
+                    setShowReportDialog(true);
                   }}
                   className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
                 >
@@ -116,10 +165,15 @@ function MainApp() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 font-medium">Total Revenue</p>
-                      <p className="text-4xl font-bold text-green-600">
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-600 font-medium">
+                        Total Revenue {dashboardData.data_from && <span className="text-xs">(from {dashboardData.data_from})</span>}
+                      </p>
+                      <p className="text-3xl font-bold text-green-600">
                         {formatIndianNumber(dashboardData.total_revenue || 0, true)}
+                      </p>
+                      <p className="text-base font-semibold text-green-500 mt-1">
+                        Avg: {formatIndianNumber(dashboardData.avg_yearly_revenue || 0, true)}
                       </p>
                     </div>
                     <BarChart3 className="h-10 w-10 text-green-600" />
@@ -130,38 +184,66 @@ function MainApp() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 font-medium">Total Profit</p>
-                      <p className="text-4xl font-bold text-blue-600">
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-600 font-medium">
+                        Total Profit {dashboardData.data_from && <span className="text-xs">(from {dashboardData.data_from})</span>}
+                      </p>
+                      <p className="text-3xl font-bold text-blue-600">
                         {formatIndianNumber(dashboardData.total_profit || 0, true)}
                       </p>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <p className="text-base font-semibold text-blue-500">
+                          Avg: {formatIndianNumber(dashboardData.avg_yearly_profit || 0, true)}
+                        </p>
+                        <span className="text-sm text-blue-700 font-bold bg-blue-100 px-2 py-0.5 rounded">
+                          {formatPercentage(dashboardData.profit_percentage || 0)}
+                        </span>
+                      </div>
                     </div>
                     <TrendingUp className="h-10 w-10 text-blue-600" />
                   </div>
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="relative">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 font-medium">Items Sold</p>
-                      <p className="text-4xl font-bold text-purple-600">
-                        {formatIndianNumber(dashboardData.total_items_sold || 0)}
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-600 font-medium">
+                        Current Stock Value
+                      </p>
+                      <p className="text-3xl font-bold text-purple-600">
+                        {formatIndianNumber(dashboardData.current_stock_value || 0, true)}
+                      </p>
+                      <p className="text-base font-semibold text-purple-500 mt-1">
+                        Avg: {formatIndianNumber(dashboardData.avg_yearly_stock_value || 0, true)}
                       </p>
                     </div>
                     <FileSpreadsheet className="h-10 w-10 text-purple-600" />
                   </div>
+                  <button
+                    onClick={handleRefreshStock}
+                    disabled={refreshingStock}
+                    className="absolute bottom-2 right-2 p-1.5 rounded-full hover:bg-purple-50 transition-colors disabled:opacity-50"
+                    title="Refresh stock value"
+                  >
+                    <RefreshCw className={`h-4 w-4 text-purple-600 ${refreshingStock ? 'animate-spin' : ''}`} />
+                  </button>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 font-medium">Profit Margin</p>
-                      <p className="text-4xl font-bold text-orange-600">
-                        {formatPercentage(dashboardData.profit_margin || 0)}
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-600 font-medium">
+                        C Category Stock
+                      </p>
+                      <p className="text-3xl font-bold text-orange-600">
+                        {formatIndianNumber(dashboardData.c_category_stock_value || 0, true)}
+                      </p>
+                      <p className="text-base font-semibold text-orange-500 mt-1">
+                        Avg: {formatIndianNumber(dashboardData.avg_yearly_c_stock_value || 0, true)}
                       </p>
                     </div>
                     <BarChart3 className="h-10 w-10 text-orange-600" />
@@ -174,60 +256,66 @@ function MainApp() {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-7 mb-6 bg-gradient-to-r from-gray-100 to-gray-200 shadow-xl rounded-2xl p-3 border border-gray-300">
+          <TabsList className="grid w-full grid-cols-7 mb-6 bg-gradient-to-r from-gray-100 to-gray-200 shadow-xl rounded-2xl p-2 border border-gray-300">
             <TabsTrigger 
               value="dashboard" 
-              className="flex items-center space-x-2 px-4 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-blue-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
+              className="flex flex-col items-center justify-center px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-blue-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
             >
-              <BarChart3 className="h-5 w-5" />
-              <span>Dashboard</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="upload" 
-              className="flex items-center space-x-2 px-4 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
-            >
-              <Upload className="h-5 w-5" />
-              <span>Historical Data</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="history" 
-              className="flex items-center space-x-2 px-4 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-indigo-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
-            >
-              <Clock className="h-5 w-5" />
-              <span>Upload History</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="database" 
-              className="flex items-center space-x-2 px-4 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-lg hover:shadow-xl hover:from-cyan-600 hover:to-cyan-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
-            >
-              <Database className="h-5 w-5" />
-              <span>Database View</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="analytics" 
-              className="flex items-center space-x-2 px-4 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-purple-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
-            >
-              <TrendingUp className="h-5 w-5" />
-              <span>Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="forecasting" 
-              className="flex items-center space-x-2 px-4 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl hover:from-orange-600 hover:to-orange-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
-            >
-              <FileSpreadsheet className="h-5 w-5" />
-              <span>Forecasting</span>
+              <BarChart3 className="h-4 w-4 mb-1" />
+              <span className="text-center leading-tight">Daily Upload Dashboard</span>
             </TabsTrigger>
             <TabsTrigger 
               value="financial" 
-              className="flex items-center space-x-2 px-4 py-4 rounded-xl font-bold transition-all duration-300 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-emerald-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
+              className="flex flex-col items-center justify-center px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-emerald-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
             >
-              <DollarSign className="h-5 w-5" />
-              <span>Financial Health</span>
+              <DollarSign className="h-4 w-4 mb-1" />
+              <span className="text-center leading-tight">Daily Sale Report</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="analytics" 
+              className="flex flex-col items-center justify-center px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-purple-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
+            >
+              <TrendingUp className="h-4 w-4 mb-1" />
+              <span className="text-center leading-tight">Detailed Analytics</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="forecasting" 
+              className="flex flex-col items-center justify-center px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl hover:from-orange-600 hover:to-orange-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
+            >
+              <FileSpreadsheet className="h-4 w-4 mb-1" />
+              <span className="text-center leading-tight">Forecast</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="upload" 
+              className="flex flex-col items-center justify-center px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
+            >
+              <Upload className="h-4 w-4 mb-1" />
+              <span className="text-center leading-tight">Bulk Data Upload</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="history" 
+              className="flex flex-col items-center justify-center px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-indigo-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
+            >
+              <Clock className="h-4 w-4 mb-1" />
+              <span className="text-center leading-tight">Upload History</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="database" 
+              className="flex flex-col items-center justify-center px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-lg hover:shadow-xl hover:from-cyan-600 hover:to-cyan-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
+            >
+              <Database className="h-4 w-4 mb-1" />
+              <span className="text-center leading-tight">Database View</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            <Dashboard dashboardData={dashboardData} loading={loading} />
+            <Dashboard 
+              dashboardData={dashboardData} 
+              loading={loading} 
+              dashboardPeriod={dashboardPeriod}
+              onPeriodChange={handlePeriodChange}
+              onDataUpload={() => fetchDashboardData(dashboardPeriod)}
+            />
           </TabsContent>
 
           <TabsContent value="upload" className="space-y-6">
@@ -252,11 +340,118 @@ function MainApp() {
 
 
           <TabsContent value="financial" className="space-y-6">
-            <FinancialHealth />
+            <FinancialHealth onReportGenerated={fetchDashboardData} />
           </TabsContent>
 
         </Tabs>
       </div>
+
+      {/* Report Generation Dialog */}
+      {showReportDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                Generate {reportFormat === 'excel' ? 'Excel' : 'PDF'} Report
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Period for Report:
+                  </label>
+                  
+                  <div className="space-y-2">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="all"
+                        checked={reportPeriodType === 'all'}
+                        onChange={(e) => setReportPeriodType(e.target.value)}
+                        className="form-radio h-4 w-4 text-blue-600"
+                      />
+                      <span>All Data (All periods till date)</span>
+                    </label>
+                    
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="current"
+                        checked={reportPeriodType === 'current'}
+                        onChange={(e) => setReportPeriodType(e.target.value)}
+                        className="form-radio h-4 w-4 text-blue-600"
+                      />
+                      <span>Current Period ({dashboardPeriod})</span>
+                    </label>
+                    
+                    {dashboardData?.available_periods && dashboardData.available_periods.map((period) => (
+                      <label key={period} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          value={period}
+                          checked={reportPeriodType === period}
+                          onChange={(e) => setReportPeriodType(e.target.value)}
+                          className="form-radio h-4 w-4 text-blue-600"
+                        />
+                        <span>{period}</span>
+                      </label>
+                    ))}
+                    
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="custom"
+                        checked={reportPeriodType === 'custom'}
+                        onChange={(e) => setReportPeriodType(e.target.value)}
+                        className="form-radio h-4 w-4 text-blue-600"
+                      />
+                      <span>Custom Date Range</span>
+                    </label>
+                    
+                    {reportPeriodType === 'custom' && (
+                      <div className="ml-6 mt-2 space-y-2">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">From Date:</label>
+                          <input
+                            type="date"
+                            value={reportCustomFrom}
+                            onChange={(e) => setReportCustomFrom(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">To Date:</label>
+                          <input
+                            type="date"
+                            value={reportCustomTo}
+                            onChange={(e) => setReportCustomTo(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={handleGenerateReport}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Generate Report
+                </button>
+                <button
+                  onClick={() => setShowReportDialog(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <Toaster />
     </div>
