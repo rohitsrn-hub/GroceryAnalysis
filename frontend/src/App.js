@@ -297,10 +297,10 @@ function MainApp() {
             </TabsTrigger>
             <TabsTrigger 
               value="analytics" 
-              className="flex flex-col items-center justify-center px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-purple-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
+              className="flex flex-col items-center justify-center px-1 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-purple-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
             >
-              <TrendingUp className="h-4 w-4 mb-1" />
-              <span className="text-center leading-tight">Detailed Analytics</span>
+              <TrendingUp className="h-4 w-4 mb-1 flex-shrink-0" />
+              <span className="text-center leading-tight break-words w-full px-1">Analytics</span>
             </TabsTrigger>
             <TabsTrigger 
               value="forecasting" 
