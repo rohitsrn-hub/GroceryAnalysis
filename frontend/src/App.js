@@ -85,31 +85,55 @@ function MainApp() {
     console.log('Dashboard data refreshed');
   };
 
-  const handleGenerateReport = () => {
-    let url = `${API}/comprehensive-report?format=${reportFormat}`;
-    
-    if (reportPeriodType === 'all') {
-      // No period filter - all data
-    } else if (reportPeriodType === 'current') {
-      url += `&period=${dashboardPeriod}`;
-    } else if (reportPeriodType === 'custom') {
-      if (!reportCustomFrom || !reportCustomTo) {
-        alert('Please select both From and To dates');
-        return;
+  const handleGenerateReport = async () => {
+    try {
+      let url = `${API}/comprehensive-report?format=${reportFormat}`;
+      
+      if (reportPeriodType === 'all') {
+        // No period filter - all data
+      } else if (reportPeriodType === 'current') {
+        url += `&period=${dashboardPeriod}`;
+      } else if (reportPeriodType === 'custom') {
+        if (!reportCustomFrom || !reportCustomTo) {
+          alert('Please select both From and To dates');
+          return;
+        }
+        url += `&from_date=${reportCustomFrom}&to_date=${reportCustomTo}`;
+      } else {
+        // Specific period selected
+        url += `&period=${reportPeriodType}`;
       }
-      url += `&from_date=${reportCustomFrom}&to_date=${reportCustomTo}`;
-    } else {
-      // Specific period selected
-      url += `&period=${reportPeriodType}`;
+      
+      // Show loading toast
+      const loadingToast = toast.loading('Generating report...');
+      
+      // Fetch the report as a blob
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Report generation failed: ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      
+      // Create download link
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `URC101-Report-${reportPeriodType}.${reportFormat === 'excel' ? 'xlsx' : 'pdf'}`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(downloadUrl);
+      document.body.removeChild(link);
+      
+      toast.success('Report downloaded successfully', { id: loadingToast });
+      setShowReportDialog(false);
+    } catch (error) {
+      console.error('Report generation error:', error);
+      toast.error(error.message || 'Failed to generate report');
     }
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `URC101-Report-${reportPeriodType}.${reportFormat === 'excel' ? 'xlsx' : 'html'}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setShowReportDialog(false);
   };
 
   return (
