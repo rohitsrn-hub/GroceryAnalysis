@@ -318,10 +318,10 @@ function MainApp() {
             </TabsTrigger>
             <TabsTrigger 
               value="history" 
-              className="flex flex-col items-center justify-center px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-indigo-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100"
+              className="flex flex-col items-center justify-center px-1 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-indigo-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
             >
-              <Clock className="h-4 w-4 mb-1" />
-              <span className="text-center leading-tight">Upload History</span>
+              <Clock className="h-4 w-4 mb-1 flex-shrink-0" />
+              <span className="text-center leading-tight break-words w-full px-1">History</span>
             </TabsTrigger>
             <TabsTrigger 
               value="database" 
