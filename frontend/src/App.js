@@ -8,7 +8,7 @@ import Forecasting from "./components/Forecasting";
 import UploadHistory from "./components/UploadHistory";
 import DatabaseView from "./components/DatabaseView";
 import FinancialHealth from "./components/FinancialHealth";
-import { Toaster } from "./components/ui/sonner";
+import { Toaster, toast } from "./components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { BarChart3, Upload, TrendingUp, FileSpreadsheet, Building2, Download, Clock, Database, DollarSign, RefreshCw } from "lucide-react";
