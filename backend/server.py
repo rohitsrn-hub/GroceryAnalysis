@@ -1786,9 +1786,14 @@ async def generate_comprehensive_report(
         # Get group analysis - pass None directly for period
         group_analysis = await get_group_analysis(period=None)
         
-        # Get fastest selling items (manually since we can't call with Query params)
+        # Build match filter based on selected periods
+        match_filter = {"upload_source": {"$ne": "forecast"}}
+        if period_list and len(period_list) > 0:
+            match_filter["data_period"] = {"$in": period_list}
+        
+        # Get fastest selling items with period filter
         fastest_pipeline = [
-            {"$match": {"upload_source": {"$ne": "forecast"}}},
+            {"$match": match_filter},
             {"$group": {
                 "_id": {"item_code": "$pluno", "item_name": "$item_name", "group": "$group"},
                 "total_sold": {"$sum": "$net_qty"},
@@ -1800,9 +1805,9 @@ async def generate_comprehensive_report(
         ]
         fastest_raw = await db.sales_records.aggregate(fastest_pipeline).to_list(None)
         
-        # Calculate number of months in data
+        # Calculate number of months in data with period filter
         date_pipeline = [
-            {"$match": {"upload_source": {"$ne": "forecast"}}},
+            {"$match": match_filter},
             {"$group": {"_id": "$data_period"}},
             {"$count": "total_months"}
         ]
