@@ -304,38 +304,38 @@ function MainApp() {
             </TabsTrigger>
             <TabsTrigger 
               value="analytics" 
-              className="flex flex-col items-center justify-center px-1 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-purple-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
+              className="flex items-start px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-purple-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
             >
-              <TrendingUp className="h-4 w-4 mb-1 flex-shrink-0" />
-              <span className="text-center leading-tight break-words w-full px-1">Analytics</span>
+              <TrendingUp className="h-4 w-4 mt-0.5 mr-1.5 flex-shrink-0" />
+              <span className="text-left leading-tight whitespace-normal">Analytics</span>
             </TabsTrigger>
             <TabsTrigger 
               value="forecasting" 
-              className="flex flex-col items-center justify-center px-1 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl hover:from-orange-600 hover:to-orange-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
+              className="flex items-start px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg hover:shadow-xl hover:from-orange-600 hover:to-orange-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
             >
-              <FileSpreadsheet className="h-4 w-4 mb-1 flex-shrink-0" />
-              <span className="text-center leading-tight break-words w-full px-1">Forecast</span>
+              <FileSpreadsheet className="h-4 w-4 mt-0.5 mr-1.5 flex-shrink-0" />
+              <span className="text-left leading-tight whitespace-normal">Forecast</span>
             </TabsTrigger>
             <TabsTrigger 
               value="upload" 
-              className="flex flex-col items-center justify-center px-1 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
+              className="flex items-start px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
             >
-              <Upload className="h-4 w-4 mb-1 flex-shrink-0" />
-              <span className="text-center leading-tight break-words w-full px-1">Bulk Upload</span>
+              <Upload className="h-4 w-4 mt-0.5 mr-1.5 flex-shrink-0" />
+              <span className="text-left leading-tight whitespace-normal">Bulk Upload</span>
             </TabsTrigger>
             <TabsTrigger 
               value="history" 
-              className="flex flex-col items-center justify-center px-1 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-indigo-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
+              className="flex items-start px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-indigo-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
             >
-              <Clock className="h-4 w-4 mb-1 flex-shrink-0" />
-              <span className="text-center leading-tight break-words w-full px-1">History</span>
+              <Clock className="h-4 w-4 mt-0.5 mr-1.5 flex-shrink-0" />
+              <span className="text-left leading-tight whitespace-normal">History</span>
             </TabsTrigger>
             <TabsTrigger 
               value="database" 
-              className="flex flex-col items-center justify-center px-1 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-lg hover:shadow-xl hover:from-cyan-600 hover:to-cyan-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
+              className="flex items-start px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-cyan-500 to-cyan-600 text-white shadow-lg hover:shadow-xl hover:from-cyan-600 hover:to-cyan-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
             >
-              <Database className="h-4 w-4 mb-1 flex-shrink-0" />
-              <span className="text-center leading-tight break-words w-full px-1">Database</span>
+              <Database className="h-4 w-4 mt-0.5 mr-1.5 flex-shrink-0" />
+              <span className="text-left leading-tight whitespace-normal">Database</span>
             </TabsTrigger>
           </TabsList>
 
