@@ -517,13 +517,13 @@ def format_indian_currency(amount: float, use_symbol: bool = True) -> str:
         return f"Rs. {amount:,.2f}"
 
 async def format_period_display_name(period: str) -> str:
-    """Format period name intelligently based on actual data coverage
+    """Format period name intelligently based on stored period format
     
     Examples:
-    - Full year: "2024"
-    - Single month: "Nov 2025"
-    - Current month: "Current Period (Dec 2025)"
-    - Period with multiple records: Check if it's actually a range or single month
+    - Full year: "2024" -> "2024"
+    - Single month: "2025-11" -> "Nov 2025"
+    - Current month: "2025-12" -> "Current Period (Dec 2025)"
+    - Range: "2025-01-09" -> "Jan-Sep 2025"
     """
     import re
     from datetime import datetime
@@ -532,14 +532,31 @@ async def format_period_display_name(period: str) -> str:
     if re.match(r'^\d{4}$', period):
         return period
     
-    # If it matches YYYY-MM format
+    month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    
+    # Check for range format: YYYY-MM-MM (start month to end month)
+    range_match = re.match(r'^(\d{4})-(\d{2})-(\d{2})$', period)
+    if range_match:
+        year = range_match.group(1)
+        start_month = int(range_match.group(2))
+        end_month = int(range_match.group(3))
+        
+        # If start and end are the same, treat as single month
+        if start_month == end_month:
+            current_date = datetime.now()
+            if int(year) == current_date.year and start_month == current_date.month:
+                return f"Current Period ({month_names[start_month-1]} {year})"
+            return f"{month_names[start_month-1]} {year}"
+        
+        # Range format
+        return f"{month_names[start_month-1]}-{month_names[end_month-1]} {year}"
+    
+    # Single month format: YYYY-MM
     month_match = re.match(r'^(\d{4})-(\d{2})$', period)
     if month_match:
         year = month_match.group(1)
         month = int(month_match.group(2))
-        
-        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
         
         # Check if this is current month
         current_date = datetime.now()
