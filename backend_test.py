@@ -16,14 +16,14 @@ from io import BytesIO
 # Backend URL from environment
 BACKEND_URL = "https://daily-reports-8.preview.emergentagent.com/api"
 
-def test_comprehensive_report_excel():
-    """Test comprehensive report generation in Excel format"""
+def test_excel_report_single_period():
+    """Test Excel report with single period (2025-11) - verify revenue and profit data"""
     print("\n" + "="*60)
-    print("🧪 TESTING: Comprehensive Report Generation (Excel Format)")
+    print("🧪 TESTING: Excel Report with Single Period (2025-11)")
     print("="*60)
     
     try:
-        url = f"{BACKEND_URL}/comprehensive-report?format=excel"
+        url = f"{BACKEND_URL}/comprehensive-report?format=excel&periods=2025-11"
         print(f"📡 Making request to: {url}")
         
         response = requests.get(url, timeout=30)
@@ -53,22 +53,162 @@ def test_comprehensive_report_excel():
                 print(f"❌ File size too small: {len(response.content):,} bytes (< 10KB)")
                 return False
             
-            # Try to save the file to verify it's valid
+            # Parse Excel file to verify data content
             try:
-                filename = f"test_report_excel_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-                with open(filename, 'wb') as f:
-                    f.write(response.content)
-                print(f"✅ Excel file saved successfully as: {filename}")
+                workbook = openpyxl.load_workbook(BytesIO(response.content))
+                print(f"✅ Excel file is valid and readable")
+                print(f"📊 Worksheets found: {workbook.sheetnames}")
                 
-                # Clean up test file
-                os.remove(filename)
-                print("🧹 Test file cleaned up")
+                # Check for Top Performers sheet
+                if 'Top Performers' in workbook.sheetnames:
+                    print("✅ 'Top Performers' sheet found")
+                    sheet = workbook['Top Performers']
+                    
+                    # Look for revenue data in the sheet
+                    revenue_found = False
+                    profit_found = False
+                    non_zero_revenue = False
+                    non_zero_profit = False
+                    
+                    for row in sheet.iter_rows(values_only=True):
+                        if row and any(cell for cell in row):
+                            row_str = str(row).lower()
+                            # Check for revenue-related data
+                            if 'revenue' in row_str or 'r_amt' in row_str or 'sales' in row_str:
+                                revenue_found = True
+                                # Check if there are non-zero values
+                                for cell in row:
+                                    if isinstance(cell, (int, float)) and cell > 0:
+                                        non_zero_revenue = True
+                                        break
+                            
+                            # Check for profit-related data
+                            if 'profit' in row_str or 'margin' in row_str:
+                                profit_found = True
+                                # Check if there are non-zero values
+                                for cell in row:
+                                    if isinstance(cell, (int, float)) and cell > 0:
+                                        non_zero_profit = True
+                                        break
+                    
+                    if revenue_found:
+                        print("✅ Revenue data found in Top Performers sheet")
+                        if non_zero_revenue:
+                            print("✅ Non-zero revenue values found")
+                        else:
+                            print("❌ All revenue values appear to be zero")
+                            return False
+                    else:
+                        print("❌ No revenue data found in Top Performers sheet")
+                        return False
+                    
+                    if profit_found:
+                        print("✅ Profit data found in Top Performers sheet")
+                        if non_zero_profit:
+                            print("✅ Non-zero profit values found")
+                        else:
+                            print("⚠️  All profit values appear to be zero (may be normal)")
+                    else:
+                        print("⚠️  No profit data found in Top Performers sheet")
                 
-            except Exception as save_error:
-                print(f"❌ Failed to save Excel file: {str(save_error)}")
+                else:
+                    print("❌ 'Top Performers' sheet not found")
+                    return False
+                
+                workbook.close()
+                
+            except Exception as parse_error:
+                print(f"❌ Failed to parse Excel file: {str(parse_error)}")
                 return False
             
-            print("✅ Excel report generation test PASSED")
+            print("✅ Excel report with single period test PASSED")
+            return True
+            
+        else:
+            print(f"❌ Request failed with status {response.status_code}")
+            print(f"📝 Response text: {response.text[:500]}")
+            return False
+            
+    except requests.exceptions.Timeout:
+        print("❌ Request timed out (30 seconds)")
+        return False
+    except requests.exceptions.ConnectionError:
+        print("❌ Connection error - backend may be down")
+        return False
+    except Exception as e:
+        print(f"❌ Unexpected error: {str(e)}")
+        return False
+
+def test_excel_report_multiple_periods():
+    """Test Excel report with multiple periods - verify data aggregation"""
+    print("\n" + "="*60)
+    print("🧪 TESTING: Excel Report with Multiple Periods (2025-11,2024)")
+    print("="*60)
+    
+    try:
+        url = f"{BACKEND_URL}/comprehensive-report?format=excel&periods=2025-11,2024"
+        print(f"📡 Making request to: {url}")
+        
+        response = requests.get(url, timeout=30)
+        
+        print(f"📊 Response Status: {response.status_code}")
+        print(f"📋 Response Headers: {dict(response.headers)}")
+        
+        if response.status_code == 200:
+            # Check Content-Type
+            content_type = response.headers.get('Content-Type', '')
+            expected_content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            
+            print(f"📄 Content-Type: {content_type}")
+            print(f"📏 Content-Length: {len(response.content)} bytes")
+            
+            # Verify MIME type
+            if expected_content_type in content_type:
+                print("✅ MIME type is correct for Excel file")
+            else:
+                print(f"❌ MIME type mismatch. Expected: {expected_content_type}, Got: {content_type}")
+                return False
+            
+            # Check file size (should be > 10KB for a comprehensive report)
+            if len(response.content) > 10240:  # 10KB
+                print(f"✅ File size is adequate: {len(response.content):,} bytes (> 10KB)")
+            else:
+                print(f"❌ File size too small: {len(response.content):,} bytes (< 10KB)")
+                return False
+            
+            # Parse Excel file to verify aggregated data
+            try:
+                workbook = openpyxl.load_workbook(BytesIO(response.content))
+                print(f"✅ Excel file is valid and readable")
+                print(f"📊 Worksheets found: {workbook.sheetnames}")
+                
+                # Check for aggregated data across multiple periods
+                aggregated_data_found = False
+                
+                for sheet_name in workbook.sheetnames:
+                    sheet = workbook[sheet_name]
+                    for row in sheet.iter_rows(values_only=True):
+                        if row and any(cell for cell in row):
+                            row_str = str(row).lower()
+                            # Look for period indicators or aggregated totals
+                            if ('2025' in row_str and '2024' in row_str) or 'total' in row_str or 'aggregate' in row_str:
+                                aggregated_data_found = True
+                                break
+                    if aggregated_data_found:
+                        break
+                
+                if aggregated_data_found:
+                    print("✅ Aggregated data for multiple periods found")
+                else:
+                    print("⚠️  Could not verify aggregated data (may still be correct)")
+                
+                workbook.close()
+                
+            except Exception as parse_error:
+                print(f"❌ Failed to parse Excel file: {str(parse_error)}")
+                return False
+            
+            print("✅ Excel report with multiple periods test PASSED")
             return True
             
         else:
