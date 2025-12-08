@@ -116,6 +116,9 @@ backend:
         - working: true
           agent: "testing"
           comment: "✅ Excel report generation test PASSED. Endpoint GET /api/comprehensive-report?format=excel returns valid Excel file with correct MIME type (application/vnd.openxmlformats-officedocument.spreadsheetml.sheet), file size 16,623 bytes (>10KB requirement met), and downloadable content. Response status 200 OK."
+        - working: true
+          agent: "testing"
+          comment: "✅ COMPREHENSIVE REVENUE AND PROFIT DATA TESTING COMPLETED SUCCESSFULLY. All review request scenarios PASSED: 1) Excel Report Single Period (2025-11) - VERIFIED Top Performers sheet contains correct non-zero revenue values (20 entries, sample: ₹1,989.68, ₹1,138.28, ₹2,042.04), profit calculations accurate (r_amt - w_amt), margin percentages correct (profit/revenue * 100). 2) Excel Report Multiple Periods (2025-11,2024) - VERIFIED data aggregation works correctly across periods. 3) All calculations verified: Revenue=actual sales data, Profit=r_amt-w_amt, Margin=(profit/revenue*100). Sample verification: Item 1 Revenue=₹1989.68, Profit=₹94.05, Margin=4.73% (calculated 4.73% matches reported). Zero revenue/profit issue from review request has been RESOLVED - all values are correctly populated and calculated."
 
   - task: "Comprehensive Report Generation (PDF Format)"
     implemented: true
@@ -128,6 +131,9 @@ backend:
         - working: true
           agent: "testing"
           comment: "✅ PDF report generation test PASSED. Endpoint GET /api/comprehensive-report?format=pdf returns valid HTML report with correct content (16,879 bytes >5KB requirement met). Note: Current implementation returns styled HTML instead of actual PDF, but contains all expected sections including Executive Summary and comprehensive analysis. Response status 200 OK."
+        - working: true
+          agent: "testing"
+          comment: "✅ PDF REPORT REVENUE DATA VERIFICATION COMPLETED. PDF Report Single Period (2025-11) test PASSED - VERIFIED Top 10 Performing Items section shows correct non-zero revenue values (74 currency values found), profit data present, all revenue indicators working correctly. Current implementation returns styled HTML instead of actual PDF but contains all required financial data with proper formatting. Revenue values are NOT zero as initially reported - issue has been RESOLVED."
 
 metadata:
   created_by: "testing_agent"
