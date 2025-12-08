@@ -1771,9 +1771,41 @@ async def generate_comprehensive_report(
             # Too many periods, show range or count
             period_label = f" - {period_list[0]} to {period_list[-1]} ({len(period_list)} periods)"
         
-        # For dashboard summary, pass None to get all data or first period for filtering
-        # Note: The dashboard API doesn't support multiple periods, so we'll aggregate data manually
-        dashboard_summary = await get_dashboard_summary(period=None)
+        # Aggregate dashboard summary data based on selected periods
+        if period_list and len(period_list) > 0:
+            # Calculate aggregated metrics for selected periods
+            summary_pipeline = [
+                {"$match": match_filter},
+                {"$group": {
+                    "_id": None,
+                    "total_revenue": {"$sum": "$r_amt"},
+                    "total_profit": {"$sum": "$profit"},
+                    "total_items_sold": {"$sum": "$net_qty"},
+                    "total_records": {"$sum": 1}
+                }}
+            ]
+            summary_result = await db.sales_records.aggregate(summary_pipeline).to_list(None)
+            
+            if summary_result and len(summary_result) > 0:
+                result = summary_result[0]
+                dashboard_summary = {
+                    "total_revenue": result.get("total_revenue", 0) or 0,
+                    "total_profit": result.get("total_profit", 0) or 0,
+                    "total_items_sold": result.get("total_items_sold", 0) or 0,
+                    "total_records": result.get("total_records", 0) or 0,
+                    "profit_margin": (result.get("total_profit", 0) / result.get("total_revenue", 1) * 100) if result.get("total_revenue", 0) > 0 else 0
+                }
+            else:
+                dashboard_summary = {
+                    "total_revenue": 0,
+                    "total_profit": 0,
+                    "total_items_sold": 0,
+                    "total_records": 0,
+                    "profit_margin": 0
+                }
+        else:
+            # Get all data
+            dashboard_summary = await get_dashboard_summary(period=None)
         
         # Get ABC analysis using existing endpoint - pass None directly for group and period
         abc_response = await get_abc_analysis(group=None, period=None)
