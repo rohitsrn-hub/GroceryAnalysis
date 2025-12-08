@@ -44,6 +44,12 @@ function MainApp() {
       });
       const data = await response.json();
       setDashboardData(data);
+      
+      // Extract and set available periods
+      if (data.available_periods && data.available_periods.length > 0) {
+        setAvailablePeriods(data.available_periods);
+      }
+      
       console.log('Dashboard data fetched:', data.total_records, 'records');
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
