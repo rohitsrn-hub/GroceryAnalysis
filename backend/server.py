@@ -1825,9 +1825,10 @@ async def generate_comprehensive_report(
             "profit_margin": (item.get("total_profit", 0) / item.get("total_revenue", 1) * 100) if item.get("total_revenue", 0) > 0 else 0
         } for item in fastest_raw]
         
-        # Get slowest selling items (capital blockers)
+        # Get slowest selling items (capital blockers) with period filter
+        slowest_match_filter = {**match_filter, "closing_stock": {"$gt": 0}}
         slowest_pipeline = [
-            {"$match": {"upload_source": {"$ne": "forecast"}, "closing_stock": {"$gt": 0}}},
+            {"$match": slowest_match_filter},
             {"$group": {
                 "_id": {"item_code": "$pluno", "item_name": "$item_name", "group": "$group"},
                 "total_sold": {"$sum": "$net_qty"},
