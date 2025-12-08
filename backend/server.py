@@ -1753,12 +1753,12 @@ async def generate_comprehensive_report(format: str = Query("excel")):
         # Use existing API endpoints to get pre-calculated data
         dashboard_summary = await get_dashboard_summary(period=None)
         
-        # Get ABC analysis using existing endpoint
-        abc_response = await get_abc_analysis(None)
+        # Get ABC analysis using existing endpoint - pass None directly for group and period
+        abc_response = await get_abc_analysis(group=None, period=None)
         abc_analysis = abc_response if isinstance(abc_response, dict) else {}
         
-        # Get capital blocking analysis using existing endpoint
-        capital_response = await get_capital_blocking_analysis(None)
+        # Get capital blocking analysis using existing endpoint - pass None directly for group and period
+        capital_response = await get_capital_blocking_analysis(group=None, period=None)
         capital_analysis = capital_response if isinstance(capital_response, dict) else {}
         
         # Get group analysis
