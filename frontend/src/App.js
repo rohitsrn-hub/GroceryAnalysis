@@ -174,13 +174,21 @@ function MainApp() {
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setReportFormat('excel');
-                    setShowReportDialog(true);
-                    // Initialize with all periods selected if available
-                    if (availablePeriods.length > 0 && selectedPeriods.length === 0) {
-                      setSelectedPeriods([...availablePeriods]);
+                    // Fetch available periods
+                    try {
+                      const response = await fetch(`${API}/available-periods`);
+                      const data = await response.json();
+                      if (data.available_periods && data.available_periods.length > 0) {
+                        setAvailablePeriods(data.available_periods);
+                        // Select all periods by default
+                        setSelectedPeriods(data.available_periods);
+                      }
+                    } catch (error) {
+                      console.error('Error fetching available periods:', error);
                     }
+                    setShowReportDialog(true);
                   }}
                   className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
                 >
@@ -189,13 +197,21 @@ function MainApp() {
                 </button>
                 
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setReportFormat('pdf');
-                    setShowReportDialog(true);
-                    // Initialize with all periods selected if available
-                    if (availablePeriods.length > 0 && selectedPeriods.length === 0) {
-                      setSelectedPeriods([...availablePeriods]);
+                    // Fetch available periods
+                    try {
+                      const response = await fetch(`${API}/available-periods`);
+                      const data = await response.json();
+                      if (data.available_periods && data.available_periods.length > 0) {
+                        setAvailablePeriods(data.available_periods);
+                        // Select all periods by default
+                        setSelectedPeriods(data.available_periods);
+                      }
+                    } catch (error) {
+                      console.error('Error fetching available periods:', error);
                     }
+                    setShowReportDialog(true);
                   }}
                   className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
                 >
