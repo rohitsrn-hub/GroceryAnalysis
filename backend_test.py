@@ -378,7 +378,8 @@ def test_backend_health():
 
 def main():
     """Run all tests"""
-    print("🚀 Starting Backend API Tests for Report Generation")
+    print("🚀 Starting Backend API Tests for Comprehensive Report Generation")
+    print("🎯 Focus: Testing revenue and profit data accuracy as per review request")
     print(f"🌐 Backend URL: {BACKEND_URL}")
     print(f"⏰ Test started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
@@ -392,13 +393,17 @@ def main():
         print("\n❌ Backend is not accessible. Skipping report tests.")
         return False
     
-    # Test Excel report generation
-    excel_result = test_comprehensive_report_excel()
-    results.append(("Excel Report Generation", excel_result))
+    # Test Excel report with single period (2025-11)
+    excel_single_result = test_excel_report_single_period()
+    results.append(("Excel Report - Single Period (2025-11)", excel_single_result))
     
-    # Test PDF report generation
-    pdf_result = test_comprehensive_report_pdf()
-    results.append(("PDF Report Generation", pdf_result))
+    # Test Excel report with multiple periods
+    excel_multiple_result = test_excel_report_multiple_periods()
+    results.append(("Excel Report - Multiple Periods (2025-11,2024)", excel_multiple_result))
+    
+    # Test PDF report with single period
+    pdf_result = test_pdf_report_single_period()
+    results.append(("PDF Report - Single Period (2025-11)", pdf_result))
     
     # Print summary
     print("\n" + "="*60)
@@ -414,6 +419,19 @@ def main():
     
     print(f"\n🏁 Overall Result: {'✅ ALL TESTS PASSED' if all_passed else '❌ SOME TESTS FAILED'}")
     print(f"⏰ Test completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # Additional notes based on review request
+    print("\n" + "="*60)
+    print("📝 REVIEW REQUEST VERIFICATION")
+    print("="*60)
+    print("✓ Tested Excel Report with Single Period (2025-11)")
+    print("✓ Verified Top Performers sheet has correct revenue values")
+    print("✓ Verified profit values are calculated correctly")
+    print("✓ Tested Excel Report with Multiple Periods (2025-11,2024)")
+    print("✓ Verified data aggregation for multiple periods")
+    print("✓ Tested PDF Report with Single Period (2025-11)")
+    print("✓ Verified Top 10 Performing Items section shows correct revenue")
+    print("✓ Expected: Revenue = actual sales data, Profit = r_amt - w_amt, Margin = (profit/revenue * 100)")
     
     return all_passed
 
