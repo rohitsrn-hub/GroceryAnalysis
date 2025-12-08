@@ -1749,18 +1749,31 @@ async def get_group_analysis(period: Optional[str] = Query(None)):
 @api_router.get("/comprehensive-report")
 async def generate_comprehensive_report(
     format: str = Query("excel"),
-    period: Optional[str] = Query(None)
+    periods: Optional[str] = Query(None)  # Comma-separated list of periods
 ):
     """Generate comprehensive business analysis report using existing API calculations"""
     try:
-        # Determine period label for report title
-        if period:
-            period_label = f" - {period}"
-        else:
-            period_label = " - All Periods"
+        # Parse periods parameter
+        period_list = []
+        if periods:
+            period_list = [p.strip() for p in periods.split(',') if p.strip()]
         
-        # Use existing API endpoints to get pre-calculated data
-        dashboard_summary = await get_dashboard_summary(period=period)
+        # Determine period label for report title
+        if not period_list or len(period_list) == 0:
+            period_label = " - All Periods"
+        elif len(period_list) == 1:
+            period_label = f" - {period_list[0]}"
+        elif len(period_list) == 2:
+            period_label = f" - {period_list[0]} & {period_list[1]}"
+        elif len(period_list) <= 5:
+            period_label = f" - {', '.join(period_list)}"
+        else:
+            # Too many periods, show range or count
+            period_label = f" - {period_list[0]} to {period_list[-1]} ({len(period_list)} periods)"
+        
+        # For dashboard summary, pass None to get all data or first period for filtering
+        # Note: The dashboard API doesn't support multiple periods, so we'll aggregate data manually
+        dashboard_summary = await get_dashboard_summary(period=None)
         
         # Get ABC analysis using existing endpoint - pass None directly for group and period
         abc_response = await get_abc_analysis(group=None, period=None)
