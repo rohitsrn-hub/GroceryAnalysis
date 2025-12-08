@@ -2568,6 +2568,31 @@ async def generate_comprehensive_report(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
 
+@api_router.post("/fix-jan-sep-period")
+async def fix_jan_sep_period():
+    """Migration: Fix Jan-Sep 2025 data that was incorrectly stored as 2025-01"""
+    try:
+        # Update records with period "2025-01" to "2025-01-09" (Jan-Sep range)
+        # This should only be done if the data actually represents Jan-Sep
+        result = await db.sales_records.update_many(
+            {
+                "data_period": "2025-01",
+                "upload_source": {"$ne": "forecast"}
+            },
+            {
+                "$set": {"data_period": "2025-01-09"}  # Jan (01) to Sep (09)
+            }
+        )
+        
+        return {
+            "success": True,
+            "modified_count": result.modified_count,
+            "message": f"Updated {result.modified_count} records from '2025-01' to '2025-01-09' (Jan-Sep 2025)"
+        }
+    except Exception as e:
+        logger.error(f"Error fixing period: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fixing period: {str(e)}")
+
 @api_router.get("/available-periods")
 async def get_available_periods():
     """Get list of available periods from uploaded data with formatted display names"""
