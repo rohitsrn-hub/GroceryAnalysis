@@ -25,9 +25,8 @@ function MainApp() {
   const [dashboardPeriod, setDashboardPeriod] = useState(`${new Date().getFullYear()} - Current Year`);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [reportFormat, setReportFormat] = useState('excel');
-  const [reportPeriodType, setReportPeriodType] = useState('all');
-  const [reportCustomFrom, setReportCustomFrom] = useState('');
-  const [reportCustomTo, setReportCustomTo] = useState('');
+  const [selectedPeriods, setSelectedPeriods] = useState([]);
+  const [availablePeriods, setAvailablePeriods] = useState([]);
 
   const fetchDashboardData = async (period = `${new Date().getFullYear()} - Current Year`) => {
     try {
