@@ -226,14 +226,14 @@ def test_excel_report_multiple_periods():
         print(f"❌ Unexpected error: {str(e)}")
         return False
 
-def test_comprehensive_report_pdf():
-    """Test comprehensive report generation in PDF format"""
+def test_pdf_report_single_period():
+    """Test PDF report with single period (2025-11) - verify revenue data"""
     print("\n" + "="*60)
-    print("🧪 TESTING: Comprehensive Report Generation (PDF Format)")
+    print("🧪 TESTING: PDF Report with Single Period (2025-11)")
     print("="*60)
     
     try:
-        url = f"{BACKEND_URL}/comprehensive-report?format=pdf"
+        url = f"{BACKEND_URL}/comprehensive-report?format=pdf&periods=2025-11"
         print(f"📡 Making request to: {url}")
         
         response = requests.get(url, timeout=30)
@@ -264,36 +264,62 @@ def test_comprehensive_report_pdf():
                 print(f"❌ File size too small: {len(response.content):,} bytes (< 5KB)")
                 return False
             
-            # Try to save the file to verify it's valid
-            try:
-                # Save as HTML since that's what the current implementation returns
-                filename = f"test_report_pdf_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-                with open(filename, 'w', encoding='utf-8') as f:
-                    f.write(response.text)
-                print(f"✅ Report file saved successfully as: {filename}")
+            # Verify content contains revenue and profit data
+            response_text = response.text.lower()
+            
+            # Check for Top 10 Performing Items section
+            if "top 10 performing items" in response_text or "top performers" in response_text:
+                print("✅ Top 10 Performing Items section found")
                 
-                # Verify it contains expected content
-                if "URC 101 Area - Comprehensive Sales Analysis Report" in response.text:
-                    print("✅ Report contains expected title")
+                # Check for revenue indicators
+                revenue_indicators = ['revenue', 'r_amt', 'sales', 'amount', '₹', 'rs.']
+                revenue_found = any(indicator in response_text for indicator in revenue_indicators)
+                
+                if revenue_found:
+                    print("✅ Revenue data indicators found in report")
+                    
+                    # Look for non-zero values (basic check)
+                    import re
+                    # Look for currency amounts (₹ or Rs. followed by numbers)
+                    currency_pattern = r'[₹Rs\.]\s*[\d,]+\.?\d*'
+                    currency_matches = re.findall(currency_pattern, response.text)
+                    
+                    if currency_matches:
+                        print(f"✅ Found {len(currency_matches)} currency values in report")
+                        # Check if any values are non-zero
+                        non_zero_found = False
+                        for match in currency_matches[:5]:  # Check first 5 matches
+                            # Extract numeric value
+                            numeric_part = re.sub(r'[₹Rs\.,\s]', '', match)
+                            try:
+                                value = float(numeric_part)
+                                if value > 0:
+                                    non_zero_found = True
+                                    break
+                            except ValueError:
+                                continue
+                        
+                        if non_zero_found:
+                            print("✅ Non-zero revenue values found")
+                        else:
+                            print("❌ All revenue values appear to be zero")
+                            return False
+                    else:
+                        print("⚠️  No currency values found in expected format")
                 else:
-                    print("❌ Report missing expected title")
+                    print("❌ No revenue data indicators found")
                     return False
-                
-                if "Executive Summary" in response.text:
-                    print("✅ Report contains Executive Summary section")
-                else:
-                    print("❌ Report missing Executive Summary section")
-                    return False
-                
-                # Clean up test file
-                os.remove(filename)
-                print("🧹 Test file cleaned up")
-                
-            except Exception as save_error:
-                print(f"❌ Failed to save report file: {str(save_error)}")
+            else:
+                print("❌ Top 10 Performing Items section not found")
                 return False
             
-            print("✅ PDF/HTML report generation test PASSED")
+            # Check for profit data
+            if 'profit' in response_text or 'margin' in response_text:
+                print("✅ Profit data found in report")
+            else:
+                print("⚠️  No profit data found in report")
+            
+            print("✅ PDF report with single period test PASSED")
             print("ℹ️  Note: Current implementation returns HTML instead of actual PDF")
             return True
             
