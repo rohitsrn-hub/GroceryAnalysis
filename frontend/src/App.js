@@ -93,21 +93,17 @@ function MainApp() {
   const handleGenerateReport = async () => {
     let loadingToast;
     try {
+      // Validate that at least one period is selected
+      if (selectedPeriods.length === 0) {
+        toast.error('Please select at least one period for the report');
+        return;
+      }
+      
       let url = `${API}/comprehensive-report?format=${reportFormat}`;
       
-      if (reportPeriodType === 'all') {
-        // No period filter - all data
-      } else if (reportPeriodType === 'current') {
-        url += `&period=${dashboardPeriod}`;
-      } else if (reportPeriodType === 'custom') {
-        if (!reportCustomFrom || !reportCustomTo) {
-          alert('Please select both From and To dates');
-          return;
-        }
-        url += `&from_date=${reportCustomFrom}&to_date=${reportCustomTo}`;
-      } else {
-        // Specific period selected
-        url += `&period=${reportPeriodType}`;
+      // Add selected periods as comma-separated list
+      if (selectedPeriods.length > 0) {
+        url += `&periods=${selectedPeriods.join(',')}`;
       }
       
       // Show loading toast
@@ -123,11 +119,22 @@ function MainApp() {
       
       const blob = await response.blob();
       
+      // Create download filename based on selected periods
+      let filename = 'URC101-Report';
+      if (selectedPeriods.length === availablePeriods.length) {
+        filename += '-AllPeriods';
+      } else if (selectedPeriods.length === 1) {
+        filename += `-${selectedPeriods[0]}`;
+      } else {
+        filename += `-${selectedPeriods.length}Periods`;
+      }
+      filename += `.${reportFormat === 'excel' ? 'xlsx' : 'pdf'}`;
+      
       // Create download link
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = `URC101-Report-${reportPeriodType}.${reportFormat === 'excel' ? 'xlsx' : 'pdf'}`;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       
