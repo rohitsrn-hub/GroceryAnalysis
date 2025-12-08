@@ -372,20 +372,19 @@ def validate_excel_structure(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 def extract_period_from_filename(filename: str) -> Dict[str, Any]:
-    """Extract year and month from filename"""
+    """Extract period information from filename with smart date range detection
+    
+    Examples:
+    - "01 Jan to Sep 30 2025" -> Jan-Sep 2025
+    - "01 to 30 Oct 25" -> Oct 2025
+    - "YR 2024 C.xlsx" -> 2024
+    - "Nov 2025.xlsx" -> Nov 2025
+    """
     import re
     
-    # Patterns to match
-    # "Jan 2023.xlsx", "1Aug to 31 2025.xlsx", "YR 2024 C.xlsx"
+    result = {"year": None, "month": None, "period": None, "data_type": None, "start_month": None, "end_month": None}
     
-    result = {"year": None, "month": None, "period": None, "data_type": None}
-    
-    # Try to find year (4 digits)
-    year_match = re.search(r'20\d{2}', filename)
-    if year_match:
-        result["year"] = int(year_match.group())
-    
-    # Try to find month
+    # Month mapping
     months = {
         'jan': 1, 'january': 1,
         'feb': 2, 'february': 2,
@@ -401,19 +400,71 @@ def extract_period_from_filename(filename: str) -> Dict[str, Any]:
         'dec': 12, 'december': 12
     }
     
+    month_names_short = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    
     filename_lower = filename.lower()
+    
+    # Extract year (4 digits or 2 digits)
+    year_match = re.search(r'20(\d{2})', filename)
+    if not year_match:
+        year_match = re.search(r'\b(\d{2})\b', filename)  # 2-digit year like "25"
+        if year_match:
+            year_2digit = int(year_match.group(1))
+            result["year"] = 2000 + year_2digit if year_2digit < 50 else 1900 + year_2digit
+    else:
+        result["year"] = int(year_match.group())
+    
+    # Pattern 1: Range with two month names - "01 Jan to Sep 30 2025" or "Jan to Sep 2025"
+    range_pattern = r'(\w+)\s+to\s+(\w+)'
+    range_match = re.search(range_pattern, filename_lower)
+    
+    if range_match:
+        start_part = range_match.group(1)
+        end_part = range_match.group(2)
+        
+        # Find months in the range
+        start_month = None
+        end_month = None
+        
+        for month_name, month_num in months.items():
+            if month_name in start_part:
+                start_month = month_num
+            if month_name in end_part:
+                end_month = month_num
+        
+        if start_month and end_month:
+            result["start_month"] = start_month
+            result["end_month"] = end_month
+            result["data_type"] = "range"
+            
+            # Format: "Jan-Sep 2025"
+            if result["year"]:
+                start_name = month_names_short[start_month - 1]
+                end_name = month_names_short[end_month - 1]
+                result["period"] = f"{result['year']}-{start_month:02d}-{end_month:02d}"  # Store as range
+                result["display_name"] = f"{start_name}-{end_name} {result['year']}"
+            return result
+    
+    # Pattern 2: Single month - "Nov 2025", "October 25", "01 to 30 Oct 25"
+    found_months = []
     for month_name, month_num in months.items():
         if month_name in filename_lower:
-            result["month"] = month_num
-            break
+            found_months.append(month_num)
     
-    # Determine period and data_type
-    if result["year"] and result["month"]:
-        result["period"] = f"{result['year']}-{result['month']:02d}"
+    if found_months:
+        result["month"] = found_months[0]  # Take first found month
         result["data_type"] = "monthly"
-    elif result["year"]:
+        if result["year"]:
+            result["period"] = f"{result['year']}-{result['month']:02d}"
+            result["display_name"] = f"{month_names_short[result['month']-1]} {result['year']}"
+        return result
+    
+    # Pattern 3: Yearly data - "YR 2024", "2024"
+    if result["year"] and not result["month"]:
         result["period"] = str(result["year"])
         result["data_type"] = "yearly"
+        result["display_name"] = str(result["year"])
+        return result
     
     return result
 
