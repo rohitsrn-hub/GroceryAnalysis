@@ -137,8 +137,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Comprehensive Report Generation (Excel Format)"
-    - "Comprehensive Report Generation (PDF Format)"
+    - "Tab Label Updates"
+    - "Report Generation Dialog UI"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
