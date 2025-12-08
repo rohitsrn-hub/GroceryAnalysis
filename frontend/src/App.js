@@ -180,10 +180,10 @@ function MainApp() {
                     try {
                       const response = await fetch(`${API}/available-periods`);
                       const data = await response.json();
-                      if (data.available_periods && data.available_periods.length > 0) {
-                        setAvailablePeriods(data.available_periods);
-                        // Select all periods by default
-                        setSelectedPeriods(data.available_periods);
+                      if (data.periods_detailed && data.periods_detailed.length > 0) {
+                        setAvailablePeriods(data.periods_detailed);
+                        // Select all periods by default (store values for API call)
+                        setSelectedPeriods(data.periods_detailed.map(p => p.value));
                       }
                     } catch (error) {
                       console.error('Error fetching available periods:', error);
@@ -203,10 +203,10 @@ function MainApp() {
                     try {
                       const response = await fetch(`${API}/available-periods`);
                       const data = await response.json();
-                      if (data.available_periods && data.available_periods.length > 0) {
-                        setAvailablePeriods(data.available_periods);
-                        // Select all periods by default
-                        setSelectedPeriods(data.available_periods);
+                      if (data.periods_detailed && data.periods_detailed.length > 0) {
+                        setAvailablePeriods(data.periods_detailed);
+                        // Select all periods by default (store values for API call)
+                        setSelectedPeriods(data.periods_detailed.map(p => p.value));
                       }
                     } catch (error) {
                       console.error('Error fetching available periods:', error);
