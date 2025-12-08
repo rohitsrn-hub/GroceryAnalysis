@@ -1747,11 +1747,20 @@ async def get_group_analysis(period: Optional[str] = Query(None)):
         raise HTTPException(status_code=500, detail=f"Error in group analysis: {str(e)}")
 
 @api_router.get("/comprehensive-report")
-async def generate_comprehensive_report(format: str = Query("excel")):
+async def generate_comprehensive_report(
+    format: str = Query("excel"),
+    period: Optional[str] = Query(None)
+):
     """Generate comprehensive business analysis report using existing API calculations"""
     try:
+        # Determine period label for report title
+        if period:
+            period_label = f" - {period}"
+        else:
+            period_label = " - All Periods"
+        
         # Use existing API endpoints to get pre-calculated data
-        dashboard_summary = await get_dashboard_summary(period=None)
+        dashboard_summary = await get_dashboard_summary(period=period)
         
         # Get ABC analysis using existing endpoint - pass None directly for group and period
         abc_response = await get_abc_analysis(group=None, period=None)
