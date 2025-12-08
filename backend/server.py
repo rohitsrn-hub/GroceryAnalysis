@@ -3599,14 +3599,26 @@ async def get_database_view(
                 .limit(limit)\
                 .to_list(limit)
         
-        # Get unique periods in database
+        # Get unique periods in database with formatted display names
         periods_pipeline = [
+            {"$match": {"upload_source": {"$ne": "forecast"}, "data_period": {"$exists": True, "$ne": None}}},
             {"$group": {"_id": "$data_period"}},
             {"$sort": {"_id": -1}},
             {"$limit": 50}
         ]
         periods = await db.sales_records.aggregate(periods_pipeline).to_list(50)
-        unique_periods = [p["_id"] for p in periods if p["_id"]]
+        raw_periods = [p["_id"] for p in periods if p["_id"]]
+        
+        # Format period names for display (consistent with report generation modal)
+        periods_with_display = []
+        for period in raw_periods:
+            display_name = await format_period_display_name(period)
+            periods_with_display.append({
+                "value": period,
+                "label": display_name
+            })
+        
+        unique_periods = [p["label"] for p in periods_with_display]  # Use formatted names for backward compatibility
         
         # Get groups
         groups_pipeline = [
