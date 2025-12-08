@@ -3504,12 +3504,12 @@ async def get_available_data_periods():
                 })
         
         return {
-            "periods": periods_sorted,  # NEW: List of unique period strings
+            "periods": periods_formatted,  # Formatted period names (e.g., "Nov 2025", "Jan-Sep 2025")
             "daily_uploads": daily_uploads,
             "historical_uploads": historical_uploads,
             "total_daily": len(daily_uploads),
             "total_historical": len(historical_uploads),
-            "total_periods": len(periods_sorted)
+            "total_periods": len(periods_formatted)
         }
         
     except Exception as e:
