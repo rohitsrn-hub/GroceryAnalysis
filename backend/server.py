@@ -404,15 +404,19 @@ def extract_period_from_filename(filename: str) -> Dict[str, Any]:
     
     filename_lower = filename.lower()
     
-    # Extract year (4 digits or 2 digits)
-    year_match = re.search(r'20(\d{2})', filename)
-    if not year_match:
-        year_match = re.search(r'\b(\d{2})\b', filename)  # 2-digit year like "25"
-        if year_match:
-            year_2digit = int(year_match.group(1))
-            result["year"] = 2000 + year_2digit if year_2digit < 50 else 1900 + year_2digit
-    else:
+    # Extract year - prioritize 4-digit years, then 2-digit years that look like years
+    year_match = re.search(r'20\d{2}', filename)  # 4-digit year like 2025
+    if year_match:
         result["year"] = int(year_match.group())
+    else:
+        # Look for 2-digit year that's NOT a day number (usually at end or after month)
+        # Match patterns like "Oct 25", "25.xlsx", but not "01 to 30"
+        year_2digit_match = re.search(r'(?:^|\s|[a-z])(\d{2})(?:\s|\.|\)|$)', filename_lower)
+        if year_2digit_match:
+            year_2digit = int(year_2digit_match.group(1))
+            # Only treat as year if it's reasonable (20-99 for 2020-2099)
+            if 20 <= year_2digit <= 99:
+                result["year"] = 1900 + year_2digit if year_2digit >= 50 else 2000 + year_2digit
     
     # Pattern 1: Range with two month names - "01 Jan to Sep 30 2025" or "Jan to Sep 2025"
     range_pattern = r'(\w+)\s+to\s+(\w+)'
