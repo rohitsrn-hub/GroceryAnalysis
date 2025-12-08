@@ -1827,7 +1827,7 @@ async def generate_comprehensive_report(
         fastest_pipeline = [
             {"$match": match_filter},
             {"$group": {
-                "_id": {"item_code": "$pluno", "item_name": "$item_name", "group": "$group"},
+                "_id": {"item_code": "$pluno", "item_name": "$item_name", "group": "$product_group"},
                 "total_sold": {"$sum": "$net_qty"},
                 "total_revenue": {"$sum": "$r_amt"},
                 "total_profit": {"$sum": "$profit"}
