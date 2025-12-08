@@ -143,6 +143,33 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+frontend:
+  - task: "Tab Label Updates"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "UI fixes implemented for tab labels: 'Daily Dashboard' and 'Daily Sales Report', with left-aligned icons and proper text wrapping. Needs testing verification."
+
+  - task: "Report Generation Dialog UI"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Report generation dialog with toast notifications implemented. Need to test dialog opening, option selection, report generation, and toast behavior."
+
 agent_communication:
     - agent: "testing"
       message: "Completed comprehensive testing of report generation endpoints. Both Excel and PDF format endpoints are working correctly. Excel returns proper .xlsx file, PDF returns styled HTML (not actual PDF but meets functional requirements). All file size requirements met. Backend is healthy and accessible."
+    - agent: "main"
+      message: "Added frontend UI testing tasks for tab label updates and report generation dialog. Ready for UI testing with playwright automation."
