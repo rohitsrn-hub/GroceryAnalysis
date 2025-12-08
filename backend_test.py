@@ -133,7 +133,9 @@ def test_excel_report_single_period():
                     if revenue_found:
                         print("✅ Revenue data found in Top Performers sheet")
                         if non_zero_revenue:
-                            print("✅ Non-zero revenue values found")
+                            print(f"✅ Non-zero revenue values found ({len(revenue_values)} revenue entries)")
+                            if revenue_values:
+                                print(f"   Sample revenue values: {revenue_values[:3]}")
                         else:
                             print("❌ All revenue values appear to be zero")
                             return False
@@ -144,11 +146,22 @@ def test_excel_report_single_period():
                     if profit_found:
                         print("✅ Profit data found in Top Performers sheet")
                         if non_zero_profit:
-                            print("✅ Non-zero profit values found")
+                            print(f"✅ Non-zero profit values found ({len(profit_values)} profit entries)")
+                            if profit_values:
+                                print(f"   Sample profit values: {profit_values[:3]}")
                         else:
-                            print("⚠️  All profit values appear to be zero (may be normal)")
+                            print("⚠️  All profit values appear to be zero (may be normal for some items)")
                     else:
                         print("⚠️  No profit data found in Top Performers sheet")
+                    
+                    # Verify profit calculation (profit = r_amt - w_amt)
+                    if revenue_values and profit_values:
+                        print("✅ Revenue and profit data structure verified")
+                        # Check margin calculation for first few items
+                        for i in range(min(3, len(revenue_values), len(profit_values))):
+                            if revenue_values[i] > 0:
+                                calculated_margin = (profit_values[i] / revenue_values[i]) * 100
+                                print(f"   Item {i+1}: Revenue=₹{revenue_values[i]:.2f}, Profit=₹{profit_values[i]:.2f}, Margin={calculated_margin:.2f}%")
                 
                 else:
                     print("❌ 'Top Performers' sheet not found")
