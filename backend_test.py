@@ -2,13 +2,16 @@
 """
 Backend API Testing Script for Report Generation
 Tests comprehensive report generation endpoints (Excel and PDF formats)
+Focus on testing revenue and profit data accuracy as per review request
 """
 
 import requests
 import json
 import sys
 import os
+import openpyxl
 from datetime import datetime
+from io import BytesIO
 
 # Backend URL from environment
 BACKEND_URL = "https://daily-reports-8.preview.emergentagent.com/api"
