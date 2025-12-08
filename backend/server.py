@@ -1829,7 +1829,7 @@ async def generate_comprehensive_report(
             ws_summary = workbook.active
             ws_summary.title = "Executive Summary"
             
-            ws_summary.append(["URC 101 Area - Comprehensive Sales Analysis Report"])
+            ws_summary.append([f"URC 101 Area - Comprehensive Sales Analysis Report{period_label}"])
             ws_summary.append(["Generated on:", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
             ws_summary.append([""])
             ws_summary.append(["KEY METRICS"])
