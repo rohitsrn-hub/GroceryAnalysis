@@ -1823,12 +1823,7 @@ async def generate_comprehensive_report(
         # Get group analysis - pass None directly for period
         group_analysis = await get_group_analysis(period=None)
         
-        # Build match filter based on selected periods
-        match_filter = {"upload_source": {"$ne": "forecast"}}
-        if period_list and len(period_list) > 0:
-            match_filter["data_period"] = {"$in": period_list}
-        
-        # Get fastest selling items with period filter
+        # Get fastest selling items with period filter (match_filter already defined above)
         fastest_pipeline = [
             {"$match": match_filter},
             {"$group": {
