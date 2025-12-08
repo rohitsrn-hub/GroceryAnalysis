@@ -1761,8 +1761,8 @@ async def generate_comprehensive_report(format: str = Query("excel")):
         capital_response = await get_capital_blocking_analysis(group=None, period=None)
         capital_analysis = capital_response if isinstance(capital_response, dict) else {}
         
-        # Get group analysis
-        group_analysis = await get_group_analysis()
+        # Get group analysis - pass None directly for period
+        group_analysis = await get_group_analysis(period=None)
         
         # Get fastest selling items (manually since we can't call with Query params)
         fastest_pipeline = [
