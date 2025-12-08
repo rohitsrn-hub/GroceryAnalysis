@@ -1920,18 +1920,29 @@ async def generate_comprehensive_report(
         if periods:
             period_list = [p.strip() for p in periods.split(',') if p.strip()]
         
-        # Determine period label for report title
+        # Determine period label for report title - format period values to display names
         if not period_list or len(period_list) == 0:
             period_label = " - All Periods"
         elif len(period_list) == 1:
-            period_label = f" - {period_list[0]}"
+            # Format single period
+            formatted_period = await format_period_display_name(period_list[0])
+            period_label = f" - {formatted_period}"
         elif len(period_list) == 2:
-            period_label = f" - {period_list[0]} & {period_list[1]}"
+            # Format two periods
+            formatted_1 = await format_period_display_name(period_list[0])
+            formatted_2 = await format_period_display_name(period_list[1])
+            period_label = f" - {formatted_1} & {formatted_2}"
         elif len(period_list) <= 5:
-            period_label = f" - {', '.join(period_list)}"
+            # Format multiple periods
+            formatted_periods = []
+            for p in period_list:
+                formatted_periods.append(await format_period_display_name(p))
+            period_label = f" - {', '.join(formatted_periods)}"
         else:
-            # Too many periods, show range or count
-            period_label = f" - {period_list[0]} to {period_list[-1]} ({len(period_list)} periods)"
+            # Too many periods, show range or count with formatted names
+            formatted_first = await format_period_display_name(period_list[0])
+            formatted_last = await format_period_display_name(period_list[-1])
+            period_label = f" - {formatted_first} to {formatted_last} ({len(period_list)} periods)"
         
         # Build match filter based on selected periods
         match_filter = {"upload_source": {"$ne": "forecast"}}
