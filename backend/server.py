@@ -3437,7 +3437,7 @@ async def get_upload_history(
 
 @api_router.get("/available-data-periods")
 async def get_available_data_periods():
-    """Get list of all available data periods from sales records"""
+    """Get list of all available data periods from sales records with formatted display names"""
     try:
         # Get unique data_period values from sales_records, sorted in descending order
         periods = await db.sales_records.distinct(
@@ -3446,8 +3446,13 @@ async def get_available_data_periods():
         )
         
         # Sort periods in descending order (newest first)
-        # Assuming format like "2025-01", "2024-12", etc.
         periods_sorted = sorted(periods, reverse=True)
+        
+        # Format period names for display (consistent with report generation modal)
+        periods_formatted = []
+        for period in periods_sorted:
+            display_name = await format_period_display_name(period)
+            periods_formatted.append(display_name)
         
         # Also get upload info for context
         pipeline = [
