@@ -2115,7 +2115,7 @@ async def generate_comprehensive_report(
             <!DOCTYPE html>
             <html>
             <head>
-                <title>URC 101 Area - Comprehensive Sales Analysis Report</title>
+                <title>URC 101 Area - Comprehensive Sales Analysis Report{period_label}</title>
                 <style>
                     body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
                     .header {{ text-align: center; margin-bottom: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; }}
@@ -2138,7 +2138,7 @@ async def generate_comprehensive_report(
             </head>
             <body>
                 <div class="header">
-                    <h1>🏪 URC 101 Area - Comprehensive Sales Analysis Report</h1>
+                    <h1>🏪 URC 101 Area - Comprehensive Sales Analysis Report{period_label}</h1>
                     <p style="margin: 5px 0;">Generated on: {datetime.now().strftime("%d %B %Y, %H:%M:%S")}</p>
                     <p style="margin: 5px 0; font-size: 14px;">Strategic Inventory & Procurement Intelligence</p>
                 </div>
