@@ -1276,6 +1276,10 @@ async def upload_sales_data(
             # Insert into MongoDB
             result = await db.sales_records.insert_many([SalesRecord(**record).dict() for record in records])
             
+            # For daily uploads, consolidate previous month's data if we're in a new month
+            if upload_type == "daily" and data_date:
+                await consolidate_daily_to_monthly(data_date)
+            
             # Calculate processing time
             processing_time = (datetime.now() - start_time).total_seconds()
             
