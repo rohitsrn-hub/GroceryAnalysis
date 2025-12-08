@@ -69,27 +69,66 @@ def test_excel_report_single_period():
                     profit_found = False
                     non_zero_revenue = False
                     non_zero_profit = False
+                    revenue_values = []
+                    profit_values = []
                     
-                    for row in sheet.iter_rows(values_only=True):
+                    # Find header row first
+                    revenue_col_idx = None
+                    profit_col_idx = None
+                    
+                    for row_idx, row in enumerate(sheet.iter_rows(values_only=True)):
                         if row and any(cell for cell in row):
+                            # Check if this is the header row
                             row_str = str(row).lower()
-                            # Check for revenue-related data
-                            if 'revenue' in row_str or 'r_amt' in row_str or 'sales' in row_str:
-                                revenue_found = True
-                                # Check if there are non-zero values
-                                for cell in row:
-                                    if isinstance(cell, (int, float)) and cell > 0:
-                                        non_zero_revenue = True
-                                        break
+                            if 'revenue' in row_str and 'profit' in row_str:
+                                # Find column indices
+                                for col_idx, cell in enumerate(row):
+                                    if cell and 'revenue' in str(cell).lower():
+                                        revenue_col_idx = col_idx
+                                        revenue_found = True
+                                    elif cell and 'profit' in str(cell).lower():
+                                        profit_col_idx = col_idx
+                                        profit_found = True
+                                continue
                             
-                            # Check for profit-related data
-                            if 'profit' in row_str or 'margin' in row_str:
-                                profit_found = True
-                                # Check if there are non-zero values
-                                for cell in row:
-                                    if isinstance(cell, (int, float)) and cell > 0:
-                                        non_zero_profit = True
-                                        break
+                            # Process data rows if we found the columns
+                            if revenue_col_idx is not None and len(row) > revenue_col_idx:
+                                revenue_cell = row[revenue_col_idx]
+                                if revenue_cell and str(revenue_cell) != 'Revenue':
+                                    # Parse currency value (₹1,989.68)
+                                    try:
+                                        import re
+                                        if isinstance(revenue_cell, str) and '₹' in revenue_cell:
+                                            # Extract numeric value from currency string
+                                            numeric_str = re.sub(r'[₹,\s]', '', revenue_cell)
+                                            revenue_value = float(numeric_str)
+                                            revenue_values.append(revenue_value)
+                                            if revenue_value > 0:
+                                                non_zero_revenue = True
+                                        elif isinstance(revenue_cell, (int, float)) and revenue_cell > 0:
+                                            revenue_values.append(revenue_cell)
+                                            non_zero_revenue = True
+                                    except (ValueError, TypeError):
+                                        pass
+                            
+                            if profit_col_idx is not None and len(row) > profit_col_idx:
+                                profit_cell = row[profit_col_idx]
+                                if profit_cell and str(profit_cell) != 'Profit':
+                                    # Parse currency value (₹94.05)
+                                    try:
+                                        import re
+                                        if isinstance(profit_cell, str) and '₹' in profit_cell:
+                                            # Extract numeric value from currency string
+                                            numeric_str = re.sub(r'[₹,\s]', '', profit_cell)
+                                            profit_value = float(numeric_str)
+                                            profit_values.append(profit_value)
+                                            if profit_value > 0:
+                                                non_zero_profit = True
+                                        elif isinstance(profit_cell, (int, float)) and profit_cell > 0:
+                                            profit_values.append(profit_cell)
+                                            non_zero_profit = True
+                                    except (ValueError, TypeError):
+                                        pass
                     
                     if revenue_found:
                         print("✅ Revenue data found in Top Performers sheet")
