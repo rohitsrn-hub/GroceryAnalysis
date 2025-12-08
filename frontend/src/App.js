@@ -400,80 +400,54 @@ function MainApp() {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Period for Report:
-                  </label>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Select Periods for Report:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedPeriods.length === availablePeriods.length) {
+                          setSelectedPeriods([]);
+                        } else {
+                          setSelectedPeriods([...availablePeriods]);
+                        }
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      {selectedPeriods.length === availablePeriods.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                  </div>
                   
-                  <div className="space-y-2">
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="all"
-                        checked={reportPeriodType === 'all'}
-                        onChange={(e) => setReportPeriodType(e.target.value)}
-                        className="form-radio h-4 w-4 text-blue-600"
-                      />
-                      <span>All Data (All periods till date)</span>
-                    </label>
-                    
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="current"
-                        checked={reportPeriodType === 'current'}
-                        onChange={(e) => setReportPeriodType(e.target.value)}
-                        className="form-radio h-4 w-4 text-blue-600"
-                      />
-                      <span>Current Period ({dashboardPeriod})</span>
-                    </label>
-                    
-                    {dashboardData?.available_periods && dashboardData.available_periods.map((period) => (
-                      <label key={period} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          value={period}
-                          checked={reportPeriodType === period}
-                          onChange={(e) => setReportPeriodType(e.target.value)}
-                          className="form-radio h-4 w-4 text-blue-600"
-                        />
-                        <span>{period}</span>
-                      </label>
-                    ))}
-                    
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="custom"
-                        checked={reportPeriodType === 'custom'}
-                        onChange={(e) => setReportPeriodType(e.target.value)}
-                        className="form-radio h-4 w-4 text-blue-600"
-                      />
-                      <span>Custom Date Range</span>
-                    </label>
-                    
-                    {reportPeriodType === 'custom' && (
-                      <div className="ml-6 mt-2 space-y-2">
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">From Date:</label>
+                  <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                    {availablePeriods.length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-4">No data available. Please upload data first.</p>
+                    ) : (
+                      availablePeriods.map((period) => (
+                        <label key={period} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
                           <input
-                            type="date"
-                            value={reportCustomFrom}
-                            onChange={(e) => setReportCustomFrom(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            type="checkbox"
+                            checked={selectedPeriods.includes(period)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedPeriods([...selectedPeriods, period]);
+                              } else {
+                                setSelectedPeriods(selectedPeriods.filter(p => p !== period));
+                              }
+                            }}
+                            className="form-checkbox h-4 w-4 text-blue-600 rounded"
                           />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">To Date:</label>
-                          <input
-                            type="date"
-                            value={reportCustomTo}
-                            onChange={(e) => setReportCustomTo(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      </div>
+                          <span className="text-sm">{period}</span>
+                        </label>
+                      ))
                     )}
                   </div>
+                  
+                  {selectedPeriods.length > 0 && (
+                    <p className="text-xs text-gray-600 mt-2">
+                      {selectedPeriods.length} period{selectedPeriods.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
                 </div>
               </div>
               
