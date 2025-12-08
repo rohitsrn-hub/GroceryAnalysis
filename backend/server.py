@@ -1862,7 +1862,7 @@ async def generate_comprehensive_report(
         slowest_pipeline = [
             {"$match": slowest_match_filter},
             {"$group": {
-                "_id": {"item_code": "$pluno", "item_name": "$item_name", "group": "$group"},
+                "_id": {"item_code": "$pluno", "item_name": "$item_name", "group": "$product_group"},
                 "total_sold": {"$sum": "$net_qty"},
                 "avg_closing_stock": {"$avg": "$closing_stock"},
                 "capital_blocked": {"$sum": {"$multiply": ["$closing_stock", "$w_rate"]}}
