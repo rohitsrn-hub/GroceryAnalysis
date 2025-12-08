@@ -516,6 +516,56 @@ def format_indian_currency(amount: float, use_symbol: bool = True) -> str:
         logger.error(f"Error formatting currency: {str(e)}")
         return f"Rs. {amount:,.2f}"
 
+async def consolidate_daily_to_monthly(current_upload_date: str):
+    """Consolidate previous month's daily uploads into a monthly period
+    
+    When a new month starts, all daily uploads from the previous month
+    should have their data_period updated to the monthly format (YYYY-MM)
+    
+    Example: When uploading data for Dec 1, 2025, all November daily uploads
+    should have data_period changed from individual dates to "2025-11"
+    """
+    from datetime import datetime
+    
+    try:
+        # Parse the current upload date
+        current_date = datetime.strptime(current_upload_date, "%Y-%m-%d")
+        
+        # Calculate previous month
+        if current_date.month == 1:
+            prev_month = 12
+            prev_year = current_date.year - 1
+        else:
+            prev_month = current_date.month - 1
+            prev_year = current_date.year
+        
+        # Check if previous month has any daily uploads with individual date periods
+        prev_month_period = f"{prev_year}-{prev_month:02d}"
+        
+        # Find records from previous month that are from daily uploads
+        # These will have data_period matching specific dates
+        result = await db.sales_records.update_many(
+            {
+                "upload_source": "daily",
+                "data_period": {"$regex": f"^{prev_year}-{prev_month:02d}"},
+                "upload_date": {
+                    "$gte": datetime(prev_year, prev_month, 1),
+                    "$lt": datetime(current_date.year, current_date.month, 1)
+                }
+            },
+            {
+                "$set": {"data_period": prev_month_period}
+            }
+        )
+        
+        if result.modified_count > 0:
+            logger.info(f"Consolidated {result.modified_count} daily records to period {prev_month_period}")
+        
+    except Exception as e:
+        logger.error(f"Error consolidating daily to monthly: {str(e)}")
+        # Don't fail the upload if consolidation fails
+        pass
+
 async def format_period_display_name(period: str) -> str:
     """Format period name intelligently based on stored period format
     
