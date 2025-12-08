@@ -1771,6 +1771,11 @@ async def generate_comprehensive_report(
             # Too many periods, show range or count
             period_label = f" - {period_list[0]} to {period_list[-1]} ({len(period_list)} periods)"
         
+        # Build match filter based on selected periods
+        match_filter = {"upload_source": {"$ne": "forecast"}}
+        if period_list and len(period_list) > 0:
+            match_filter["data_period"] = {"$in": period_list}
+        
         # Aggregate dashboard summary data based on selected periods
         if period_list and len(period_list) > 0:
             # Calculate aggregated metrics for selected periods
