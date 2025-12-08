@@ -470,9 +470,9 @@ async def format_period_display_name(period: str) -> str:
     
     Examples:
     - Full year: "2024"
-    - Partial year (Jan-Sep): "Jan-Sep 2025"  
     - Single month: "Nov 2025"
     - Current month: "Current Period (Dec 2025)"
+    - Period with multiple records: Check if it's actually a range or single month
     """
     import re
     from datetime import datetime
@@ -487,19 +487,6 @@ async def format_period_display_name(period: str) -> str:
         year = month_match.group(1)
         month = int(month_match.group(2))
         
-        # Check if there are multiple months in this year
-        pipeline = [
-            {"$match": {
-                "upload_source": {"$ne": "forecast"},
-                "data_period": {"$regex": f"^{year}-"}
-            }},
-            {"$group": {"_id": "$data_period"}},
-            {"$sort": {"_id": 1}}
-        ]
-        
-        result = await db.sales_records.aggregate(pipeline).to_list(None)
-        periods_in_year = [item["_id"] for item in result]
-        
         month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
         
@@ -508,22 +495,7 @@ async def format_period_display_name(period: str) -> str:
         if int(year) == current_date.year and month == current_date.month:
             return f"Current Period ({month_names[month-1]} {year})"
         
-        # If multiple months exist in this year, show range
-        if len(periods_in_year) > 1:
-            # Extract month numbers
-            months = []
-            for p in periods_in_year:
-                m = re.match(r'^\d{4}-(\d{2})$', p)
-                if m:
-                    months.append(int(m.group(1)))
-            
-            if months:
-                months.sort()
-                start_month = month_names[months[0]-1]
-                end_month = month_names[months[-1]-1]
-                return f"{start_month}-{end_month} {year}"
-        
-        # Single month
+        # For non-current months, format as "Month Year"
         return f"{month_names[month-1]} {year}"
     
     # Fallback: return as is
