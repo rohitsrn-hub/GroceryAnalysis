@@ -177,6 +177,10 @@ function MainApp() {
                   onClick={() => {
                     setReportFormat('excel');
                     setShowReportDialog(true);
+                    // Initialize with all periods selected if available
+                    if (availablePeriods.length > 0 && selectedPeriods.length === 0) {
+                      setSelectedPeriods([...availablePeriods]);
+                    }
                   }}
                   className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
                 >
@@ -188,6 +192,10 @@ function MainApp() {
                   onClick={() => {
                     setReportFormat('pdf');
                     setShowReportDialog(true);
+                    // Initialize with all periods selected if available
+                    if (availablePeriods.length > 0 && selectedPeriods.length === 0) {
+                      setSelectedPeriods([...availablePeriods]);
+                    }
                   }}
                   className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md"
                 >
