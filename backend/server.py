@@ -2461,7 +2461,7 @@ async def generate_comprehensive_report(
 
 @api_router.get("/available-periods")
 async def get_available_periods():
-    """Get list of available periods from uploaded data"""
+    """Get list of available periods from uploaded data with formatted display names"""
     try:
         # Get unique periods from sales_records, excluding forecast data
         pipeline = [
@@ -2471,9 +2471,22 @@ async def get_available_periods():
         ]
         
         result = await db.sales_records.aggregate(pipeline).to_list(None)
-        periods = [item["_id"] for item in result if item.get("_id")]
+        raw_periods = [item["_id"] for item in result if item.get("_id")]
         
-        return {"available_periods": periods, "count": len(periods)}
+        # Format period names for display
+        periods_with_display = []
+        for period in raw_periods:
+            display_name = await format_period_display_name(period)
+            periods_with_display.append({
+                "value": period,  # Original value for filtering
+                "label": display_name  # Formatted name for display
+            })
+        
+        return {
+            "available_periods": [p["label"] for p in periods_with_display],  # For backward compatibility
+            "periods_detailed": periods_with_display,  # New format with value and label
+            "count": len(periods_with_display)
+        }
     except Exception as e:
         logger.error(f"Error fetching available periods: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching available periods: {str(e)}")
