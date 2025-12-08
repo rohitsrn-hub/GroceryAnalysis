@@ -2395,6 +2395,25 @@ async def generate_comprehensive_report(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
 
+@api_router.get("/available-periods")
+async def get_available_periods():
+    """Get list of available periods from uploaded data"""
+    try:
+        # Get unique periods from sales_records, excluding forecast data
+        pipeline = [
+            {"$match": {"upload_source": {"$ne": "forecast"}, "data_period": {"$exists": True, "$ne": None}}},
+            {"$group": {"_id": "$data_period"}},
+            {"$sort": {"_id": -1}}  # Sort in descending order (most recent first)
+        ]
+        
+        result = await db.sales_records.aggregate(pipeline).to_list(None)
+        periods = [item["_id"] for item in result if item.get("_id")]
+        
+        return {"available_periods": periods, "count": len(periods)}
+    except Exception as e:
+        logger.error(f"Error fetching available periods: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching available periods: {str(e)}")
+
 @api_router.get("/export-data/{analysis_type}")
 async def export_data_to_excel(analysis_type: str, group: Optional[str] = Query(None)):
     """Export analysis data to Excel file"""
