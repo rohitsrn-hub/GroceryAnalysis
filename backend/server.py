@@ -465,6 +465,70 @@ def format_indian_currency(amount: float, use_symbol: bool = True) -> str:
         logger.error(f"Error formatting currency: {str(e)}")
         return f"Rs. {amount:,.2f}"
 
+async def format_period_display_name(period: str) -> str:
+    """Format period name intelligently based on actual data coverage
+    
+    Examples:
+    - Full year: "2024"
+    - Partial year (Jan-Sep): "Jan-Sep 2025"  
+    - Single month: "Nov 2025"
+    - Current month: "Current Period (Dec 2025)"
+    """
+    import re
+    from datetime import datetime
+    
+    # If it's already a year (4 digits), return as is
+    if re.match(r'^\d{4}$', period):
+        return period
+    
+    # If it matches YYYY-MM format
+    month_match = re.match(r'^(\d{4})-(\d{2})$', period)
+    if month_match:
+        year = month_match.group(1)
+        month = int(month_match.group(2))
+        
+        # Check if there are multiple months in this year
+        pipeline = [
+            {"$match": {
+                "upload_source": {"$ne": "forecast"},
+                "data_period": {"$regex": f"^{year}-"}
+            }},
+            {"$group": {"_id": "$data_period"}},
+            {"$sort": {"_id": 1}}
+        ]
+        
+        result = await db.sales_records.aggregate(pipeline).to_list(None)
+        periods_in_year = [item["_id"] for item in result]
+        
+        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        
+        # Check if this is current month
+        current_date = datetime.now()
+        if int(year) == current_date.year and month == current_date.month:
+            return f"Current Period ({month_names[month-1]} {year})"
+        
+        # If multiple months exist in this year, show range
+        if len(periods_in_year) > 1:
+            # Extract month numbers
+            months = []
+            for p in periods_in_year:
+                m = re.match(r'^\d{4}-(\d{2})$', p)
+                if m:
+                    months.append(int(m.group(1)))
+            
+            if months:
+                months.sort()
+                start_month = month_names[months[0]-1]
+                end_month = month_names[months[-1]-1]
+                return f"{start_month}-{end_month} {year}"
+        
+        # Single month
+        return f"{month_names[month-1]} {year}"
+    
+    # Fallback: return as is
+    return period
+
 
 def extract_net_amt_from_summary(df: pd.DataFrame) -> Optional[float]:
     """Extract Net Amt value from TReport Total row's R_Amt column"""
