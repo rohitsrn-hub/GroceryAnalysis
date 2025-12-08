@@ -434,7 +434,7 @@ function MainApp() {
                         if (selectedPeriods.length === availablePeriods.length) {
                           setSelectedPeriods([]);
                         } else {
-                          setSelectedPeriods([...availablePeriods]);
+                          setSelectedPeriods(availablePeriods.map(p => p.value));
                         }
                       }}
                       className="text-xs text-blue-600 hover:text-blue-800 font-medium"
@@ -448,20 +448,20 @@ function MainApp() {
                       <p className="text-sm text-gray-500 text-center py-4">No data available. Please upload data first.</p>
                     ) : (
                       availablePeriods.map((period) => (
-                        <label key={period} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                        <label key={period.value} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
                           <input
                             type="checkbox"
-                            checked={selectedPeriods.includes(period)}
+                            checked={selectedPeriods.includes(period.value)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedPeriods([...selectedPeriods, period]);
+                                setSelectedPeriods([...selectedPeriods, period.value]);
                               } else {
-                                setSelectedPeriods(selectedPeriods.filter(p => p !== period));
+                                setSelectedPeriods(selectedPeriods.filter(p => p !== period.value));
                               }
                             }}
                             className="form-checkbox h-4 w-4 text-blue-600 rounded"
                           />
-                          <span className="text-sm">{period}</span>
+                          <span className="text-sm">{period.label}</span>
                         </label>
                       ))
                     )}
