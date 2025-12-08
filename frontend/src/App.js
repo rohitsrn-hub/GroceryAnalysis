@@ -86,6 +86,7 @@ function MainApp() {
   };
 
   const handleGenerateReport = async () => {
+    let loadingToast;
     try {
       let url = `${API}/comprehensive-report?format=${reportFormat}`;
       
@@ -105,13 +106,14 @@ function MainApp() {
       }
       
       // Show loading toast
-      const loadingToast = toast.loading('Generating report...');
+      loadingToast = toast.loading('Generating report...');
       
       // Fetch the report as a blob
       const response = await fetch(url);
       
       if (!response.ok) {
-        throw new Error(`Report generation failed: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Report generation failed: ${response.statusText}`);
       }
       
       const blob = await response.blob();
@@ -132,7 +134,12 @@ function MainApp() {
       setShowReportDialog(false);
     } catch (error) {
       console.error('Report generation error:', error);
-      toast.error(error.message || 'Failed to generate report');
+      toast.error(error.message || 'Failed to generate report', { id: loadingToast });
+    } finally {
+      // Ensure toast is always dismissed
+      if (loadingToast) {
+        toast.dismiss(loadingToast);
+      }
     }
   };
 
