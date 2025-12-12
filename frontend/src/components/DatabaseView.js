@@ -304,7 +304,11 @@ const DatabaseView = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all-periods">All Periods</SelectItem>
-                  {summary?.available_periods?.filter(period => period && period.trim() !== '').map(period => (
+                  {summary?.periods_detailed?.map(period => (
+                    <SelectItem key={period.value} value={period.value}>
+                      {period.label}
+                    </SelectItem>
+                  )) || summary?.available_periods?.filter(period => period && period.trim() !== '').map(period => (
                     <SelectItem key={period} value={period}>{period}</SelectItem>
                   ))}
                 </SelectContent>
