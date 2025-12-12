@@ -137,15 +137,13 @@ const DatabaseView = () => {
 
       allRecords.forEach(record => {
         // Handle both aggregated and non-aggregated records
-        // For aggregated records, calculate average rates from amounts and quantities
-        const isAggregated = !!record.total_qty;
         const qty = record.qty || record.total_qty || 0;
         const wAmt = record.w_amt || record.total_w_amt || 0;
         const rAmt = record.r_amt || record.total_r_amt || 0;
         
-        // Calculate average rates for aggregated view
-        const wRate = record.w_rate || (isAggregated && qty > 0 ? wAmt / qty : 0);
-        const rRate = record.r_rate || (isAggregated && qty > 0 ? rAmt / qty : 0);
+        // Use latest rates for aggregated view, actual rates for non-aggregated
+        const wRate = record.w_rate || record.latest_w_rate || 0;
+        const rRate = record.r_rate || record.latest_r_rate || 0;
         
         const row = [
           `"${record.pluno || record.gp_index_no || ''}"`,
