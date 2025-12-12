@@ -2722,8 +2722,8 @@ async def export_data_to_excel(
                 ])
                 
         elif analysis_type == "inventory-health":
-            # Get inventory analysis
-            response = await get_inventory_analysis()
+            # Get inventory analysis with period filter
+            response = await get_inventory_analysis(period=period)
             ws.title = "Inventory Health Analysis"
             
             # Dead Inventory Sheet
