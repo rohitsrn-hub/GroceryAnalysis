@@ -2626,16 +2626,20 @@ async def get_available_periods():
         raise HTTPException(status_code=500, detail=f"Error fetching available periods: {str(e)}")
 
 @api_router.get("/export-data/{analysis_type}")
-async def export_data_to_excel(analysis_type: str, group: Optional[str] = Query(None)):
-    """Export analysis data to Excel file"""
+async def export_data_to_excel(
+    analysis_type: str, 
+    group: Optional[str] = Query(None),
+    period: Optional[str] = Query(None)
+):
+    """Export analysis data to Excel file with group and period filters"""
     try:
         # Create a new workbook
         workbook = openpyxl.Workbook()
         ws = workbook.active
         
         if analysis_type == "abc":
-            # Get ABC analysis data
-            response = await get_abc_analysis(group)
+            # Get ABC analysis data with period filter
+            response = await get_abc_analysis(group=group, period=period)
             ws.title = "ABC Analysis"
             
             # Headers
