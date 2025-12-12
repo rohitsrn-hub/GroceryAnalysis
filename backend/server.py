@@ -3534,7 +3534,8 @@ async def get_available_data_periods():
                 })
         
         return {
-            "periods": periods_formatted,  # Formatted period names (e.g., "Nov 2025", "Jan-Sep 2025")
+            "periods": periods_formatted,  # Formatted period names (backward compatibility)
+            "periods_detailed": periods_detailed,  # Array of {value, label} objects
             "daily_uploads": daily_uploads,
             "historical_uploads": historical_uploads,
             "total_daily": len(daily_uploads),
