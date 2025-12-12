@@ -3658,7 +3658,7 @@ async def get_database_view(
                 "label": display_name
             })
         
-        unique_periods = [p["label"] for p in periods_with_display]  # Use formatted names for backward compatibility
+        unique_periods = [p["label"] for p in periods_with_display]  # Backward compatibility (labels only)
         
         # Get groups
         groups_pipeline = [
@@ -3671,7 +3671,8 @@ async def get_database_view(
         # Summary statistics
         summary = {
             "total_records": total,
-            "available_periods": unique_periods,
+            "available_periods": unique_periods,  # Labels for backward compatibility
+            "periods_detailed": periods_with_display,  # Array of {value, label} objects
             "available_groups": unique_groups,
             "date_range": {
                 "earliest": None,
