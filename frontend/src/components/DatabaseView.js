@@ -137,16 +137,26 @@ const DatabaseView = () => {
 
       allRecords.forEach(record => {
         // Handle both aggregated and non-aggregated records
+        // For aggregated records, calculate average rates from amounts and quantities
+        const isAggregated = !!record.total_qty;
+        const qty = record.qty || record.total_qty || 0;
+        const wAmt = record.w_amt || record.total_w_amt || 0;
+        const rAmt = record.r_amt || record.total_r_amt || 0;
+        
+        // Calculate average rates for aggregated view
+        const wRate = record.w_rate || (isAggregated && qty > 0 ? wAmt / qty : 0);
+        const rRate = record.r_rate || (isAggregated && qty > 0 ? rAmt / qty : 0);
+        
         const row = [
           `"${record.pluno || record.gp_index_no || ''}"`,
           `"${record.item_name || ''}"`,
           `"${record.product_group || ''}"`,
-          record.qty || record.total_qty || 0,
+          qty,
           record.net_qty || record.total_net_qty || 0,
-          (record.w_rate || 0).toFixed(2),
-          (record.r_rate || 0).toFixed(2),
-          (record.w_amt || record.total_w_amt || 0).toFixed(2),
-          (record.r_amt || record.total_r_amt || 0).toFixed(2),
+          wRate.toFixed(2),
+          rRate.toFixed(2),
+          wAmt.toFixed(2),
+          rAmt.toFixed(2),
           (record.profit || record.total_profit || 0).toFixed(2),
           record.closing_stock || record.avg_closing_stock || 0,
           record.o_b || 0,
