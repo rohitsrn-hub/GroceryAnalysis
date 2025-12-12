@@ -78,26 +78,37 @@ const DatabaseView = () => {
       return;
     }
 
-    const toastId = toast.loading("Fetching all records for export...");
+    const toastId = toast.loading(`Fetching ${totalRecords} records for export...`);
 
     try {
-      // Fetch ALL records with current filters for export
-      const params = new URLSearchParams({
-        limit: totalRecords.toString(),  // Fetch all records
-        skip: "0"
-      });
+      // Fetch records in chunks (backend limit is 500)
+      const chunkSize = 500;
+      let allRecords = [];
+      let fetchedCount = 0;
 
-      if (searchTerm) params.append("search", searchTerm);
-      if (groupFilter !== "all") params.append("group_filter", groupFilter);
-      if (periodFilter && periodFilter !== "all-periods") params.append("period_filter", periodFilter);
-      if (gpIndexNoFilter) params.append("gp_index_no", gpIndexNoFilter);
-      if (aggregated) params.append("aggregated", "true");
+      // Fetch in batches
+      for (let skip = 0; skip < totalRecords; skip += chunkSize) {
+        const params = new URLSearchParams({
+          limit: Math.min(chunkSize, totalRecords - skip).toString(),
+          skip: skip.toString()
+        });
 
-      const response = await fetch(`${API}/database-view?${params}`);
-      if (!response.ok) throw new Error("Failed to fetch records");
+        if (searchTerm) params.append("search", searchTerm);
+        if (groupFilter !== "all") params.append("group_filter", groupFilter);
+        if (periodFilter && periodFilter !== "all-periods") params.append("period_filter", periodFilter);
+        if (gpIndexNoFilter) params.append("gp_index_no", gpIndexNoFilter);
+        if (aggregated) params.append("aggregated", "true");
 
-      const data = await response.json();
-      const allRecords = data.records || [];
+        const response = await fetch(`${API}/database-view?${params}`);
+        if (!response.ok) throw new Error("Failed to fetch records");
+
+        const data = await response.json();
+        const records = data.records || [];
+        allRecords = allRecords.concat(records);
+        
+        fetchedCount += records.length;
+        toast.loading(`Fetching records... ${fetchedCount}/${totalRecords}`, { id: toastId });
+      }
 
       if (allRecords.length === 0) {
         toast.error("No records to export", { id: toastId });
