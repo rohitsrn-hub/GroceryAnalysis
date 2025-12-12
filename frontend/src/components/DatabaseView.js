@@ -72,66 +72,96 @@ const DatabaseView = () => {
     fetchRecords();
   };
 
-  const exportToCSV = () => {
-    if (records.length === 0) {
+  const exportToCSV = async () => {
+    if (totalRecords === 0) {
       toast.error("No records to export");
       return;
     }
 
-    const headers = [
-      "Item Code",
-      "Item Name",
-      "Product Group",
-      "Quantity Sold",
-      "Net Quantity",
-      "Wholesale Rate",
-      "Retail Rate",
-      "Wholesale Amount",
-      "Retail Amount",
-      "Profit",
-      "Closing Stock",
-      "Opening Balance",
-      "Net Tax",
-      "Data Period",
-      "Upload Date"
-    ];
+    const toastId = toast.loading("Fetching all records for export...");
 
-    const csvRows = [headers.join(",")];
+    try {
+      // Fetch ALL records with current filters for export
+      const params = new URLSearchParams({
+        limit: totalRecords.toString(),  // Fetch all records
+        skip: "0"
+      });
 
-    records.forEach(record => {
-      const row = [
-        `"${record.pluno || ''}"`,
-        `"${record.item_name || ''}"`,
-        `"${record.product_group || ''}"`,
-        record.qty || 0,
-        record.net_qty || 0,
-        (record.w_rate || 0).toFixed(2),
-        (record.r_rate || 0).toFixed(2),
-        (record.w_amt || 0).toFixed(2),
-        (record.r_amt || 0).toFixed(2),
-        (record.profit || 0).toFixed(2),
-        record.closing_stock || 0,
-        record.o_b || 0,
-        (record.net_tax || 0).toFixed(2),
-        `"${record.data_period || ''}"`,
-        `"${new Date(record.upload_date).toLocaleString()}"`
+      if (searchTerm) params.append("search", searchTerm);
+      if (groupFilter !== "all") params.append("group_filter", groupFilter);
+      if (periodFilter && periodFilter !== "all-periods") params.append("period_filter", periodFilter);
+      if (gpIndexNoFilter) params.append("gp_index_no", gpIndexNoFilter);
+      if (aggregated) params.append("aggregated", "true");
+
+      const response = await fetch(`${API}/database-view?${params}`);
+      if (!response.ok) throw new Error("Failed to fetch records");
+
+      const data = await response.json();
+      const allRecords = data.records || [];
+
+      if (allRecords.length === 0) {
+        toast.error("No records to export", { id: toastId });
+        return;
+      }
+
+      const headers = [
+        "Item Code",
+        "Item Name",
+        "Product Group",
+        "Quantity Sold",
+        "Net Quantity",
+        "Wholesale Rate",
+        "Retail Rate",
+        "Wholesale Amount",
+        "Retail Amount",
+        "Profit",
+        "Closing Stock",
+        "Opening Balance",
+        "Net Tax",
+        "Data Period",
+        "Upload Date"
       ];
-      csvRows.push(row.join(","));
-    });
 
-    const csvContent = csvRows.join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
+      const csvRows = [headers.join(",")];
 
-    link.setAttribute("href", url);
-    link.setAttribute("download", `database-export-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      allRecords.forEach(record => {
+        const row = [
+          `"${record.pluno || ''}"`,
+          `"${record.item_name || ''}"`,
+          `"${record.product_group || ''}"`,
+          record.qty || 0,
+          record.net_qty || 0,
+          (record.w_rate || 0).toFixed(2),
+          (record.r_rate || 0).toFixed(2),
+          (record.w_amt || 0).toFixed(2),
+          (record.r_amt || 0).toFixed(2),
+          (record.profit || 0).toFixed(2),
+          record.closing_stock || 0,
+          record.o_b || 0,
+          (record.net_tax || 0).toFixed(2),
+          `"${record.data_period || ''}"`,
+          `"${new Date(record.upload_date).toLocaleString()}"`
+        ];
+        csvRows.push(row.join(","));
+      });
 
-    toast.success("Database records exported successfully");
+      const csvContent = csvRows.join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+
+      link.setAttribute("href", url);
+      link.setAttribute("download", `database-export-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success(`Exported ${allRecords.length} records successfully`, { id: toastId });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Failed to export records", { id: toastId });
+    }
   };
 
   const totalPages = Math.ceil(totalRecords / limit);
