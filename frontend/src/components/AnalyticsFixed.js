@@ -251,8 +251,8 @@ const AnalyticsFixed = () => {
                 <SelectContent>
                   <SelectItem value="all">All Periods</SelectItem>
                   {availablePeriods.map(period => (
-                    <SelectItem key={period} value={period}>
-                      {period}
+                    <SelectItem key={period.value} value={period.value}>
+                      {period.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
