@@ -2662,8 +2662,8 @@ async def export_data_to_excel(
                     ])
                     
         elif analysis_type == "capital-blocking":
-            # Get capital blocking data
-            response = await get_capital_blocking_analysis(group)
+            # Get capital blocking data with period filter
+            response = await get_capital_blocking_analysis(group=group, period=period)
             ws.title = "Capital Blocking Analysis"
             
             headers = ["Item Code", "Item Name", "Group", "Capital Blocked", "Days to Sell", "Monthly Sales", "Risk Level", "Recommendation"]
