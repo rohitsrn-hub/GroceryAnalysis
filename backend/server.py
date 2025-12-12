@@ -2703,8 +2703,8 @@ async def export_data_to_excel(
                 ])
                 
         elif analysis_type == "group-analysis":
-            # Get group analysis
-            response = await get_group_analysis()
+            # Get group analysis with period filter
+            response = await get_group_analysis(period=period)
             ws.title = "Group Performance Analysis"
             
             headers = ["Group", "Items Count", "Total Revenue", "Total Profit", "Profit Margin %", "Top Performer"]
