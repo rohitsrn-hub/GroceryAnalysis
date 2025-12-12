@@ -113,17 +113,27 @@ const AnalyticsFixed = () => {
 
   const exportToExcel = async (analysisType) => {
     try {
-      const groupParam = selectedGroup !== 'all' ? `?group=${selectedGroup}` : '';
-      const response = await fetch(`${API}/export-data/${analysisType}${groupParam}`);
+      // Build query parameters for both group and period
+      const params = [];
+      if (selectedGroup !== 'all') params.push(`group=${selectedGroup}`);
+      if (selectedPeriod !== 'all') params.push(`period=${selectedPeriod}`);
+      const queryString = params.length > 0 ? '?' + params.join('&') : '';
+      
+      const response = await fetch(`${API}/export-data/${analysisType}${queryString}`);
       
       if (!response.ok) throw new Error('Export failed');
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `${analysisType}-analysis-${selectedGroup || 'all'}.xlsx`;
+      
+      // Include period in filename if selected
+      const periodSuffix = selectedPeriod !== 'all' ? `-${selectedPeriod}` : '';
+      const groupSuffix = selectedGroup !== 'all' ? `-${selectedGroup}` : '';
+      a.download = `${analysisType}-analysis${groupSuffix}${periodSuffix}.xlsx`;
+      
       document.body.appendChild(a);
+      a.href = url;
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
