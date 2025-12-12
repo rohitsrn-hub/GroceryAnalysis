@@ -3475,9 +3475,14 @@ async def get_available_data_periods():
         
         # Format period names for display (consistent with report generation modal)
         periods_formatted = []
+        periods_detailed = []
         for period in periods_sorted:
             display_name = await format_period_display_name(period)
             periods_formatted.append(display_name)
+            periods_detailed.append({
+                "value": period,  # Original database value (e.g., "2025-11", "2025-01-09")
+                "label": display_name  # Formatted display name (e.g., "Nov 2025", "Jan-Sep 2025")
+            })
         
         # Also get upload info for context
         pipeline = [
