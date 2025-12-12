@@ -136,22 +136,23 @@ const DatabaseView = () => {
       const csvRows = [headers.join(",")];
 
       allRecords.forEach(record => {
+        // Handle both aggregated and non-aggregated records
         const row = [
-          `"${record.pluno || ''}"`,
+          `"${record.pluno || record.gp_index_no || ''}"`,
           `"${record.item_name || ''}"`,
           `"${record.product_group || ''}"`,
-          record.qty || 0,
-          record.net_qty || 0,
+          record.qty || record.total_qty || 0,
+          record.net_qty || record.total_net_qty || 0,
           (record.w_rate || 0).toFixed(2),
           (record.r_rate || 0).toFixed(2),
-          (record.w_amt || 0).toFixed(2),
-          (record.r_amt || 0).toFixed(2),
-          (record.profit || 0).toFixed(2),
-          record.closing_stock || 0,
+          (record.w_amt || record.total_w_amt || 0).toFixed(2),
+          (record.r_amt || record.total_r_amt || 0).toFixed(2),
+          (record.profit || record.total_profit || 0).toFixed(2),
+          record.closing_stock || record.avg_closing_stock || 0,
           record.o_b || 0,
           (record.net_tax || 0).toFixed(2),
-          `"${record.data_period || ''}"`,
-          `"${new Date(record.upload_date).toLocaleString()}"`
+          `"${record.data_period || (record.periods ? record.periods.join(', ') : '') || ''}"`,
+          `"${record.upload_date ? new Date(record.upload_date).toLocaleString() : 'N/A'}"`
         ];
         csvRows.push(row.join(","));
       });
