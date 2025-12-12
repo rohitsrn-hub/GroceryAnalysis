@@ -2684,8 +2684,8 @@ async def export_data_to_excel(
                 ])
                 
         elif analysis_type == "fastest-selling":
-            # Get fastest selling items
-            fastest_items = await get_fastest_selling_items(50)
+            # Get fastest selling items with period filter
+            fastest_items = await get_fastest_selling_items(limit=50, group=group, period=period)
             ws.title = "Fastest Selling Items"
             
             headers = ["Item Code", "Item Name", "Group", "Total Sold", "Avg Monthly Sales", "Total Revenue", "Rank"]
