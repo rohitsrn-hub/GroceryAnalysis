@@ -43,7 +43,8 @@ const AnalyticsFixed = () => {
       const response = await fetch(`${API}/available-data-periods`);
       if (response.ok) {
         const data = await response.json();
-        setAvailablePeriods(data.periods || []);
+        // Use periods_detailed which has both value and label
+        setAvailablePeriods(data.periods_detailed || []);
       }
     } catch (error) {
       console.error('Error fetching available periods:', error);
