@@ -3597,6 +3597,7 @@ async def get_database_view(
             # Aggregated view: group by gp_index_no and sum quantities
             pipeline = [
                 {"$match": filter_query},
+                {"$sort": {"upload_date": 1}},  # Sort by upload date to get latest rates
                 {
                     "$group": {
                         "_id": "$gp_index_no",
@@ -3609,6 +3610,8 @@ async def get_database_view(
                         "total_w_amt": {"$sum": {"$ifNull": ["$w_amt", 0]}},
                         "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
                         "avg_closing_stock": {"$avg": {"$ifNull": ["$closing_stock", 0]}},
+                        "latest_w_rate": {"$last": "$w_rate"},  # Latest wholesale rate
+                        "latest_r_rate": {"$last": "$r_rate"},  # Latest retail rate
                         "periods": {"$addToSet": "$data_period"},
                         "record_count": {"$sum": 1}
                     }
