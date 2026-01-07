@@ -4655,6 +4655,181 @@ async def generate_daily_sales_report(
         raise HTTPException(status_code=500, detail=f"Error fetching previous bank amount: {str(e)}")
 
 
+# =====================================================
+# AI CHATBOT ENDPOINT
+# =====================================================
+
+class ChatMessage(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+class ChatResponse(BaseModel):
+    response: str
+    session_id: str
+
+@api_router.post("/chatbot", response_model=ChatResponse)
+async def chat_with_data(request: ChatMessage):
+    """
+    AI Chatbot endpoint that answers questions about sales data.
+    Uses OpenAI GPT-5.1 via Emergent Integrations.
+    """
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    import uuid
+    
+    try:
+        # Get or create session ID
+        session_id = request.session_id or str(uuid.uuid4())
+        
+        # Get API key from environment
+        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        if not api_key:
+            raise HTTPException(status_code=500, detail="LLM API key not configured")
+        
+        # Gather relevant data context from the database
+        # Get summary statistics
+        total_records = await db.sales_records.count_documents({"upload_source": {"$ne": "forecast"}})
+        
+        # Get revenue and profit totals
+        pipeline = [
+            {"$match": {"upload_source": {"$ne": "forecast"}}},
+            {"$group": {
+                "_id": None,
+                "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+                "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
+                "total_qty": {"$sum": {"$ifNull": ["$net_qty", 0]}}
+            }}
+        ]
+        totals = await db.sales_records.aggregate(pipeline).to_list(1)
+        totals_data = totals[0] if totals else {"total_revenue": 0, "total_profit": 0, "total_qty": 0}
+        
+        # Get available periods
+        periods = await db.sales_records.distinct("data_period", {"upload_source": {"$ne": "forecast"}})
+        periods = [p for p in periods if p]
+        
+        # Get top 10 items by revenue
+        top_items_pipeline = [
+            {"$match": {"upload_source": {"$ne": "forecast"}, "r_amt": {"$gt": 0}}},
+            {"$group": {
+                "_id": "$item_name",
+                "total_revenue": {"$sum": "$r_amt"},
+                "total_profit": {"$sum": "$profit"},
+                "total_qty": {"$sum": "$net_qty"}
+            }},
+            {"$sort": {"total_revenue": -1}},
+            {"$limit": 10}
+        ]
+        top_items = await db.sales_records.aggregate(top_items_pipeline).to_list(10)
+        
+        # Get group breakdown
+        group_pipeline = [
+            {"$match": {"upload_source": {"$ne": "forecast"}, "product_group": {"$exists": True}}},
+            {"$group": {
+                "_id": "$product_group",
+                "total_revenue": {"$sum": "$r_amt"},
+                "total_profit": {"$sum": "$profit"},
+                "item_count": {"$sum": 1}
+            }},
+            {"$sort": {"total_revenue": -1}}
+        ]
+        groups = await db.sales_records.aggregate(group_pipeline).to_list(10)
+        
+        # Format context for the LLM
+        top_items_str = "\n".join([
+            f"- {item['_id']}: Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}, Qty {item['total_qty']}"
+            for item in top_items if item['_id']
+        ])
+        
+        groups_str = "\n".join([
+            f"- {g['_id']}: Revenue ₹{g['total_revenue']:,.2f}, Profit ₹{g['total_profit']:,.2f}, Items {g['item_count']}"
+            for g in groups if g['_id']
+        ])
+        
+        # Create context-rich system message
+        system_message = f"""You are a helpful AI assistant for URC 101 Grocery Sales Analytics Dashboard. 
+You help users understand their sales data and provide insights.
+
+CURRENT DATA SUMMARY:
+- Total Records: {total_records:,}
+- Total Revenue: ₹{totals_data['total_revenue']:,.2f}
+- Total Profit: ₹{totals_data['total_profit']:,.2f}
+- Total Quantity Sold: {totals_data['total_qty']:,}
+- Available Periods: {', '.join(sorted(periods)[-10:]) if periods else 'No data'}
+
+TOP 10 PERFORMING ITEMS (by Revenue):
+{top_items_str if top_items_str else 'No items data available'}
+
+SALES BY PRODUCT GROUP:
+{groups_str if groups_str else 'No group data available'}
+
+IMPORTANT GUIDELINES:
+1. Always format currency in Indian Rupees (₹) with proper comma formatting
+2. Be concise but informative
+3. If asked about specific items or periods not in the summary, explain that you have access to aggregate data
+4. Provide actionable insights when possible
+5. If you don't have enough data to answer, say so clearly
+6. For comparisons, use percentages when helpful"""
+
+        # Initialize LLM chat
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=session_id,
+            system_message=system_message
+        )
+        
+        # Configure to use OpenAI GPT-5.1
+        chat.with_model("openai", "gpt-5.1")
+        
+        # Create user message
+        user_message = UserMessage(text=request.message)
+        
+        # Get response from LLM
+        response = await chat.send_message(user_message)
+        
+        # Store chat history in database for persistence
+        chat_record = {
+            "session_id": session_id,
+            "user_message": request.message,
+            "assistant_response": response,
+            "timestamp": datetime.now(timezone.utc)
+        }
+        await db.chat_history.insert_one(chat_record)
+        
+        return ChatResponse(
+            response=response,
+            session_id=session_id
+        )
+        
+    except Exception as e:
+        logger.exception(f"Chatbot error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
+
+
+@api_router.get("/chat-history/{session_id}")
+async def get_chat_history(session_id: str, limit: int = Query(50, ge=1, le=100)):
+    """Get chat history for a specific session"""
+    try:
+        history = await db.chat_history.find(
+            {"session_id": session_id},
+            {"_id": 0}
+        ).sort("timestamp", 1).limit(limit).to_list(limit)
+        
+        return {"session_id": session_id, "messages": history}
+    except Exception as e:
+        logger.exception(f"Error fetching chat history: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching chat history: {str(e)}")
+
+
+@api_router.delete("/chat-history/{session_id}")
+async def clear_chat_history(session_id: str):
+    """Clear chat history for a specific session"""
+    try:
+        result = await db.chat_history.delete_many({"session_id": session_id})
+        return {"deleted_count": result.deleted_count, "session_id": session_id}
+    except Exception as e:
+        logger.exception(f"Error clearing chat history: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error clearing chat history: {str(e)}")
+
+
 # Configure logging FIRST (before CORS setup uses it)
 logging.basicConfig(
     level=logging.INFO,
