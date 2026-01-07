@@ -189,6 +189,98 @@ def test_daily_sales_trend_by_period():
         print(f"❌ Unexpected error: {str(e)}")
         return False
 
+def test_pdf_report_daily_sales_trend_line_graph():
+    """Test GET /api/comprehensive-report?format=pdf&periods=2025-11 for SVG Line Graph Fix"""
+    print("\n" + "="*60)
+    print("🧪 TESTING: PDF Report Daily Sales Trend Line Graph (SVG Fix)")
+    print("="*60)
+    
+    try:
+        url = f"{BACKEND_URL}/comprehensive-report"
+        params = {
+            "format": "pdf",
+            "periods": "2025-11"
+        }
+        
+        print(f"📡 Making request to: {url}")
+        print(f"📝 Parameters: {params}")
+        
+        response = requests.get(url, params=params, timeout=60)
+        
+        print(f"📊 Response Status: {response.status_code}")
+        print(f"📋 Response Headers: {dict(response.headers)}")
+        print(f"📏 Response Size: {len(response.content)} bytes")
+        
+        if response.status_code == 200:
+            print(f"✅ Request successful")
+            
+            content_text = response.text
+            content_lower = content_text.lower()
+            
+            # Check for Daily Sales Trend section
+            if 'daily sales trend' in content_lower:
+                print("✅ Daily Sales Trend section found in report")
+                
+                # CRITICAL: Check for SVG LINE GRAPH (not table)
+                if '<svg' in content_text and 'viewBox="0 0 600 250"' in content_text:
+                    print("✅ SVG element found with correct viewBox='0 0 600 250'")
+                    
+                    # Check for line graph components
+                    svg_components = {
+                        'line_path': '<path' in content_text and 'stroke=' in content_text,
+                        'data_points': '<circle' in content_text,
+                        'x_axis_labels': 'Day of Month' in content_text or 'day' in content_lower,
+                        'y_axis_labels': 'Sales' in content_text and '₹' in content_text
+                    }
+                    
+                    print("🔍 Checking SVG line graph components:")
+                    for component, found in svg_components.items():
+                        status = "✅" if found else "❌"
+                        print(f"   {status} {component.replace('_', ' ').title()}: {found}")
+                    
+                    if all(svg_components.values()):
+                        print("✅ SVG line graph contains all required components (line path, data points, axis labels)")
+                    else:
+                        print("❌ SVG line graph missing some required components")
+                        return False
+                    
+                    # CRITICAL: Verify old table format is NOT present
+                    table_indicators = [
+                        '<table' in content_lower and 'daily sales trend' in content_lower,
+                        'Day</th>' in content_text or 'Sales</th>' in content_text,
+                        'Visual</th>' in content_text  # Old table had Day, Sales, Visual columns
+                    ]
+                    
+                    if any(table_indicators):
+                        print("❌ OLD TABLE FORMAT STILL PRESENT - This should be replaced with SVG line graph")
+                        print("   Found table elements in Daily Sales Trend section")
+                        return False
+                    else:
+                        print("✅ Old table format NOT present - correctly replaced with SVG line graph")
+                    
+                    return True
+                else:
+                    print("❌ SVG element with viewBox='0 0 600 250' NOT found")
+                    print("   Daily Sales Trend should contain SVG LINE GRAPH, not table")
+                    return False
+            else:
+                print("❌ Daily Sales Trend section not found in report")
+                return False
+        else:
+            print(f"❌ Request failed with status {response.status_code}")
+            print(f"📝 Response text: {response.text[:500]}")
+            return False
+            
+    except requests.exceptions.Timeout:
+        print("❌ Request timed out (60 seconds)")
+        return False
+    except requests.exceptions.ConnectionError:
+        print("❌ Connection error - backend may be down")
+        return False
+    except Exception as e:
+        print(f"❌ Unexpected error: {str(e)}")
+        return False
+
 def test_comprehensive_report_with_monthly_insights():
     """Test GET /api/comprehensive-report?format=pdf&periods=2025-11"""
     print("\n" + "="*60)
