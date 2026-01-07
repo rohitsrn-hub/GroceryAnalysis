@@ -274,7 +274,7 @@ const ChatBot = () => {
                     >
                       <div className="flex items-start space-x-2">
                         {msg.role === 'assistant' && (
-                          <span className={`text-sm mt-0.5 flex-shrink-0`}>🦏</span>
+                          <img src={SANDY_IMAGE_URL} alt="Sandy" className="w-5 h-5 rounded-full mt-0.5 flex-shrink-0 border border-purple-200" />
                         )}
                         <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
                         {msg.role === 'user' && (
@@ -291,7 +291,7 @@ const ChatBot = () => {
                 <div className="flex justify-start">
                   <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-gray-100">
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm">🦏</span>
+                      <img src={SANDY_IMAGE_URL} alt="Sandy" className="w-5 h-5 rounded-full border border-purple-200" />
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                         <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
