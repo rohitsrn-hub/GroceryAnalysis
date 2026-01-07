@@ -198,7 +198,7 @@ const ChatBot = () => {
         <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <span className="text-xl">🦏</span>
+              <img src={SANDY_IMAGE_URL} alt="Sandy" className="w-8 h-8 rounded-full object-cover border-2 border-white/50" />
               <CardTitle className="text-base font-semibold">Sandy - Sales Assistant</CardTitle>
             </div>
             <div className="flex items-center space-x-1">
