@@ -122,6 +122,128 @@ def generate_trend_bars(trend_data):
     return '\n'.join(svg_parts)
 
 
+def generate_daily_sales_line_graph(daily_data):
+    """Generate SVG line graph for daily sales trend"""
+    if not daily_data or len(daily_data) == 0:
+        return ""
+    
+    # Sort by day
+    sorted_data = sorted(daily_data, key=lambda x: x['day'])
+    
+    # Chart dimensions
+    chart_width = 600
+    chart_height = 250
+    padding_left = 70
+    padding_right = 30
+    padding_top = 30
+    padding_bottom = 50
+    
+    graph_width = chart_width - padding_left - padding_right
+    graph_height = chart_height - padding_top - padding_bottom
+    
+    # Find max sales for scaling
+    max_sales = max([d['sales'] for d in sorted_data]) if sorted_data else 1
+    if max_sales == 0:
+        max_sales = 1
+    
+    # Find day range
+    min_day = min([d['day'] for d in sorted_data])
+    max_day = max([d['day'] for d in sorted_data])
+    day_range = max(max_day - min_day, 1)
+    
+    # Generate path points
+    points = []
+    for d in sorted_data:
+        x = padding_left + ((d['day'] - min_day) / day_range) * graph_width
+        y = padding_top + graph_height - (d['sales'] / max_sales) * graph_height
+        points.append(f"{x},{y}")
+    
+    path_d = "M " + " L ".join(points)
+    
+    # Generate dots
+    dots = []
+    for d in sorted_data:
+        x = padding_left + ((d['day'] - min_day) / day_range) * graph_width
+        y = padding_top + graph_height - (d['sales'] / max_sales) * graph_height
+        dots.append(f'<circle cx="{x}" cy="{y}" r="4" fill="#667eea" stroke="white" stroke-width="1"/>')
+    
+    # Generate grid lines and labels
+    grid_lines = []
+    y_labels = []
+    
+    # Y-axis grid lines and labels (5 lines)
+    for i in range(5):
+        y = padding_top + (i * graph_height / 4)
+        value = max_sales * (1 - i / 4)
+        grid_lines.append(f'<line x1="{padding_left}" y1="{y}" x2="{chart_width - padding_right}" y2="{y}" stroke="#e5e5e5" stroke-width="1"/>')
+        
+        # Format value in lakhs/thousands
+        if value >= 100000:
+            label = f"₹{value/100000:.1f}L"
+        elif value >= 1000:
+            label = f"₹{value/1000:.0f}K"
+        else:
+            label = f"₹{value:.0f}"
+        y_labels.append(f'<text x="{padding_left - 5}" y="{y + 4}" font-size="10" text-anchor="end" fill="#666">{label}</text>')
+    
+    # X-axis labels (every 5 days)
+    x_labels = []
+    for day in range(min_day, max_day + 1, 5):
+        if day <= max_day:
+            x = padding_left + ((day - min_day) / day_range) * graph_width
+            x_labels.append(f'<text x="{x}" y="{chart_height - 20}" font-size="10" text-anchor="middle" fill="#666">Day {day}</text>')
+    
+    # Add last day if not included
+    if max_day % 5 != 0:
+        x = padding_left + graph_width
+        x_labels.append(f'<text x="{x}" y="{chart_height - 20}" font-size="10" text-anchor="middle" fill="#666">Day {max_day}</text>')
+    
+    svg = f'''
+    <svg viewBox="0 0 {chart_width} {chart_height}" style="width: 100%; max-width: 700px; height: auto; margin: 0 auto; display: block;">
+        <!-- Background -->
+        <rect width="{chart_width}" height="{chart_height}" fill="#fafafa" rx="8"/>
+        
+        <!-- Grid lines -->
+        {''.join(grid_lines)}
+        
+        <!-- Axes -->
+        <line x1="{padding_left}" y1="{padding_top}" x2="{padding_left}" y2="{padding_top + graph_height}" stroke="#ccc" stroke-width="2"/>
+        <line x1="{padding_left}" y1="{padding_top + graph_height}" x2="{chart_width - padding_right}" y2="{padding_top + graph_height}" stroke="#ccc" stroke-width="2"/>
+        
+        <!-- Y-axis labels -->
+        {''.join(y_labels)}
+        
+        <!-- X-axis labels -->
+        {''.join(x_labels)}
+        
+        <!-- X-axis title -->
+        <text x="{chart_width / 2}" y="{chart_height - 5}" font-size="11" text-anchor="middle" fill="#333">Day of Month</text>
+        
+        <!-- Y-axis title -->
+        <text x="15" y="{chart_height / 2}" font-size="11" text-anchor="middle" fill="#333" transform="rotate(-90, 15, {chart_height / 2})">Sales (₹)</text>
+        
+        <!-- Area fill under line -->
+        <path d="{path_d} L {padding_left + graph_width},{padding_top + graph_height} L {padding_left},{padding_top + graph_height} Z" fill="url(#gradient)" opacity="0.3"/>
+        
+        <!-- Line -->
+        <path d="{path_d}" fill="none" stroke="#667eea" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        
+        <!-- Dots -->
+        {''.join(dots)}
+        
+        <!-- Gradient definition -->
+        <defs>
+            <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.6"/>
+                <stop offset="100%" style="stop-color:#667eea;stop-opacity:0.1"/>
+            </linearGradient>
+        </defs>
+    </svg>
+    '''
+    
+    return svg
+
+
 # Create the main app without a prefix
 app = FastAPI()
 
