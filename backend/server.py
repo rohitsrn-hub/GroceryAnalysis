@@ -4714,6 +4714,149 @@ def detect_period_from_query(query: str, available_periods: List[str]) -> Option
     return None
 
 
+def detect_multiple_periods_from_query(query: str, available_periods: List[str]) -> List[str]:
+    """
+    Detect multiple periods mentioned in a comparison query.
+    Returns list of matching data_period values.
+    """
+    import re
+    query_lower = query.lower()
+    detected_periods = []
+    
+    # Month name mapping
+    month_map = {
+        'january': '01', 'jan': '01',
+        'february': '02', 'feb': '02',
+        'march': '03', 'mar': '03',
+        'april': '04', 'apr': '04',
+        'may': '05',
+        'june': '06', 'jun': '06',
+        'july': '07', 'jul': '07',
+        'august': '08', 'aug': '08',
+        'september': '09', 'sep': '09', 'sept': '09',
+        'october': '10', 'oct': '10',
+        'november': '11', 'nov': '11',
+        'december': '12', 'dec': '12'
+    }
+    
+    # Find all years in query
+    years_found = re.findall(r'20\d{2}', query)
+    
+    # Find all month-year combinations
+    for month_name, month_num in month_map.items():
+        if month_name in query_lower:
+            # Try to associate with each year found
+            for year in years_found:
+                target_period = f"{year}-{month_num}"
+                if target_period in available_periods and target_period not in detected_periods:
+                    detected_periods.append(target_period)
+            
+            # If only one year found, use it for this month
+            if len(years_found) == 1:
+                target_period = f"{years_found[0]}-{month_num}"
+                if target_period in available_periods and target_period not in detected_periods:
+                    detected_periods.append(target_period)
+    
+    # Also check for standalone years (for yearly comparisons)
+    for year in years_found:
+        if year in available_periods and year not in detected_periods:
+            detected_periods.append(year)
+    
+    return detected_periods
+
+
+def is_comparison_query(query: str) -> bool:
+    """
+    Detect if user is asking for a comparison between periods.
+    """
+    query_lower = query.lower()
+    comparison_keywords = [
+        'compare', 'comparison', 'vs', 'versus', 'between', 
+        'difference', 'differ', 'change', 'changed', 'growth',
+        'increase', 'decrease', 'better', 'worse', 'more than',
+        'less than', 'higher', 'lower', 'trend', 'month over month',
+        'mom', 'yoy', 'year over year', 'previous', 'last month',
+        'this month vs', 'compared to', 'against'
+    ]
+    return any(keyword in query_lower for keyword in comparison_keywords)
+
+
+async def get_period_summary(period: str, db) -> Dict[str, Any]:
+    """
+    Get summary statistics for a specific period.
+    """
+    match_filter = {"upload_source": {"$ne": "forecast"}, "data_period": period}
+    
+    # Get period totals
+    totals_pipeline = [
+        {"$match": match_filter},
+        {"$group": {
+            "_id": None,
+            "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+            "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
+            "total_qty": {"$sum": {"$ifNull": ["$net_qty", 0]}},
+            "record_count": {"$sum": 1},
+            "unique_items": {"$addToSet": "$item_name"}
+        }}
+    ]
+    totals = await db.sales_records.aggregate(totals_pipeline).to_list(1)
+    
+    if totals:
+        result = totals[0]
+        result['unique_item_count'] = len(result.get('unique_items', []))
+        del result['unique_items']  # Don't need the full list
+        result['profit_margin'] = (result['total_profit'] / result['total_revenue'] * 100) if result['total_revenue'] > 0 else 0
+        return result
+    
+    return {"total_revenue": 0, "total_profit": 0, "total_qty": 0, "record_count": 0, "unique_item_count": 0, "profit_margin": 0}
+
+
+async def get_comparison_data(periods: List[str], db) -> Dict[str, Any]:
+    """
+    Get comparison data for multiple periods.
+    """
+    comparison_data = {}
+    
+    for period in periods:
+        period_display = await format_period_display_name(period)
+        summary = await get_period_summary(period, db)
+        
+        # Get top 5 items by profit for this period
+        top_profit_pipeline = [
+            {"$match": {"upload_source": {"$ne": "forecast"}, "data_period": period}},
+            {"$group": {
+                "_id": "$item_name",
+                "total_profit": {"$sum": "$profit"},
+                "total_revenue": {"$sum": "$r_amt"},
+                "total_qty": {"$sum": "$net_qty"}
+            }},
+            {"$sort": {"total_profit": -1}},
+            {"$limit": 5}
+        ]
+        top_items = await db.sales_records.aggregate(top_profit_pipeline).to_list(5)
+        
+        # Get group breakdown
+        group_pipeline = [
+            {"$match": {"upload_source": {"$ne": "forecast"}, "data_period": period}},
+            {"$group": {
+                "_id": "$product_group",
+                "total_revenue": {"$sum": "$r_amt"},
+                "total_profit": {"$sum": "$profit"}
+            }},
+            {"$sort": {"total_revenue": -1}}
+        ]
+        groups = await db.sales_records.aggregate(group_pipeline).to_list(10)
+        
+        comparison_data[period] = {
+            "display_name": period_display,
+            "summary": summary,
+            "top_items": top_items,
+            "groups": groups
+        }
+    
+    return comparison_data
+
+
 async def get_period_specific_data(period: str, db) -> Dict[str, Any]:
     """
     Get detailed analytics for a specific period.
