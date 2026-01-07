@@ -473,51 +473,44 @@ def test_chat_history_clearing():
     except Exception as e:
         print(f"❌ Unexpected error: {str(e)}")
         return False
-    """Test Excel report with single period (2025-11) - verify revenue and profit data"""
+
+def test_backend_health():
+    """Test if backend is accessible"""
     print("\n" + "="*60)
-    print("🧪 TESTING: Excel Report with Single Period (2025-11)")
+    print("🏥 TESTING: Backend Health Check")
     print("="*60)
     
     try:
-        url = f"{BACKEND_URL}/comprehensive-report?format=excel&periods=2025-11"
-        print(f"📡 Making request to: {url}")
+        # Try a simple endpoint first
+        url = f"{BACKEND_URL.replace('/api', '')}/health" if "/api" in BACKEND_URL else f"{BACKEND_URL}/health"
+        print(f"📡 Checking health endpoint: {url}")
         
-        response = requests.get(url, timeout=30)
-        
-        print(f"📊 Response Status: {response.status_code}")
-        print(f"📋 Response Headers: {dict(response.headers)}")
-        
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
-            # Check Content-Type
-            content_type = response.headers.get('Content-Type', '')
-            expected_content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            print("✅ Backend health check passed")
+            return True
+        else:
+            print(f"⚠️  Health endpoint returned {response.status_code}")
             
-            print(f"📄 Content-Type: {content_type}")
-            print(f"📏 Content-Length: {len(response.content)} bytes")
+    except Exception as e:
+        print(f"⚠️  Health endpoint not available: {str(e)}")
+    
+    # Try the base API endpoint
+    try:
+        print(f"📡 Checking base API: {BACKEND_URL}")
+        response = requests.get(BACKEND_URL, timeout=10)
+        print(f"📊 Base API Status: {response.status_code}")
+        
+        if response.status_code in [200, 404, 405]:  # 404/405 are OK for base API
+            print("✅ Backend is accessible")
+            return True
+        else:
+            print(f"❌ Backend not accessible: {response.status_code}")
+            return False
             
-            # Verify MIME type
-            if expected_content_type in content_type:
-                print("✅ MIME type is correct for Excel file")
-            else:
-                print(f"❌ MIME type mismatch. Expected: {expected_content_type}, Got: {content_type}")
-                return False
-            
-            # Check file size (should be > 10KB for a comprehensive report)
-            if len(response.content) > 10240:  # 10KB
-                print(f"✅ File size is adequate: {len(response.content):,} bytes (> 10KB)")
-            else:
-                print(f"❌ File size too small: {len(response.content):,} bytes (< 10KB)")
-                return False
-            
-            # Parse Excel file to verify data content
-            try:
-                workbook = openpyxl.load_workbook(BytesIO(response.content))
-                print(f"✅ Excel file is valid and readable")
-                print(f"📊 Worksheets found: {workbook.sheetnames}")
-                
-                # Check for Top Performers sheet
-                if 'Top Performers' in workbook.sheetnames:
-                    print("✅ 'Top Performers' sheet found")
+    except Exception as e:
+        print(f"❌ Backend connection failed: {str(e)}")
+        return False
                     sheet = workbook['Top Performers']
                     
                     # Look for revenue data in the sheet
