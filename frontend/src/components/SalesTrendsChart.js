@@ -29,8 +29,11 @@ const SalesTrendsChart = () => {
   }, []);
 
   useEffect(() => {
-    fetchTrendData();
-  }, [viewMode, selectedPeriods, singlePeriod]);
+    // Only fetch trend data when periods are available
+    if (availablePeriods.length > 0) {
+      fetchTrendData();
+    }
+  }, [viewMode, selectedPeriods, singlePeriod, availablePeriods]);
 
   const fetchAvailablePeriods = async () => {
     try {
