@@ -2720,16 +2720,7 @@ async def generate_comprehensive_report(
                 
                 <div class="section">
                     <h2 class="section-title">📊 Daily Sales Trend</h2>
-                    <div style="overflow-x: auto;">
-                        <table class="table" style="font-size: 11px;">
-                            <tr>
-                                <th>Day</th>
-                                <th>Sales (₹)</th>
-                                <th>Visual</th>
-                            </tr>
-                            {daily_rows}
-                        </table>
-                    </div>
+                    {generate_daily_sales_line_graph(monthly_insights.get('daily_sales_data', []))}
                 </div>
                 """
             
