@@ -301,7 +301,7 @@ const ChatBot = () => {
                     <div
                       className={`max-w-[85%] rounded-2xl px-4 py-2 ${
                         msg.role === 'user'
-                          ? 'bg-blue-600 text-white rounded-br-md'
+                          ? 'bg-purple-600 text-white rounded-br-md'
                           : msg.isError
                           ? 'bg-red-100 text-red-800 rounded-bl-md'
                           : 'bg-white text-gray-800 shadow-sm border border-gray-100 rounded-bl-md'
@@ -309,11 +309,11 @@ const ChatBot = () => {
                     >
                       <div className="flex items-start space-x-2">
                         {msg.role === 'assistant' && (
-                          <Bot className={`h-4 w-4 mt-0.5 flex-shrink-0 ${msg.isError ? 'text-red-500' : 'text-blue-500'}`} />
+                          <span className={`text-sm mt-0.5 flex-shrink-0`}>🦏</span>
                         )}
                         <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
                         {msg.role === 'user' && (
-                          <User className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-200" />
+                          <User className="h-4 w-4 mt-0.5 flex-shrink-0 text-purple-200" />
                         )}
                       </div>
                     </div>
@@ -326,11 +326,11 @@ const ChatBot = () => {
                 <div className="flex justify-start">
                   <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-gray-100">
                     <div className="flex items-center space-x-2">
-                      <Bot className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm">🦏</span>
                       <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                       </div>
                     </div>
                   </div>
@@ -349,14 +349,14 @@ const ChatBot = () => {
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Ask about your sales data..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Ask Sandy about your sales data..."
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   disabled={isLoading}
                 />
                 <Button
                   onClick={sendMessage}
                   disabled={!inputMessage.trim() || isLoading}
-                  className="h-10 w-10 rounded-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300"
+                  className="h-10 w-10 rounded-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300"
                 >
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
