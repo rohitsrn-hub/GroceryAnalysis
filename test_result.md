@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test the report generation functionality for comprehensive reports in Excel and PDF formats"
+user_problem_statement: "Implement AI Chatbot feature for querying sales data"
 
 backend:
   - task: "Comprehensive Report Generation (Excel Format)"
@@ -134,6 +134,18 @@ backend:
         - working: true
           agent: "testing"
           comment: "✅ PDF REPORT REVENUE DATA VERIFICATION COMPLETED. PDF Report Single Period (2025-11) test PASSED - VERIFIED Top 10 Performing Items section shows correct non-zero revenue values (74 currency values found), profit data present, all revenue indicators working correctly. Current implementation returns styled HTML instead of actual PDF but contains all required financial data with proper formatting. Revenue values are NOT zero as initially reported - issue has been RESOLVED."
+
+  - task: "AI Chatbot Backend Endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Implemented POST /api/chatbot endpoint using OpenAI GPT-5.1 via Emergent Integrations. Features: 1) Queries sales database for context (total revenue, profit, top items, group breakdown), 2) Stores chat history in MongoDB for persistence, 3) GET /api/chat-history/{session_id} for history retrieval, 4) DELETE /api/chat-history/{session_id} for clearing. Manually tested with curl - returns accurate total revenue (₹2,42,26,84,31.35)."
 
 metadata:
   created_by: "testing_agent"
