@@ -496,6 +496,9 @@ function MainApp() {
       )}
       
       <Toaster />
+      
+      {/* AI Chatbot */}
+      <ChatBot />
     </div>
   );
 }
