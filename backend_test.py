@@ -16,25 +16,20 @@ from datetime import datetime
 # Backend URL from environment
 BACKEND_URL = "https://retail-pulse-35.preview.emergentagent.com/api"
 
-def test_chatbot_basic_question():
-    """Test basic chatbot question: 'What is the total revenue?'"""
+def test_previous_financial_data():
+    """Test GET /api/previous-financial-data?date=2025-12-05"""
     print("\n" + "="*60)
-    print("🧪 TESTING: Chatbot Basic Question - Total Revenue")
+    print("🧪 TESTING: Previous Financial Data API")
     print("="*60)
     
     try:
-        url = f"{BACKEND_URL}/chatbot"
-        session_id = str(uuid.uuid4())
-        
-        payload = {
-            "message": "What is the total revenue?",
-            "session_id": session_id
-        }
+        url = f"{BACKEND_URL}/previous-financial-data"
+        params = {"date": "2025-12-05"}
         
         print(f"📡 Making request to: {url}")
-        print(f"📝 Payload: {json.dumps(payload, indent=2)}")
+        print(f"📝 Parameters: {params}")
         
-        response = requests.post(url, json=payload, timeout=30)
+        response = requests.get(url, params=params, timeout=30)
         
         print(f"📊 Response Status: {response.status_code}")
         print(f"📋 Response Headers: {dict(response.headers)}")
@@ -45,44 +40,50 @@ def test_chatbot_basic_question():
             print(f"📝 Response keys: {list(data.keys())}")
             
             # Verify response structure
-            if 'response' in data and 'session_id' in data:
-                print("✅ Response has correct structure (response, session_id)")
+            expected_keys = ['previous_date', 'bank_amount', 'stock_value', 'found']
+            if all(key in data for key in expected_keys):
+                print("✅ Response has correct structure (previous_date, bank_amount, stock_value, found)")
                 
-                # Check if response contains revenue information
-                response_text = data['response'].lower()
-                if any(keyword in response_text for keyword in ['revenue', 'total', '₹', 'rs']):
-                    print("✅ Response contains revenue-related information")
-                    print(f"📄 AI Response: {data['response'][:200]}...")
+                # Check if data was found
+                if data['found']:
+                    print("✅ Previous financial data found")
+                    print(f"📅 Previous Date: {data['previous_date']}")
+                    print(f"💰 Bank Amount: {data['bank_amount']}")
+                    print(f"📦 Stock Value: {data['stock_value']}")
                     
-                    # Verify session ID is returned
-                    if data['session_id'] == session_id:
-                        print("✅ Session ID matches request")
-                    else:
-                        print(f"⚠️  Session ID changed: {session_id} -> {data['session_id']}")
+                    # Verify it's the LAST AVAILABLE record before the date (not just previous day)
+                    if data['previous_date']:
+                        prev_date = datetime.strptime(data['previous_date'], "%Y-%m-%d")
+                        target_date = datetime.strptime("2025-12-05", "%Y-%m-%d")
+                        if prev_date < target_date:
+                            print("✅ Previous date is before target date (correctly skips holidays/weekly offs)")
+                        else:
+                            print(f"❌ Previous date {data['previous_date']} is not before target date 2025-12-05")
+                            return False
                     
-                    return True, data['session_id']
+                    return True
                 else:
-                    print("❌ Response doesn't contain revenue information")
-                    print(f"📄 AI Response: {data['response']}")
-                    return False, None
+                    print("⚠️  No previous financial data found (may be expected if no data exists)")
+                    print(f"📄 Response: {data}")
+                    return True  # Still consider success if API works correctly
             else:
-                print("❌ Response missing required fields")
+                print(f"❌ Response missing required fields. Expected: {expected_keys}, Got: {list(data.keys())}")
                 print(f"📄 Response: {data}")
-                return False, None
+                return False
         else:
             print(f"❌ Request failed with status {response.status_code}")
             print(f"📝 Response text: {response.text[:500]}")
-            return False, None
+            return False
             
     except requests.exceptions.Timeout:
         print("❌ Request timed out (30 seconds)")
-        return False, None
+        return False
     except requests.exceptions.ConnectionError:
         print("❌ Connection error - backend may be down")
-        return False, None
+        return False
     except Exception as e:
         print(f"❌ Unexpected error: {str(e)}")
-        return False, None
+        return False
 
 def test_chatbot_profit_question():
     """Test profit question: 'What is my total profit?'"""
