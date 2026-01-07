@@ -447,6 +447,10 @@ def main():
     daily_sales_trend_result = test_daily_sales_trend_by_period()
     results.append(("Daily Sales Trend by Period API", daily_sales_trend_result))
     
+    # Test the specific PDF report SVG line graph fix from review request
+    pdf_svg_fix_result = test_pdf_report_daily_sales_trend_line_graph()
+    results.append(("PDF Report Daily Sales Trend SVG Line Graph", pdf_svg_fix_result))
+    
     comprehensive_report_result = test_comprehensive_report_with_monthly_insights()
     results.append(("Comprehensive Report with Monthly Insights", comprehensive_report_result))
     
