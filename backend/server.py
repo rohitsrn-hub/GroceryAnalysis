@@ -5002,12 +5002,125 @@ async def chat_with_data(request: ChatMessage):
         available_periods = await db.sales_records.distinct("data_period", {"upload_source": {"$ne": "forecast"}})
         available_periods = [p for p in available_periods if p]
         
-        # Detect if user is asking about a specific period
-        detected_period = detect_period_from_query(request.message, available_periods)
-        period_display_name = await format_period_display_name(detected_period) if detected_period else None
+        # Check if this is a comparison query first
+        is_comparison = is_comparison_query(request.message)
+        detected_periods = detect_multiple_periods_from_query(request.message, available_periods) if is_comparison else []
         
-        # Build context based on whether a specific period was detected
-        if detected_period:
+        # Build context based on query type
+        if is_comparison and len(detected_periods) >= 2:
+            # COMPARISON MODE: User wants to compare multiple periods
+            comparison_data = await get_comparison_data(detected_periods, db)
+            
+            # Build comparison context string
+            comparison_sections = []
+            for period, data in comparison_data.items():
+                display_name = data['display_name']
+                summary = data['summary']
+                
+                top_items_str = "\n".join([
+                    f"    {i+1}. {item['_id']}: Profit ₹{item['total_profit']:,.2f}, Revenue ₹{item['total_revenue']:,.2f}"
+                    for i, item in enumerate(data['top_items']) if item.get('_id')
+                ])
+                
+                groups_str = "\n".join([
+                    f"    - {g['_id']}: Revenue ₹{g['total_revenue']:,.2f}, Profit ₹{g['total_profit']:,.2f}"
+                    for g in data['groups'] if g.get('_id')
+                ])
+                
+                section = f"""
+=== {display_name} ===
+  Revenue: ₹{summary.get('total_revenue', 0):,.2f}
+  Profit: ₹{summary.get('total_profit', 0):,.2f}
+  Quantity Sold: {summary.get('total_qty', 0):,}
+  Unique Items: {summary.get('unique_item_count', 0):,}
+  Profit Margin: {summary.get('profit_margin', 0):.2f}%
+  
+  Top 5 Items by Profit:
+{top_items_str if top_items_str else '    No data'}
+
+  Sales by Group:
+{groups_str if groups_str else '    No data'}
+"""
+                comparison_sections.append(section)
+            
+            # Calculate changes between periods (if exactly 2 periods)
+            changes_section = ""
+            if len(detected_periods) == 2:
+                period1, period2 = detected_periods[0], detected_periods[1]
+                data1, data2 = comparison_data[period1], comparison_data[period2]
+                s1, s2 = data1['summary'], data2['summary']
+                
+                rev_change = s2.get('total_revenue', 0) - s1.get('total_revenue', 0)
+                rev_pct = (rev_change / s1.get('total_revenue', 1) * 100) if s1.get('total_revenue', 0) > 0 else 0
+                
+                profit_change = s2.get('total_profit', 0) - s1.get('total_profit', 0)
+                profit_pct = (profit_change / s1.get('total_profit', 1) * 100) if s1.get('total_profit', 0) > 0 else 0
+                
+                qty_change = s2.get('total_qty', 0) - s1.get('total_qty', 0)
+                qty_pct = (qty_change / s1.get('total_qty', 1) * 100) if s1.get('total_qty', 0) > 0 else 0
+                
+                changes_section = f"""
+=== CHANGES: {data1['display_name']} → {data2['display_name']} ===
+  Revenue Change: ₹{rev_change:,.2f} ({rev_pct:+.1f}%)
+  Profit Change: ₹{profit_change:,.2f} ({profit_pct:+.1f}%)
+  Quantity Change: {qty_change:,} ({qty_pct:+.1f}%)
+"""
+            
+            # Format available periods
+            formatted_periods = []
+            for p in sorted(available_periods):
+                formatted_periods.append(await format_period_display_name(p))
+            
+            system_message = f"""You are a helpful AI assistant for URC 101 Grocery Sales Analytics Dashboard.
+You help users understand their sales data and provide comparisons.
+
+The user is asking for a COMPARISON between periods.
+
+{''.join(comparison_sections)}
+{changes_section}
+
+=== ALL AVAILABLE PERIODS ===
+{', '.join(formatted_periods) if formatted_periods else 'No data'}
+
+IMPORTANT GUIDELINES:
+1. Always format currency in Indian Rupees (₹) with proper Indian comma formatting
+2. When comparing, clearly show the difference and percentage change
+3. Highlight which period performed better and why
+4. Use tables or structured format for clear comparisons
+5. Provide actionable insights - what can the business learn from this comparison?
+6. If trends are visible, mention them"""
+
+        elif is_comparison and len(detected_periods) < 2:
+            # User wants comparison but didn't specify enough periods
+            # Provide helpful response with available periods
+            formatted_periods = []
+            for p in sorted(available_periods):
+                formatted_periods.append(await format_period_display_name(p))
+            
+            system_message = f"""You are a helpful AI assistant for URC 101 Grocery Sales Analytics Dashboard.
+
+The user seems to want a comparison but hasn't specified which periods to compare.
+
+=== AVAILABLE PERIODS FOR COMPARISON ===
+{', '.join(formatted_periods) if formatted_periods else 'No data available'}
+
+Please help the user by:
+1. Asking which specific periods they want to compare (e.g., "Nov 2025 vs Oct 2025")
+2. Suggesting relevant comparisons based on available data
+3. Explaining they can compare any two or more periods from the list above
+
+Example comparison queries:
+- "Compare November 2025 with October 2025"
+- "How did sales change between Oct and Nov 2025?"
+- "Compare profit in 2024 vs 2023"
+"""
+
+        elif not is_comparison:
+            # Check for single period query
+            detected_period = detect_period_from_query(request.message, available_periods)
+            period_display_name = await format_period_display_name(detected_period) if detected_period else None
+            
+            if detected_period:
             # Get period-specific detailed data
             period_data = await get_period_specific_data(detected_period, db)
             
