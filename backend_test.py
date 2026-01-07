@@ -85,50 +85,109 @@ def test_previous_financial_data():
         print(f"❌ Unexpected error: {str(e)}")
         return False
 
-def test_chatbot_profit_question():
-    """Test profit question: 'What is my total profit?'"""
+def test_daily_sales_trend_by_period():
+    """Test GET /api/daily-sales-trend-by-period?period=2025-11"""
     print("\n" + "="*60)
-    print("🧪 TESTING: Chatbot Profit Question")
+    print("🧪 TESTING: Daily Sales Trend by Period API")
     print("="*60)
     
     try:
-        url = f"{BACKEND_URL}/chatbot"
-        session_id = str(uuid.uuid4())
-        
-        payload = {
-            "message": "What is my total profit?",
-            "session_id": session_id
-        }
+        url = f"{BACKEND_URL}/daily-sales-trend-by-period"
+        params = {"period": "2025-11"}
         
         print(f"📡 Making request to: {url}")
-        print(f"📝 Payload: {json.dumps(payload, indent=2)}")
+        print(f"📝 Parameters: {params}")
         
-        response = requests.post(url, json=payload, timeout=30)
+        response = requests.get(url, params=params, timeout=30)
         
         print(f"📊 Response Status: {response.status_code}")
+        print(f"📋 Response Headers: {dict(response.headers)}")
         
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Request successful")
+            print(f"📝 Response keys: {list(data.keys())}")
             
-            # Check if response contains profit information
-            response_text = data['response'].lower()
-            if any(keyword in response_text for keyword in ['profit', 'total', '₹', 'rs']):
-                print("✅ Response contains profit-related information")
-                print(f"📄 AI Response: {data['response'][:200]}...")
-                return True, data['session_id']
+            # Verify response structure
+            expected_keys = ['period', 'period_label', 'data', 'total_sales', 'avg_daily_sales', 'days_tracked']
+            if all(key in data for key in expected_keys):
+                print("✅ Response has correct structure")
+                
+                # Verify period information
+                if data['period'] == '2025-11':
+                    print("✅ Period matches request (2025-11)")
+                else:
+                    print(f"❌ Period mismatch: expected '2025-11', got '{data['period']}'")
+                    return False
+                
+                # Verify period label format
+                if 'Nov 2025' in data['period_label']:
+                    print(f"✅ Period label correctly formatted: {data['period_label']}")
+                else:
+                    print(f"❌ Period label format unexpected: {data['period_label']}")
+                    return False
+                
+                # Verify data structure
+                if isinstance(data['data'], list):
+                    print(f"✅ Data is a list with {len(data['data'])} entries")
+                    
+                    # Check if we have daily sales data
+                    if len(data['data']) > 0:
+                        print("✅ Daily sales data found")
+                        
+                        # Verify data entry structure
+                        first_entry = data['data'][0]
+                        if all(key in first_entry for key in ['date', 'day', 'sales']):
+                            print("✅ Daily data entries have correct structure (date, day, sales)")
+                            print(f"📅 Sample entry: {first_entry}")
+                        else:
+                            print(f"❌ Daily data entry structure incorrect: {list(first_entry.keys())}")
+                            return False
+                    else:
+                        print("⚠️  No daily sales data found for November 2025 (may be expected)")
+                
+                # Verify numeric fields
+                print(f"📊 Total Sales: {data['total_sales']}")
+                print(f"📊 Average Daily Sales: {data['avg_daily_sales']}")
+                print(f"📊 Days Tracked: {data['days_tracked']}")
+                
+                if isinstance(data['total_sales'], (int, float)) and data['total_sales'] >= 0:
+                    print("✅ Total sales is valid numeric value")
+                else:
+                    print(f"❌ Total sales invalid: {data['total_sales']}")
+                    return False
+                
+                if isinstance(data['avg_daily_sales'], (int, float)) and data['avg_daily_sales'] >= 0:
+                    print("✅ Average daily sales is valid numeric value")
+                else:
+                    print(f"❌ Average daily sales invalid: {data['avg_daily_sales']}")
+                    return False
+                
+                if isinstance(data['days_tracked'], int) and data['days_tracked'] >= 0:
+                    print("✅ Days tracked is valid integer")
+                else:
+                    print(f"❌ Days tracked invalid: {data['days_tracked']}")
+                    return False
+                
+                return True
             else:
-                print("❌ Response doesn't contain profit information")
-                print(f"📄 AI Response: {data['response']}")
-                return False, None
+                print(f"❌ Response missing required fields. Expected: {expected_keys}, Got: {list(data.keys())}")
+                print(f"📄 Response: {data}")
+                return False
         else:
             print(f"❌ Request failed with status {response.status_code}")
             print(f"📝 Response text: {response.text[:500]}")
-            return False, None
+            return False
             
+    except requests.exceptions.Timeout:
+        print("❌ Request timed out (30 seconds)")
+        return False
+    except requests.exceptions.ConnectionError:
+        print("❌ Connection error - backend may be down")
+        return False
     except Exception as e:
         print(f"❌ Unexpected error: {str(e)}")
-        return False, None
+        return False
 
 def test_chatbot_top_items_question():
     """Test top items question: 'Which items sell the most?'"""
