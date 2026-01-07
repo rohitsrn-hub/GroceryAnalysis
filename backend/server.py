@@ -2501,6 +2501,116 @@ async def generate_comprehensive_report(
                 </tr>
                 """
             
+            # Build Monthly Insights HTML if available
+            monthly_insights_html = ""
+            if monthly_insights:
+                # 3-month trend table rows
+                trend_rows = ""
+                for t in monthly_insights.get('three_month_trend', []):
+                    margin = round(((t['profit'] / t['revenue']) * 100) if t['revenue'] > 0 else 0, 2)
+                    trend_rows += f"""
+                    <tr>
+                        <td><strong>{t['month_name']}</strong></td>
+                        <td>{format_indian_number(t['revenue'], currency=True, use_rs_prefix=True)}</td>
+                        <td>{format_indian_number(t['profit'], currency=True, use_rs_prefix=True)}</td>
+                        <td>{margin}%</td>
+                    </tr>
+                    """
+                
+                # Daily sales rows
+                daily_rows = ""
+                avg_sale = monthly_insights.get('avg_daily_sale', 1) or 1
+                for d in sorted(monthly_insights.get('daily_sales_data', []), key=lambda x: x['day']):
+                    bar_width = min((d['sales'] / (avg_sale * 2)) * 100, 100)
+                    daily_rows += f"""
+                    <tr>
+                        <td>{d['day']}</td>
+                        <td>{format_indian_number(d['sales'], currency=True, use_rs_prefix=True)}</td>
+                        <td><div style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); height: 15px; width: {bar_width}%; border-radius: 3px;"></div></td>
+                    </tr>
+                    """
+                
+                stock_change_color = '#28a745' if monthly_insights.get('stock_value_reduction', 0) > 0 else '#dc3545'
+                stock_change_text = 'Decreased ✓' if monthly_insights.get('stock_value_reduction', 0) > 0 else 'Increased ↑'
+                
+                monthly_insights_html = f"""
+                <div class="section">
+                    <h2 class="section-title">📅 Monthly Insights</h2>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                        <div class="metric">
+                            <div>Average Daily Sale</div>
+                            <div class="metric-value">{format_indian_number(monthly_insights.get('avg_daily_sale', 0), currency=True, use_rs_prefix=True)}</div>
+                            <div style="font-size: 12px; color: #666;">Based on {monthly_insights.get('total_days_data', 0)} days of data</div>
+                        </div>
+                        <div class="metric">
+                            <div>Bank Balance (Last Day)</div>
+                            <div class="metric-value">{format_indian_number(monthly_insights.get('bank_balance_last_day', 0), currency=True, use_rs_prefix=True)}</div>
+                            <div style="font-size: 12px; color: #666;">{monthly_insights.get('bank_balance_date', 'N/A')}</div>
+                        </div>
+                        <div class="metric">
+                            <div>Stock Value Change</div>
+                            <div class="metric-value" style="color: {stock_change_color};">{format_indian_number(abs(monthly_insights.get('stock_value_reduction', 0)), currency=True, use_rs_prefix=True)}</div>
+                            <div style="font-size: 12px; color: #666;">{stock_change_text}</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>Stock Value (First Day):</strong> {format_indian_number(monthly_insights.get('stock_value_first_day', 0), currency=True, use_rs_prefix=True)}
+                                <span style="color: #666; font-size: 12px;">({monthly_insights.get('stock_first_date', 'N/A')})</span>
+                            </div>
+                            <div style="font-size: 24px;">→</div>
+                            <div>
+                                <strong>Stock Value (Last Day):</strong> {format_indian_number(monthly_insights.get('stock_value_last_day', 0), currency=True, use_rs_prefix=True)}
+                                <span style="color: #666; font-size: 12px;">({monthly_insights.get('stock_last_date', 'N/A')})</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2 class="section-title">📈 3-Month Revenue & Profit Trend</h2>
+                    <table class="table">
+                        <tr>
+                            <th>Month</th>
+                            <th>Revenue</th>
+                            <th>Profit</th>
+                            <th>Margin</th>
+                        </tr>
+                        {trend_rows}
+                    </table>
+                    
+                    <div style="margin-top: 20px;">
+                        <svg viewBox="0 0 400 200" style="width: 100%; max-width: 600px; height: auto; margin: 0 auto; display: block;">
+                            <rect width="400" height="200" fill="#f8f9fa"/>
+                            <line x1="50" y1="30" x2="50" y2="170" stroke="#ddd" stroke-width="1"/>
+                            <line x1="50" y1="170" x2="380" y2="170" stroke="#ddd" stroke-width="1"/>
+                            <line x1="50" y1="100" x2="380" y2="100" stroke="#ddd" stroke-width="1" stroke-dasharray="5,5"/>
+                            {generate_trend_bars(monthly_insights.get('three_month_trend', []))}
+                            <rect x="60" y="10" width="15" height="10" fill="#667eea"/>
+                            <text x="80" y="18" font-size="10" fill="#333">Revenue</text>
+                            <rect x="140" y="10" width="15" height="10" fill="#28a745"/>
+                            <text x="160" y="18" font-size="10" fill="#333">Profit</text>
+                        </svg>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2 class="section-title">📊 Daily Sales Trend</h2>
+                    <div style="overflow-x: auto;">
+                        <table class="table" style="font-size: 11px;">
+                            <tr>
+                                <th>Day</th>
+                                <th>Sales (₹)</th>
+                                <th>Visual</th>
+                            </tr>
+                            {daily_rows}
+                        </table>
+                    </div>
+                </div>
+                """
+            
             html_content = f"""
             <!DOCTYPE html>
             <html>
