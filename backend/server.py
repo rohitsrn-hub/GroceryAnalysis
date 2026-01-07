@@ -2165,6 +2165,34 @@ async def generate_comprehensive_report(
             ws_summary.append(["Total Items Sold", f"{dashboard_summary['total_items_sold']:,}"])
             ws_summary.append(["Total Records", f"{dashboard_summary['total_records']:,}"])
             
+            # Add Monthly Insights if available
+            if monthly_insights:
+                ws_summary.append([""])
+                ws_summary.append(["MONTHLY INSIGHTS"])
+                if 'avg_daily_sale' in monthly_insights:
+                    ws_summary.append(["Average Daily Sale", format_indian_number(monthly_insights['avg_daily_sale'], currency=True)])
+                    ws_summary.append(["Days with Data", f"{monthly_insights.get('total_days_data', 0)}"])
+                if monthly_insights.get('bank_balance_last_day'):
+                    ws_summary.append(["Bank Balance (Last Day)", format_indian_number(monthly_insights['bank_balance_last_day'], currency=True)])
+                    ws_summary.append(["Bank Balance Date", monthly_insights.get('bank_balance_date', 'N/A')])
+                if monthly_insights.get('stock_value_first_day') or monthly_insights.get('stock_value_last_day'):
+                    ws_summary.append(["Stock Value (First Day)", format_indian_number(monthly_insights.get('stock_value_first_day', 0), currency=True)])
+                    ws_summary.append(["Stock Value (Last Day)", format_indian_number(monthly_insights.get('stock_value_last_day', 0), currency=True)])
+                    reduction = monthly_insights.get('stock_value_reduction', 0)
+                    ws_summary.append(["Stock Value Reduction", format_indian_number(reduction, currency=True) + (" (Increased)" if reduction < 0 else " (Decreased)")])
+            
+            # Add 3-Month Trend if available
+            if monthly_insights.get('three_month_trend'):
+                ws_summary.append([""])
+                ws_summary.append(["3-MONTH REVENUE & PROFIT TREND"])
+                ws_summary.append(["Month", "Revenue", "Profit"])
+                for trend in monthly_insights['three_month_trend']:
+                    ws_summary.append([
+                        trend['month_name'],
+                        format_indian_number(trend['revenue'], currency=True),
+                        format_indian_number(trend['profit'], currency=True)
+                    ])
+            
             # ABC Analysis Sheet
             ws_abc = workbook.create_sheet("ABC Analysis")
             ws_abc.append(["Category", "Items", "% of Items", "Revenue", "% of Revenue", "Recommendation"])
