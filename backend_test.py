@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for AI Chatbot Feature
-Tests AI Chatbot endpoints and functionality as per review request
-Focus on testing chatbot responses, session continuity, and chat history management
+Backend API Testing Script for URC 101 Grocery Sales Analytics Dashboard
+Tests new features: Enhanced Sales Trends, Previous Financial Data, Daily Sales Trend by Period, and Comprehensive Report with Monthly Insights
+Focus on testing backend API endpoints as per review request
 """
 
 import requests
