@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Report Generation
-Tests comprehensive report generation endpoints (Excel and PDF formats)
-Focus on testing revenue and profit data accuracy as per review request
+Backend API Testing Script for AI Chatbot Feature
+Tests AI Chatbot endpoints and functionality as per review request
+Focus on testing chatbot responses, session continuity, and chat history management
 """
 
 import requests
@@ -10,6 +10,8 @@ import json
 import sys
 import os
 import openpyxl
+import uuid
+import time
 from datetime import datetime
 from io import BytesIO
 
