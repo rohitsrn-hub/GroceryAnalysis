@@ -164,16 +164,23 @@ const ChatBot = () => {
     setTimeout(() => sendMessage(), 100);
   };
 
-  // Floating chat button when closed
+  // Floating chat button when closed - TOP RIGHT position with larger icon
   if (!isOpen) {
     return (
       <button
         onClick={toggleChat}
-        className="fixed bottom-20 right-6 z-50 w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 flex items-center justify-center group"
+        className="fixed top-20 right-6 z-50 w-20 h-20 rounded-full shadow-2xl hover:shadow-xl transition-all duration-300 hover:scale-110 flex items-center justify-center group overflow-hidden border-4 border-white"
         title="Chat with Sandy 🦏"
+        style={{ 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+        }}
       >
-        <RhinoIcon className="h-10 w-10 group-hover:scale-110 transition-transform" color="white" />
-        <span className="absolute -top-1 -right-1 px-2 py-0.5 bg-green-500 rounded-full flex items-center justify-center text-xs font-bold animate-pulse">
+        <img 
+          src={SANDY_IMAGE_URL} 
+          alt="Sandy the Rhino" 
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+        />
+        <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
           Sandy
         </span>
       </button>
@@ -182,7 +189,7 @@ const ChatBot = () => {
 
   return (
     <div 
-      className={`fixed bottom-20 right-6 z-50 transition-all duration-300 ${
+      className={`fixed top-20 right-6 z-50 transition-all duration-300 ${
         isMinimized ? 'w-72' : 'w-96'
       }`}
     >
