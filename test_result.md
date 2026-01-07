@@ -158,7 +158,6 @@ metadata:
 
 test_plan:
   current_focus:
-    - "AI Chatbot Backend Endpoint"
     - "AI Chatbot Frontend Component"
   stuck_tasks: []
   test_all: false
