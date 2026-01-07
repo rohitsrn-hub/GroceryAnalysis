@@ -5121,43 +5121,43 @@ Example comparison queries:
             period_display_name = await format_period_display_name(detected_period) if detected_period else None
             
             if detected_period:
-            # Get period-specific detailed data
-            period_data = await get_period_specific_data(detected_period, db)
-            
-            # Format period-specific context
-            totals = period_data["totals"]
-            
-            top_revenue_str = "\n".join([
-                f"  {i+1}. {item['_id']}: Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}, Qty {item['total_qty']}"
-                for i, item in enumerate(period_data["top_by_revenue"]) if item['_id']
-            ])
-            
-            top_profit_str = "\n".join([
-                f"  {i+1}. {item['_id']}: Profit ₹{item['total_profit']:,.2f}, Revenue ₹{item['total_revenue']:,.2f}, Qty {item['total_qty']}"
-                for i, item in enumerate(period_data["top_by_profit"]) if item['_id']
-            ])
-            
-            top_qty_str = "\n".join([
-                f"  {i+1}. {item['_id']}: Qty {item['total_qty']}, Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}"
-                for i, item in enumerate(period_data["top_by_qty"]) if item['_id']
-            ])
-            
-            groups_str = "\n".join([
-                f"  - {g['_id']}: Revenue ₹{g['total_revenue']:,.2f}, Profit ₹{g['total_profit']:,.2f}, Items {g['item_count']}"
-                for g in period_data["groups"] if g['_id']
-            ])
-            
-            slow_items_str = "\n".join([
-                f"  {i+1}. {item['_id']}: Qty {item['total_qty']}, Revenue ₹{item['total_revenue']:,.2f}"
-                for i, item in enumerate(period_data["slow_items"]) if item['_id']
-            ])
-            
-            high_margin_str = "\n".join([
-                f"  {i+1}. {item['_id']}: Margin {item['profit_margin']:.1f}%, Profit ₹{item['total_profit']:,.2f}, Revenue ₹{item['total_revenue']:,.2f}"
-                for i, item in enumerate(period_data["high_margin_items"]) if item['_id']
-            ])
-            
-            system_message = f"""You are a helpful AI assistant for URC 101 Grocery Sales Analytics Dashboard.
+                # Get period-specific detailed data
+                period_data = await get_period_specific_data(detected_period, db)
+                
+                # Format period-specific context
+                totals = period_data["totals"]
+                
+                top_revenue_str = "\n".join([
+                    f"  {i+1}. {item['_id']}: Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}, Qty {item['total_qty']}"
+                    for i, item in enumerate(period_data["top_by_revenue"]) if item['_id']
+                ])
+                
+                top_profit_str = "\n".join([
+                    f"  {i+1}. {item['_id']}: Profit ₹{item['total_profit']:,.2f}, Revenue ₹{item['total_revenue']:,.2f}, Qty {item['total_qty']}"
+                    for i, item in enumerate(period_data["top_by_profit"]) if item['_id']
+                ])
+                
+                top_qty_str = "\n".join([
+                    f"  {i+1}. {item['_id']}: Qty {item['total_qty']}, Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}"
+                    for i, item in enumerate(period_data["top_by_qty"]) if item['_id']
+                ])
+                
+                groups_str = "\n".join([
+                    f"  - {g['_id']}: Revenue ₹{g['total_revenue']:,.2f}, Profit ₹{g['total_profit']:,.2f}, Items {g['item_count']}"
+                    for g in period_data["groups"] if g['_id']
+                ])
+                
+                slow_items_str = "\n".join([
+                    f"  {i+1}. {item['_id']}: Qty {item['total_qty']}, Revenue ₹{item['total_revenue']:,.2f}"
+                    for i, item in enumerate(period_data["slow_items"]) if item['_id']
+                ])
+                
+                high_margin_str = "\n".join([
+                    f"  {i+1}. {item['_id']}: Margin {item['profit_margin']:.1f}%, Profit ₹{item['total_profit']:,.2f}, Revenue ₹{item['total_revenue']:,.2f}"
+                    for i, item in enumerate(period_data["high_margin_items"]) if item['_id']
+                ])
+                
+                system_message = f"""You are a helpful AI assistant for URC 101 Grocery Sales Analytics Dashboard.
 You help users understand their sales data and provide insights.
 
 The user is asking about data for: **{period_display_name}**
