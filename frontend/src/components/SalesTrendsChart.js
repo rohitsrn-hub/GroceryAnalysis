@@ -40,13 +40,15 @@ const SalesTrendsChart = () => {
       const response = await fetch(`${API}/available-data-periods`);
       if (response.ok) {
         const data = await response.json();
+        // Get periods from periods_detailed which has value/label format
+        const allPeriods = data.periods_detailed || [];
         // Filter to only include monthly periods (format YYYY-MM)
-        const monthlyPeriods = data.filter(p => p.value && p.value.match(/^\d{4}-\d{2}$/));
+        const monthlyPeriods = allPeriods.filter(p => p.value && p.value.match(/^\d{4}-\d{2}$/));
         setAvailablePeriods(monthlyPeriods);
         
         // Set default single period to most recent
         if (monthlyPeriods.length > 0) {
-          setSinglePeriod(monthlyPeriods[monthlyPeriods.length - 1].value);
+          setSinglePeriod(monthlyPeriods[0].value);  // First is most recent
         }
       }
     } catch (error) {
