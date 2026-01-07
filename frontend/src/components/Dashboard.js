@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, Package, AlertTriangle, Monitor, Smartphone, 
 import { toast } from "sonner";
 import { formatIndianNumber, formatTableNumber, formatPercentage } from "../utils/numberUtils";
 import DailyUploadModal from "./DailyUploadModal";
+import SalesTrendsChart from "./SalesTrendsChart";
 import useDeviceDetect from '../hooks/useDeviceDetect';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
