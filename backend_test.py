@@ -14,7 +14,7 @@ from datetime import datetime
 from io import BytesIO
 
 # Backend URL from environment
-BACKEND_URL = "https://daily-reports-8.preview.emergentagent.com/api"
+BACKEND_URL = "https://retail-pulse-35.preview.emergentagent.com/api"
 
 def test_excel_report_single_period():
     """Test Excel report with single period (2025-11) - verify revenue and profit data"""

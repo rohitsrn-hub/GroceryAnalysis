@@ -31,7 +31,7 @@ scikit-learn==1.5.2
 **File**: `/app/frontend/.env`
 
 **Issue**: Backend URL was pointing to old Emergent preview URL
-- Old: `https://daily-reports-8.preview.emergentagent.com`
+- Old: `https://retail-pulse-35.preview.emergentagent.com`
 - New: `https://urc1oh1groceryanalysis.onrender.com`
 
 **Action**: Updated REACT_APP_BACKEND_URL to point to Render backend
