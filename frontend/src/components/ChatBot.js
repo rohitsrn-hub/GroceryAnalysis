@@ -230,11 +230,11 @@ const ChatBot = () => {
     >
       <Card className="shadow-2xl border-0 overflow-hidden">
         {/* Header */}
-        <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4">
+        <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Bot className="h-5 w-5" />
-              <CardTitle className="text-base font-semibold">AI Sales Assistant</CardTitle>
+              <span className="text-xl">🦏</span>
+              <CardTitle className="text-base font-semibold">Sandy - Sales Assistant</CardTitle>
             </div>
             <div className="flex items-center space-x-1">
               <Button
@@ -275,9 +275,9 @@ const ChatBot = () => {
             <div className="h-80 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {messages.length === 0 ? (
                 <div className="text-center py-6">
-                  <Bot className="h-12 w-12 mx-auto text-blue-500 mb-3" />
+                  <div className="text-5xl mb-3">🦏</div>
                   <p className="text-gray-600 text-sm mb-4">
-                    Hi! I'm your AI assistant. Ask me anything about your sales data!
+                    Hi! I'm <strong>Sandy</strong>, your friendly sales assistant! Ask me anything about your sales data!
                   </p>
                   <div className="space-y-2">
                     <p className="text-xs text-gray-500 mb-2">Try asking:</p>
