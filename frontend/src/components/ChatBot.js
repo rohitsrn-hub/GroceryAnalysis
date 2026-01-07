@@ -240,7 +240,7 @@ const ChatBot = () => {
             <div className="h-80 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {messages.length === 0 ? (
                 <div className="text-center py-6">
-                  <div className="text-5xl mb-3">🦏</div>
+                  <img src={SANDY_IMAGE_URL} alt="Sandy" className="w-20 h-20 mx-auto mb-3 rounded-full border-4 border-purple-200 shadow-lg" />
                   <p className="text-gray-600 text-sm mb-4">
                     Hi! I'm <strong>Sandy</strong>, your friendly sales assistant! Ask me anything about your sales data!
                   </p>
@@ -250,7 +250,7 @@ const ChatBot = () => {
                       <button
                         key={index}
                         onClick={() => askSuggestedQuestion(question)}
-                        className="block w-full text-left px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                        className="block w-full text-left px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-colors"
                       >
                         {question}
                       </button>
