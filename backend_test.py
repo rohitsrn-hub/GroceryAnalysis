@@ -293,305 +293,6 @@ def test_comprehensive_report_with_monthly_insights():
         print(f"❌ Unexpected error: {str(e)}")
         return False
 
-def test_chatbot_group_analysis():
-    """Test group analysis question: 'Show me profit by group'"""
-    print("\n" + "="*60)
-    print("🧪 TESTING: Chatbot Group Analysis Question")
-    print("="*60)
-    
-    try:
-        url = f"{BACKEND_URL}/chatbot"
-        session_id = str(uuid.uuid4())
-        
-        payload = {
-            "message": "Show me profit by group",
-            "session_id": session_id
-        }
-        
-        print(f"📡 Making request to: {url}")
-        
-        response = requests.post(url, json=payload, timeout=30)
-        
-        print(f"📊 Response Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"✅ Request successful")
-            
-            # Check if response contains group information
-            response_text = data['response'].lower()
-            if any(keyword in response_text for keyword in ['group', 'profit', 'category']):
-                print("✅ Response contains group analysis information")
-                print(f"📄 AI Response: {data['response'][:200]}...")
-                return True, data['session_id']
-            else:
-                print("❌ Response doesn't contain group analysis information")
-                print(f"📄 AI Response: {data['response']}")
-                return False, None
-        else:
-            print(f"❌ Request failed with status {response.status_code}")
-            print(f"📝 Response text: {response.text[:500]}")
-            return False, None
-            
-    except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
-        return False, None
-
-def test_chatbot_periods_question():
-    """Test periods question: 'What periods have data?'"""
-    print("\n" + "="*60)
-    print("🧪 TESTING: Chatbot Periods Question")
-    print("="*60)
-    
-    try:
-        url = f"{BACKEND_URL}/chatbot"
-        session_id = str(uuid.uuid4())
-        
-        payload = {
-            "message": "What periods have data?",
-            "session_id": session_id
-        }
-        
-        print(f"📡 Making request to: {url}")
-        
-        response = requests.post(url, json=payload, timeout=30)
-        
-        print(f"📊 Response Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            print(f"✅ Request successful")
-            
-            # Check if response contains period information
-            response_text = data['response'].lower()
-            if any(keyword in response_text for keyword in ['period', 'data', 'month', 'year', '2024', '2025']):
-                print("✅ Response contains period information")
-                print(f"📄 AI Response: {data['response'][:200]}...")
-                return True, data['session_id']
-            else:
-                print("❌ Response doesn't contain period information")
-                print(f"📄 AI Response: {data['response']}")
-                return False, None
-        else:
-            print(f"❌ Request failed with status {response.status_code}")
-            print(f"📝 Response text: {response.text[:500]}")
-            return False, None
-            
-    except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
-        return False, None
-
-def test_chatbot_session_continuity():
-    """Test session continuity - send multiple messages with same session_id"""
-    print("\n" + "="*60)
-    print("🧪 TESTING: Chatbot Session Continuity")
-    print("="*60)
-    
-    try:
-        url = f"{BACKEND_URL}/chatbot"
-        session_id = str(uuid.uuid4())
-        
-        # First message
-        payload1 = {
-            "message": "What is the total revenue?",
-            "session_id": session_id
-        }
-        
-        print(f"📡 Sending first message...")
-        response1 = requests.post(url, json=payload1, timeout=30)
-        
-        if response1.status_code != 200:
-            print(f"❌ First message failed: {response1.status_code}")
-            return False
-        
-        data1 = response1.json()
-        print(f"✅ First message successful")
-        
-        # Wait a moment
-        time.sleep(1)
-        
-        # Second message with same session
-        payload2 = {
-            "message": "What about profit?",
-            "session_id": session_id
-        }
-        
-        print(f"📡 Sending second message with same session...")
-        response2 = requests.post(url, json=payload2, timeout=30)
-        
-        if response2.status_code != 200:
-            print(f"❌ Second message failed: {response2.status_code}")
-            return False
-        
-        data2 = response2.json()
-        print(f"✅ Second message successful")
-        
-        # Verify session continuity
-        if data1['session_id'] == data2['session_id'] == session_id:
-            print("✅ Session ID maintained across messages")
-            print(f"📄 First response: {data1['response'][:100]}...")
-            print(f"📄 Second response: {data2['response'][:100]}...")
-            return True
-        else:
-            print(f"❌ Session ID not maintained: {data1['session_id']} vs {data2['session_id']}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
-        return False
-
-def test_chat_history_retrieval():
-    """Test chat history retrieval: GET /api/chat-history/{session_id}"""
-    print("\n" + "="*60)
-    print("🧪 TESTING: Chat History Retrieval")
-    print("="*60)
-    
-    try:
-        # First, create a chat session
-        chatbot_url = f"{BACKEND_URL}/chatbot"
-        session_id = str(uuid.uuid4())
-        
-        payload = {
-            "message": "Test message for history",
-            "session_id": session_id
-        }
-        
-        print(f"📡 Creating chat session...")
-        chat_response = requests.post(chatbot_url, json=payload, timeout=30)
-        
-        if chat_response.status_code != 200:
-            print(f"❌ Failed to create chat session: {chat_response.status_code}")
-            return False
-        
-        print(f"✅ Chat session created")
-        
-        # Wait a moment for data to be stored
-        time.sleep(1)
-        
-        # Now retrieve chat history
-        history_url = f"{BACKEND_URL}/chat-history/{session_id}"
-        print(f"📡 Retrieving chat history from: {history_url}")
-        
-        history_response = requests.get(history_url, timeout=30)
-        
-        print(f"📊 Response Status: {history_response.status_code}")
-        
-        if history_response.status_code == 200:
-            data = history_response.json()
-            print(f"✅ Chat history retrieved successfully")
-            print(f"📝 Response keys: {list(data.keys())}")
-            
-            # Verify response structure
-            if 'session_id' in data and 'messages' in data:
-                print("✅ Response has correct structure (session_id, messages)")
-                
-                if data['session_id'] == session_id:
-                    print("✅ Session ID matches")
-                else:
-                    print(f"❌ Session ID mismatch: expected {session_id}, got {data['session_id']}")
-                    return False
-                
-                if isinstance(data['messages'], list):
-                    print(f"✅ Messages is a list with {len(data['messages'])} entries")
-                    
-                    if len(data['messages']) > 0:
-                        print("✅ Chat history contains messages")
-                        # Check message structure
-                        first_msg = data['messages'][0]
-                        if 'user_message' in first_msg and 'assistant_response' in first_msg:
-                            print("✅ Message structure is correct")
-                            return True
-                        else:
-                            print(f"❌ Message structure incorrect: {list(first_msg.keys())}")
-                            return False
-                    else:
-                        print("⚠️  No messages in history (may be timing issue)")
-                        return True  # Still consider success if structure is correct
-                else:
-                    print(f"❌ Messages is not a list: {type(data['messages'])}")
-                    return False
-            else:
-                print(f"❌ Response missing required fields: {list(data.keys())}")
-                return False
-        else:
-            print(f"❌ Request failed with status {history_response.status_code}")
-            print(f"📝 Response text: {history_response.text[:500]}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
-        return False
-
-def test_chat_history_clearing():
-    """Test chat history clearing: DELETE /api/chat-history/{session_id}"""
-    print("\n" + "="*60)
-    print("🧪 TESTING: Chat History Clearing")
-    print("="*60)
-    
-    try:
-        # First, create a chat session
-        chatbot_url = f"{BACKEND_URL}/chatbot"
-        session_id = str(uuid.uuid4())
-        
-        payload = {
-            "message": "Test message for clearing",
-            "session_id": session_id
-        }
-        
-        print(f"📡 Creating chat session...")
-        chat_response = requests.post(chatbot_url, json=payload, timeout=30)
-        
-        if chat_response.status_code != 200:
-            print(f"❌ Failed to create chat session: {chat_response.status_code}")
-            return False
-        
-        print(f"✅ Chat session created")
-        
-        # Wait a moment for data to be stored
-        time.sleep(1)
-        
-        # Now clear chat history
-        clear_url = f"{BACKEND_URL}/chat-history/{session_id}"
-        print(f"📡 Clearing chat history at: {clear_url}")
-        
-        clear_response = requests.delete(clear_url, timeout=30)
-        
-        print(f"📊 Response Status: {clear_response.status_code}")
-        
-        if clear_response.status_code == 200:
-            data = clear_response.json()
-            print(f"✅ Chat history cleared successfully")
-            print(f"📝 Response: {data}")
-            
-            # Verify response structure
-            if 'deleted_count' in data and 'session_id' in data:
-                print("✅ Response has correct structure (deleted_count, session_id)")
-                
-                if data['session_id'] == session_id:
-                    print("✅ Session ID matches")
-                else:
-                    print(f"❌ Session ID mismatch: expected {session_id}, got {data['session_id']}")
-                    return False
-                
-                # Check if messages were deleted
-                if data['deleted_count'] >= 0:
-                    print(f"✅ Deleted {data['deleted_count']} messages")
-                    return True
-                else:
-                    print(f"❌ Invalid deleted_count: {data['deleted_count']}")
-                    return False
-            else:
-                print(f"❌ Response missing required fields: {list(data.keys())}")
-                return False
-        else:
-            print(f"❌ Request failed with status {clear_response.status_code}")
-            print(f"📝 Response text: {clear_response.text[:500]}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
-        return False
-
 def test_backend_health():
     """Test if backend is accessible"""
     print("\n" + "="*60)
@@ -631,9 +332,9 @@ def test_backend_health():
         return False
 
 def main():
-    """Run all chatbot tests"""
-    print("🚀 Starting Backend API Tests for AI Chatbot Feature")
-    print("🎯 Focus: Testing chatbot responses, session continuity, and chat history management")
+    """Run all new feature tests for URC 101 Grocery Sales Analytics Dashboard"""
+    print("🚀 Starting Backend API Tests for URC 101 Grocery Sales Analytics Dashboard")
+    print("🎯 Focus: Testing Enhanced Sales Trends, Previous Financial Data, Daily Sales Trend by Period, and Comprehensive Report with Monthly Insights")
     print(f"🌐 Backend URL: {BACKEND_URL}")
     print(f"⏰ Test started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
@@ -644,35 +345,18 @@ def main():
     results.append(("Backend Health", health_result))
     
     if not health_result:
-        print("\n❌ Backend is not accessible. Skipping chatbot tests.")
+        print("\n❌ Backend is not accessible. Skipping feature tests.")
         return False
     
-    # Test basic chatbot questions
-    basic_result, session1 = test_chatbot_basic_question()
-    results.append(("Chatbot Basic Question (Total Revenue)", basic_result))
+    # Test new backend features
+    previous_financial_result = test_previous_financial_data()
+    results.append(("Previous Financial Data API", previous_financial_result))
     
-    profit_result, session2 = test_chatbot_profit_question()
-    results.append(("Chatbot Profit Question", profit_result))
+    daily_sales_trend_result = test_daily_sales_trend_by_period()
+    results.append(("Daily Sales Trend by Period API", daily_sales_trend_result))
     
-    top_items_result, session3 = test_chatbot_top_items_question()
-    results.append(("Chatbot Top Items Question", top_items_result))
-    
-    group_result, session4 = test_chatbot_group_analysis()
-    results.append(("Chatbot Group Analysis Question", group_result))
-    
-    periods_result, session5 = test_chatbot_periods_question()
-    results.append(("Chatbot Periods Question", periods_result))
-    
-    # Test session continuity
-    continuity_result = test_chatbot_session_continuity()
-    results.append(("Chatbot Session Continuity", continuity_result))
-    
-    # Test chat history functionality
-    history_result = test_chat_history_retrieval()
-    results.append(("Chat History Retrieval", history_result))
-    
-    clear_result = test_chat_history_clearing()
-    results.append(("Chat History Clearing", clear_result))
+    comprehensive_report_result = test_comprehensive_report_with_monthly_insights()
+    results.append(("Comprehensive Report with Monthly Insights", comprehensive_report_result))
     
     # Print summary
     print("\n" + "="*60)
@@ -693,16 +377,20 @@ def main():
     print("\n" + "="*60)
     print("📝 REVIEW REQUEST VERIFICATION")
     print("="*60)
-    print("✓ Tested basic question: 'What is the total revenue?'")
-    print("✓ Tested profit question: 'What is my total profit?'")
-    print("✓ Tested top items question: 'Which items sell the most?'")
-    print("✓ Tested group analysis: 'Show me profit by group'")
-    print("✓ Tested period question: 'What periods have data?'")
-    print("✓ Tested session continuity with multiple messages")
-    print("✓ Tested chat history retrieval: GET /api/chat-history/{session_id}")
-    print("✓ Tested chat history clearing: DELETE /api/chat-history/{session_id}")
-    print("✓ Verified OpenAI GPT-5.1 integration via Emergent Integrations")
-    print("✓ Verified MongoDB sales data context querying")
+    print("✓ Tested Previous Financial Data: GET /api/previous-financial-data?date=2025-12-05")
+    print("  - Should return LAST AVAILABLE financial record before date (not just previous calendar day)")
+    print("  - Should skip holidays/weekly offs automatically")
+    print("✓ Tested Daily Sales Trend by Period: GET /api/daily-sales-trend-by-period?period=2025-11")
+    print("  - Should return daily sales data for November 2025")
+    print("  - Should include period_label, total_sales, avg_daily_sales, days_tracked")
+    print("✓ Tested Comprehensive Report with Monthly Insights: GET /api/comprehensive-report?format=pdf&periods=2025-11")
+    print("  - Should include Monthly Insights section with:")
+    print("    - Average Daily Sale")
+    print("    - Bank Balance (Last Day)")
+    print("    - Stock Value Change (First day to Last day)")
+    print("    - 3-Month Revenue & Profit Trend")
+    print("    - Daily Sales Trend table")
+    print("\n⚠️  Note: Frontend testing (Enhanced Sales Trends Chart) was skipped as per testing agent instructions")
     
     return all_passed
 
