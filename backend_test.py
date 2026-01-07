@@ -244,19 +244,35 @@ def test_pdf_report_daily_sales_trend_line_graph():
                         print("❌ SVG line graph missing some required components")
                         return False
                     
-                    # CRITICAL: Verify old table format is NOT present
-                    table_indicators = [
-                        '<table' in content_lower and 'daily sales trend' in content_lower,
-                        'Day</th>' in content_text or 'Sales</th>' in content_text,
-                        'Visual</th>' in content_text  # Old table had Day, Sales, Visual columns
-                    ]
-                    
-                    if any(table_indicators):
-                        print("❌ OLD TABLE FORMAT STILL PRESENT - This should be replaced with SVG line graph")
-                        print("   Found table elements in Daily Sales Trend section")
-                        return False
+                    # CRITICAL: Verify old table format is NOT present in Daily Sales Trend section
+                    daily_sales_start = content_lower.find('daily sales trend')
+                    if daily_sales_start != -1:
+                        # Find the next section or end of content
+                        next_section = content_lower.find('<div class="section">', daily_sales_start + 100)
+                        if next_section == -1:
+                            next_section = len(content_text)
+                        
+                        daily_sales_section = content_text[daily_sales_start:next_section]
+                        
+                        # Check for table elements specifically in Daily Sales Trend section
+                        has_table_in_section = (
+                            '<table' in daily_sales_section.lower() or
+                            '<th>' in daily_sales_section or
+                            '</th>' in daily_sales_section or
+                            '<td>' in daily_sales_section or
+                            '</td>' in daily_sales_section
+                        )
+                        
+                        if has_table_in_section:
+                            print("❌ OLD TABLE FORMAT STILL PRESENT in Daily Sales Trend section")
+                            print("   This should be replaced with SVG line graph only")
+                            return False
+                        else:
+                            print("✅ Old table format NOT present in Daily Sales Trend section")
+                            print("   Section correctly contains only SVG line graph")
                     else:
-                        print("✅ Old table format NOT present - correctly replaced with SVG line graph")
+                        print("❌ Could not locate Daily Sales Trend section for table verification")
+                        return False
                     
                     return True
                 else:
