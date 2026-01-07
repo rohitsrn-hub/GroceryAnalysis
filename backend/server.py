@@ -4667,11 +4667,181 @@ class ChatResponse(BaseModel):
     response: str
     session_id: str
 
+
+def detect_period_from_query(query: str, available_periods: List[str]) -> Optional[str]:
+    """
+    Detect if user is asking about a specific period.
+    Returns the matching data_period value or None.
+    """
+    import re
+    query_lower = query.lower()
+    
+    # Month name mapping
+    month_map = {
+        'january': '01', 'jan': '01',
+        'february': '02', 'feb': '02',
+        'march': '03', 'mar': '03',
+        'april': '04', 'apr': '04',
+        'may': '05',
+        'june': '06', 'jun': '06',
+        'july': '07', 'jul': '07',
+        'august': '08', 'aug': '08',
+        'september': '09', 'sep': '09', 'sept': '09',
+        'october': '10', 'oct': '10',
+        'november': '11', 'nov': '11',
+        'december': '12', 'dec': '12'
+    }
+    
+    # Try to find month + year pattern (e.g., "November 2025", "Nov 2025")
+    for month_name, month_num in month_map.items():
+        if month_name in query_lower:
+            # Look for year
+            year_match = re.search(r'20\d{2}', query)
+            if year_match:
+                year = year_match.group()
+                target_period = f"{year}-{month_num}"
+                # Check if this period exists in available periods
+                if target_period in available_periods:
+                    return target_period
+    
+    # Try to find just year (e.g., "2024", "year 2024")
+    year_match = re.search(r'\b(20\d{2})\b', query)
+    if year_match:
+        year = year_match.group(1)
+        if year in available_periods:
+            return year
+    
+    return None
+
+
+async def get_period_specific_data(period: str, db) -> Dict[str, Any]:
+    """
+    Get detailed analytics for a specific period.
+    """
+    match_filter = {"upload_source": {"$ne": "forecast"}, "data_period": period}
+    
+    # Get period totals
+    totals_pipeline = [
+        {"$match": match_filter},
+        {"$group": {
+            "_id": None,
+            "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+            "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
+            "total_qty": {"$sum": {"$ifNull": ["$net_qty", 0]}},
+            "record_count": {"$sum": 1}
+        }}
+    ]
+    totals = await db.sales_records.aggregate(totals_pipeline).to_list(1)
+    totals_data = totals[0] if totals else {"total_revenue": 0, "total_profit": 0, "total_qty": 0, "record_count": 0}
+    
+    # Top 10 items by revenue for this period
+    top_revenue_pipeline = [
+        {"$match": match_filter},
+        {"$group": {
+            "_id": "$item_name",
+            "total_revenue": {"$sum": "$r_amt"},
+            "total_profit": {"$sum": "$profit"},
+            "total_qty": {"$sum": "$net_qty"},
+            "product_group": {"$first": "$product_group"}
+        }},
+        {"$sort": {"total_revenue": -1}},
+        {"$limit": 10}
+    ]
+    top_by_revenue = await db.sales_records.aggregate(top_revenue_pipeline).to_list(10)
+    
+    # Top 10 items by profit for this period
+    top_profit_pipeline = [
+        {"$match": match_filter},
+        {"$group": {
+            "_id": "$item_name",
+            "total_revenue": {"$sum": "$r_amt"},
+            "total_profit": {"$sum": "$profit"},
+            "total_qty": {"$sum": "$net_qty"},
+            "product_group": {"$first": "$product_group"}
+        }},
+        {"$sort": {"total_profit": -1}},
+        {"$limit": 10}
+    ]
+    top_by_profit = await db.sales_records.aggregate(top_profit_pipeline).to_list(10)
+    
+    # Top 10 items by quantity sold for this period
+    top_qty_pipeline = [
+        {"$match": match_filter},
+        {"$group": {
+            "_id": "$item_name",
+            "total_revenue": {"$sum": "$r_amt"},
+            "total_profit": {"$sum": "$profit"},
+            "total_qty": {"$sum": "$net_qty"},
+            "product_group": {"$first": "$product_group"}
+        }},
+        {"$sort": {"total_qty": -1}},
+        {"$limit": 10}
+    ]
+    top_by_qty = await db.sales_records.aggregate(top_qty_pipeline).to_list(10)
+    
+    # Group breakdown for this period
+    group_pipeline = [
+        {"$match": match_filter},
+        {"$group": {
+            "_id": "$product_group",
+            "total_revenue": {"$sum": "$r_amt"},
+            "total_profit": {"$sum": "$profit"},
+            "item_count": {"$sum": 1}
+        }},
+        {"$sort": {"total_revenue": -1}}
+    ]
+    groups = await db.sales_records.aggregate(group_pipeline).to_list(10)
+    
+    # Slowest selling items (by quantity)
+    slow_items_pipeline = [
+        {"$match": {**match_filter, "net_qty": {"$gt": 0}}},
+        {"$group": {
+            "_id": "$item_name",
+            "total_revenue": {"$sum": "$r_amt"},
+            "total_profit": {"$sum": "$profit"},
+            "total_qty": {"$sum": "$net_qty"},
+            "product_group": {"$first": "$product_group"}
+        }},
+        {"$sort": {"total_qty": 1}},
+        {"$limit": 10}
+    ]
+    slow_items = await db.sales_records.aggregate(slow_items_pipeline).to_list(10)
+    
+    # Items with highest profit margin
+    margin_pipeline = [
+        {"$match": {**match_filter, "r_amt": {"$gt": 0}}},
+        {"$group": {
+            "_id": "$item_name",
+            "total_revenue": {"$sum": "$r_amt"},
+            "total_profit": {"$sum": "$profit"},
+            "total_qty": {"$sum": "$net_qty"},
+            "product_group": {"$first": "$product_group"}
+        }},
+        {"$addFields": {
+            "profit_margin": {"$multiply": [{"$divide": ["$total_profit", "$total_revenue"]}, 100]}
+        }},
+        {"$sort": {"profit_margin": -1}},
+        {"$limit": 10}
+    ]
+    high_margin_items = await db.sales_records.aggregate(margin_pipeline).to_list(10)
+    
+    return {
+        "totals": totals_data,
+        "top_by_revenue": top_by_revenue,
+        "top_by_profit": top_by_profit,
+        "top_by_qty": top_by_qty,
+        "groups": groups,
+        "slow_items": slow_items,
+        "high_margin_items": high_margin_items
+    }
+
+
 @api_router.post("/chatbot", response_model=ChatResponse)
 async def chat_with_data(request: ChatMessage):
     """
     AI Chatbot endpoint that answers questions about sales data.
     Uses OpenAI GPT-5.1 via Emergent Integrations.
+    Supports period-specific queries (e.g., "November 2025").
     """
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     import uuid
@@ -4685,88 +4855,202 @@ async def chat_with_data(request: ChatMessage):
         if not api_key:
             raise HTTPException(status_code=500, detail="LLM API key not configured")
         
-        # Gather relevant data context from the database
-        # Get summary statistics
-        total_records = await db.sales_records.count_documents({"upload_source": {"$ne": "forecast"}})
+        # Get available periods first
+        available_periods = await db.sales_records.distinct("data_period", {"upload_source": {"$ne": "forecast"}})
+        available_periods = [p for p in available_periods if p]
         
-        # Get revenue and profit totals
-        pipeline = [
-            {"$match": {"upload_source": {"$ne": "forecast"}}},
-            {"$group": {
-                "_id": None,
-                "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
-                "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
-                "total_qty": {"$sum": {"$ifNull": ["$net_qty", 0]}}
-            }}
-        ]
-        totals = await db.sales_records.aggregate(pipeline).to_list(1)
-        totals_data = totals[0] if totals else {"total_revenue": 0, "total_profit": 0, "total_qty": 0}
+        # Detect if user is asking about a specific period
+        detected_period = detect_period_from_query(request.message, available_periods)
+        period_display_name = await format_period_display_name(detected_period) if detected_period else None
         
-        # Get available periods
-        periods = await db.sales_records.distinct("data_period", {"upload_source": {"$ne": "forecast"}})
-        periods = [p for p in periods if p]
-        
-        # Get top 10 items by revenue
-        top_items_pipeline = [
-            {"$match": {"upload_source": {"$ne": "forecast"}, "r_amt": {"$gt": 0}}},
-            {"$group": {
-                "_id": "$item_name",
-                "total_revenue": {"$sum": "$r_amt"},
-                "total_profit": {"$sum": "$profit"},
-                "total_qty": {"$sum": "$net_qty"}
-            }},
-            {"$sort": {"total_revenue": -1}},
-            {"$limit": 10}
-        ]
-        top_items = await db.sales_records.aggregate(top_items_pipeline).to_list(10)
-        
-        # Get group breakdown
-        group_pipeline = [
-            {"$match": {"upload_source": {"$ne": "forecast"}, "product_group": {"$exists": True}}},
-            {"$group": {
-                "_id": "$product_group",
-                "total_revenue": {"$sum": "$r_amt"},
-                "total_profit": {"$sum": "$profit"},
-                "item_count": {"$sum": 1}
-            }},
-            {"$sort": {"total_revenue": -1}}
-        ]
-        groups = await db.sales_records.aggregate(group_pipeline).to_list(10)
-        
-        # Format context for the LLM
-        top_items_str = "\n".join([
-            f"- {item['_id']}: Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}, Qty {item['total_qty']}"
-            for item in top_items if item['_id']
-        ])
-        
-        groups_str = "\n".join([
-            f"- {g['_id']}: Revenue ₹{g['total_revenue']:,.2f}, Profit ₹{g['total_profit']:,.2f}, Items {g['item_count']}"
-            for g in groups if g['_id']
-        ])
-        
-        # Create context-rich system message
-        system_message = f"""You are a helpful AI assistant for URC 101 Grocery Sales Analytics Dashboard. 
+        # Build context based on whether a specific period was detected
+        if detected_period:
+            # Get period-specific detailed data
+            period_data = await get_period_specific_data(detected_period, db)
+            
+            # Format period-specific context
+            totals = period_data["totals"]
+            
+            top_revenue_str = "\n".join([
+                f"  {i+1}. {item['_id']}: Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}, Qty {item['total_qty']}"
+                for i, item in enumerate(period_data["top_by_revenue"]) if item['_id']
+            ])
+            
+            top_profit_str = "\n".join([
+                f"  {i+1}. {item['_id']}: Profit ₹{item['total_profit']:,.2f}, Revenue ₹{item['total_revenue']:,.2f}, Qty {item['total_qty']}"
+                for i, item in enumerate(period_data["top_by_profit"]) if item['_id']
+            ])
+            
+            top_qty_str = "\n".join([
+                f"  {i+1}. {item['_id']}: Qty {item['total_qty']}, Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}"
+                for i, item in enumerate(period_data["top_by_qty"]) if item['_id']
+            ])
+            
+            groups_str = "\n".join([
+                f"  - {g['_id']}: Revenue ₹{g['total_revenue']:,.2f}, Profit ₹{g['total_profit']:,.2f}, Items {g['item_count']}"
+                for g in period_data["groups"] if g['_id']
+            ])
+            
+            slow_items_str = "\n".join([
+                f"  {i+1}. {item['_id']}: Qty {item['total_qty']}, Revenue ₹{item['total_revenue']:,.2f}"
+                for i, item in enumerate(period_data["slow_items"]) if item['_id']
+            ])
+            
+            high_margin_str = "\n".join([
+                f"  {i+1}. {item['_id']}: Margin {item['profit_margin']:.1f}%, Profit ₹{item['total_profit']:,.2f}, Revenue ₹{item['total_revenue']:,.2f}"
+                for i, item in enumerate(period_data["high_margin_items"]) if item['_id']
+            ])
+            
+            system_message = f"""You are a helpful AI assistant for URC 101 Grocery Sales Analytics Dashboard.
 You help users understand their sales data and provide insights.
 
-CURRENT DATA SUMMARY:
+The user is asking about data for: **{period_display_name}**
+
+=== {period_display_name} DATA SUMMARY ===
+- Total Records: {totals.get('record_count', 0):,}
+- Total Revenue: ₹{totals.get('total_revenue', 0):,.2f}
+- Total Profit: ₹{totals.get('total_profit', 0):,.2f}
+- Total Quantity Sold: {totals.get('total_qty', 0):,}
+- Profit Margin: {(totals.get('total_profit', 0) / totals.get('total_revenue', 1) * 100):.2f}%
+
+=== TOP 10 ITEMS BY REVENUE ({period_display_name}) ===
+{top_revenue_str if top_revenue_str else 'No data available'}
+
+=== TOP 10 ITEMS BY PROFIT ({period_display_name}) ===
+{top_profit_str if top_profit_str else 'No data available'}
+
+=== TOP 10 ITEMS BY QUANTITY SOLD ({period_display_name}) ===
+{top_qty_str if top_qty_str else 'No data available'}
+
+=== TOP 10 HIGHEST PROFIT MARGIN ITEMS ({period_display_name}) ===
+{high_margin_str if high_margin_str else 'No data available'}
+
+=== SALES BY PRODUCT GROUP ({period_display_name}) ===
+{groups_str if groups_str else 'No data available'}
+
+=== SLOWEST SELLING ITEMS ({period_display_name}) ===
+{slow_items_str if slow_items_str else 'No data available'}
+
+=== ALL AVAILABLE PERIODS IN DATABASE ===
+{', '.join(sorted(available_periods)) if available_periods else 'No data'}
+
+IMPORTANT GUIDELINES:
+1. Always format currency in Indian Rupees (₹) with proper Indian comma formatting (lakhs, crores)
+2. Be concise but informative - answer the specific question asked
+3. When asked about "best selling" - clarify if by revenue, profit, or quantity
+4. Provide actionable insights when possible
+5. Mention the specific period ({period_display_name}) in your response
+6. For comparisons, use percentages when helpful"""
+
+        else:
+            # Get aggregate data across all periods
+            total_records = await db.sales_records.count_documents({"upload_source": {"$ne": "forecast"}})
+            
+            # Get revenue and profit totals
+            pipeline = [
+                {"$match": {"upload_source": {"$ne": "forecast"}}},
+                {"$group": {
+                    "_id": None,
+                    "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+                    "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
+                    "total_qty": {"$sum": {"$ifNull": ["$net_qty", 0]}}
+                }}
+            ]
+            totals = await db.sales_records.aggregate(pipeline).to_list(1)
+            totals_data = totals[0] if totals else {"total_revenue": 0, "total_profit": 0, "total_qty": 0}
+            
+            # Get top 10 items by revenue (all time)
+            top_items_pipeline = [
+                {"$match": {"upload_source": {"$ne": "forecast"}, "r_amt": {"$gt": 0}}},
+                {"$group": {
+                    "_id": "$item_name",
+                    "total_revenue": {"$sum": "$r_amt"},
+                    "total_profit": {"$sum": "$profit"},
+                    "total_qty": {"$sum": "$net_qty"}
+                }},
+                {"$sort": {"total_revenue": -1}},
+                {"$limit": 10}
+            ]
+            top_items = await db.sales_records.aggregate(top_items_pipeline).to_list(10)
+            
+            # Get top 10 items by profit (all time)
+            top_profit_pipeline = [
+                {"$match": {"upload_source": {"$ne": "forecast"}, "profit": {"$gt": 0}}},
+                {"$group": {
+                    "_id": "$item_name",
+                    "total_revenue": {"$sum": "$r_amt"},
+                    "total_profit": {"$sum": "$profit"},
+                    "total_qty": {"$sum": "$net_qty"}
+                }},
+                {"$sort": {"total_profit": -1}},
+                {"$limit": 10}
+            ]
+            top_by_profit = await db.sales_records.aggregate(top_profit_pipeline).to_list(10)
+            
+            # Get group breakdown
+            group_pipeline = [
+                {"$match": {"upload_source": {"$ne": "forecast"}, "product_group": {"$exists": True}}},
+                {"$group": {
+                    "_id": "$product_group",
+                    "total_revenue": {"$sum": "$r_amt"},
+                    "total_profit": {"$sum": "$profit"},
+                    "item_count": {"$sum": 1}
+                }},
+                {"$sort": {"total_revenue": -1}}
+            ]
+            groups = await db.sales_records.aggregate(group_pipeline).to_list(10)
+            
+            # Format context for the LLM
+            top_items_str = "\n".join([
+                f"  {i+1}. {item['_id']}: Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}, Qty {item['total_qty']}"
+                for i, item in enumerate(top_items) if item['_id']
+            ])
+            
+            top_profit_str = "\n".join([
+                f"  {i+1}. {item['_id']}: Profit ₹{item['total_profit']:,.2f}, Revenue ₹{item['total_revenue']:,.2f}, Qty {item['total_qty']}"
+                for i, item in enumerate(top_by_profit) if item['_id']
+            ])
+            
+            groups_str = "\n".join([
+                f"  - {g['_id']}: Revenue ₹{g['total_revenue']:,.2f}, Profit ₹{g['total_profit']:,.2f}, Items {g['item_count']}"
+                for g in groups if g['_id']
+            ])
+            
+            # Format available periods nicely
+            formatted_periods = []
+            for p in sorted(available_periods):
+                formatted_periods.append(await format_period_display_name(p))
+            
+            system_message = f"""You are a helpful AI assistant for URC 101 Grocery Sales Analytics Dashboard.
+You help users understand their sales data and provide insights.
+
+=== ALL-TIME DATA SUMMARY ===
 - Total Records: {total_records:,}
 - Total Revenue: ₹{totals_data['total_revenue']:,.2f}
 - Total Profit: ₹{totals_data['total_profit']:,.2f}
 - Total Quantity Sold: {totals_data['total_qty']:,}
-- Available Periods: {', '.join(sorted(periods)[-10:]) if periods else 'No data'}
+- Profit Margin: {(totals_data['total_profit'] / totals_data['total_revenue'] * 100) if totals_data['total_revenue'] > 0 else 0:.2f}%
 
-TOP 10 PERFORMING ITEMS (by Revenue):
-{top_items_str if top_items_str else 'No items data available'}
+=== TOP 10 ITEMS BY REVENUE (ALL TIME) ===
+{top_items_str if top_items_str else 'No data available'}
 
-SALES BY PRODUCT GROUP:
-{groups_str if groups_str else 'No group data available'}
+=== TOP 10 ITEMS BY PROFIT (ALL TIME) ===
+{top_profit_str if top_profit_str else 'No data available'}
+
+=== SALES BY PRODUCT GROUP (ALL TIME) ===
+{groups_str if groups_str else 'No data available'}
+
+=== AVAILABLE DATA PERIODS ===
+{', '.join(formatted_periods) if formatted_periods else 'No data'}
+
+TIP: User can ask about specific periods like "November 2025", "Oct 2025", or "2024" for period-specific analysis.
 
 IMPORTANT GUIDELINES:
-1. Always format currency in Indian Rupees (₹) with proper comma formatting
-2. Be concise but informative
-3. If asked about specific items or periods not in the summary, explain that you have access to aggregate data
-4. Provide actionable insights when possible
-5. If you don't have enough data to answer, say so clearly
+1. Always format currency in Indian Rupees (₹) with proper Indian comma formatting (lakhs, crores)
+2. Be concise but informative - answer the specific question asked
+3. When asked about "best selling" - clarify if by revenue, profit, or quantity
+4. If user asks about a specific period, let them know they can ask specifically (e.g., "for November 2025")
+5. Provide actionable insights when possible
 6. For comparisons, use percentages when helpful"""
 
         # Initialize LLM chat
