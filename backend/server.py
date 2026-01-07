@@ -2045,6 +2045,108 @@ async def generate_comprehensive_report(
         ]
         slowest_items = await db.sales_records.aggregate(slowest_pipeline).to_list(None)
         
+        # ==========================================
+        # MONTHLY INSIGHTS DATA (for enhanced reports)
+        # ==========================================
+        monthly_insights = {}
+        
+        # Only calculate monthly insights if specific period(s) selected
+        if period_list and len(period_list) > 0:
+            # Get the primary period (first one for single month view)
+            primary_period = period_list[0]
+            
+            # Parse primary period to get date range
+            if len(primary_period) == 7 and '-' in primary_period:  # Format YYYY-MM
+                year, month = primary_period.split('-')
+                year, month = int(year), int(month)
+                period_start = datetime(year, month, 1)
+                if month == 12:
+                    period_end = datetime(year + 1, 1, 1) - timedelta(days=1)
+                else:
+                    period_end = datetime(year, month + 1, 1) - timedelta(days=1)
+                
+                # 1. Calculate average daily sale (from daily uploads in this period)
+                daily_uploads = await db.upload_history.find({
+                    "upload_type": "daily",
+                    "status": "success",
+                    "data_date": {"$gte": period_start, "$lte": period_end}
+                }).to_list(None)
+                
+                daily_sales = [float(u.get('net_amt', 0) or 0) for u in daily_uploads]
+                avg_daily_sale = sum(daily_sales) / len(daily_sales) if daily_sales else 0
+                total_days = len(daily_sales)
+                
+                monthly_insights['avg_daily_sale'] = avg_daily_sale
+                monthly_insights['total_days_data'] = total_days
+                monthly_insights['daily_sales_data'] = [
+                    {'day': u.get('data_date').day, 'sales': float(u.get('net_amt', 0) or 0), 'date': u.get('data_date').strftime('%Y-%m-%d')}
+                    for u in daily_uploads if u.get('data_date')
+                ]
+                
+                # 2. Get bank balance from financial_data on last day of month
+                last_financial = await db.financial_data.find_one(
+                    {"date": {"$gte": period_start, "$lte": period_end}},
+                    sort=[("date", -1)]
+                )
+                if last_financial:
+                    monthly_insights['bank_balance_last_day'] = last_financial.get('current_bank_amount', 0)
+                    monthly_insights['bank_balance_date'] = last_financial.get('date').strftime('%Y-%m-%d') if last_financial.get('date') else None
+                else:
+                    monthly_insights['bank_balance_last_day'] = 0
+                    monthly_insights['bank_balance_date'] = None
+                
+                # 3. Stock value reduction (first day vs last day)
+                first_financial = await db.financial_data.find_one(
+                    {"date": {"$gte": period_start, "$lte": period_end}},
+                    sort=[("date", 1)]
+                )
+                if first_financial and last_financial:
+                    first_stock = first_financial.get('current_stock_value', 0) or 0
+                    last_stock = last_financial.get('current_stock_value', 0) or 0
+                    monthly_insights['stock_value_first_day'] = first_stock
+                    monthly_insights['stock_value_last_day'] = last_stock
+                    monthly_insights['stock_value_reduction'] = first_stock - last_stock
+                    monthly_insights['stock_first_date'] = first_financial.get('date').strftime('%Y-%m-%d') if first_financial.get('date') else None
+                    monthly_insights['stock_last_date'] = last_financial.get('date').strftime('%Y-%m-%d') if last_financial.get('date') else None
+                else:
+                    monthly_insights['stock_value_first_day'] = 0
+                    monthly_insights['stock_value_last_day'] = 0
+                    monthly_insights['stock_value_reduction'] = 0
+                
+                # 4. Get last 3 months revenue/profit trend
+                three_month_trend = []
+                for i in range(3):
+                    # Calculate month offset
+                    trend_month = month - i
+                    trend_year = year
+                    if trend_month < 1:
+                        trend_month += 12
+                        trend_year -= 1
+                    
+                    trend_period = f"{trend_year}-{trend_month:02d}"
+                    
+                    # Get totals for this month
+                    trend_pipeline = [
+                        {"$match": {"data_period": trend_period, "upload_source": {"$ne": "forecast"}}},
+                        {"$group": {
+                            "_id": None,
+                            "total_revenue": {"$sum": "$r_amt"},
+                            "total_profit": {"$sum": "$profit"}
+                        }}
+                    ]
+                    trend_result = await db.sales_records.aggregate(trend_pipeline).to_list(1)
+                    
+                    if trend_result:
+                        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                        three_month_trend.insert(0, {
+                            'period': trend_period,
+                            'month_name': f"{month_names[trend_month-1]} {trend_year}",
+                            'revenue': trend_result[0].get('total_revenue', 0) or 0,
+                            'profit': trend_result[0].get('total_profit', 0) or 0
+                        })
+                
+                monthly_insights['three_month_trend'] = three_month_trend
+        
         if format == "excel":
             # Create comprehensive Excel report
             workbook = openpyxl.Workbook()
