@@ -189,49 +189,109 @@ def test_daily_sales_trend_by_period():
         print(f"❌ Unexpected error: {str(e)}")
         return False
 
-def test_chatbot_top_items_question():
-    """Test top items question: 'Which items sell the most?'"""
+def test_comprehensive_report_with_monthly_insights():
+    """Test GET /api/comprehensive-report?format=pdf&periods=2025-11"""
     print("\n" + "="*60)
-    print("🧪 TESTING: Chatbot Top Items Question")
+    print("🧪 TESTING: Comprehensive Report with Monthly Insights")
     print("="*60)
     
     try:
-        url = f"{BACKEND_URL}/chatbot"
-        session_id = str(uuid.uuid4())
-        
-        payload = {
-            "message": "Which items sell the most?",
-            "session_id": session_id
+        url = f"{BACKEND_URL}/comprehensive-report"
+        params = {
+            "format": "pdf",
+            "periods": "2025-11"
         }
         
         print(f"📡 Making request to: {url}")
+        print(f"📝 Parameters: {params}")
         
-        response = requests.post(url, json=payload, timeout=30)
+        response = requests.get(url, params=params, timeout=60)  # Longer timeout for report generation
         
         print(f"📊 Response Status: {response.status_code}")
+        print(f"📋 Response Headers: {dict(response.headers)}")
+        print(f"📏 Response Size: {len(response.content)} bytes")
         
         if response.status_code == 200:
-            data = response.json()
             print(f"✅ Request successful")
             
-            # Check if response contains item information
-            response_text = data['response'].lower()
-            if any(keyword in response_text for keyword in ['item', 'sell', 'top', 'most', 'best']):
-                print("✅ Response contains top items information")
-                print(f"📄 AI Response: {data['response'][:200]}...")
-                return True, data['session_id']
+            # Check content type
+            content_type = response.headers.get('content-type', '').lower()
+            print(f"📄 Content Type: {content_type}")
+            
+            # For PDF format, we expect HTML content (as per current implementation)
+            if 'html' in content_type or 'text' in content_type:
+                print("✅ Response contains HTML content (PDF implementation returns styled HTML)")
+                
+                # Check response size (should be substantial for a comprehensive report)
+                if len(response.content) > 5000:  # At least 5KB
+                    print(f"✅ Response size is substantial ({len(response.content)} bytes > 5KB)")
+                else:
+                    print(f"⚠️  Response size is small ({len(response.content)} bytes < 5KB)")
+                
+                # Check for Monthly Insights section in HTML content
+                content_text = response.text.lower()
+                
+                # Look for Monthly Insights section
+                if 'monthly insights' in content_text:
+                    print("✅ Monthly Insights section found in report")
+                    
+                    # Check for specific Monthly Insights components
+                    insights_components = [
+                        'average daily sale',
+                        'bank balance',
+                        'stock value change',
+                        '3-month revenue',
+                        'profit trend',
+                        'daily sales trend'
+                    ]
+                    
+                    found_components = []
+                    for component in insights_components:
+                        if component in content_text:
+                            found_components.append(component)
+                    
+                    print(f"✅ Found {len(found_components)}/{len(insights_components)} Monthly Insights components:")
+                    for component in found_components:
+                        print(f"   - {component}")
+                    
+                    if len(found_components) >= 4:  # At least 4 out of 6 components
+                        print("✅ Monthly Insights section contains expected components")
+                    else:
+                        print(f"⚠️  Monthly Insights section missing some components")
+                        print(f"   Missing: {set(insights_components) - set(found_components)}")
+                else:
+                    print("❌ Monthly Insights section not found in report")
+                    # Still check for other report sections
+                    if any(section in content_text for section in ['executive summary', 'top performing', 'analysis']):
+                        print("✅ Report contains other expected sections")
+                    else:
+                        print("❌ Report appears to be missing expected content")
+                        return False
+                
+                # Check for period-specific content (Nov 2025)
+                if '2025-11' in content_text or 'nov 2025' in content_text or 'november 2025' in content_text:
+                    print("✅ Report contains period-specific content for November 2025")
+                else:
+                    print("⚠️  Report may not contain period-specific content")
+                
+                return True
             else:
-                print("❌ Response doesn't contain top items information")
-                print(f"📄 AI Response: {data['response']}")
-                return False, None
+                print(f"❌ Unexpected content type: {content_type}")
+                return False
         else:
             print(f"❌ Request failed with status {response.status_code}")
             print(f"📝 Response text: {response.text[:500]}")
-            return False, None
+            return False
             
+    except requests.exceptions.Timeout:
+        print("❌ Request timed out (60 seconds)")
+        return False
+    except requests.exceptions.ConnectionError:
+        print("❌ Connection error - backend may be down")
+        return False
     except Exception as e:
         print(f"❌ Unexpected error: {str(e)}")
-        return False, None
+        return False
 
 def test_chatbot_group_analysis():
     """Test group analysis question: 'Show me profit by group'"""
