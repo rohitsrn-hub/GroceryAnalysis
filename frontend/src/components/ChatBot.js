@@ -366,7 +366,7 @@ const ChatBot = () => {
                 </Button>
               </div>
               <p className="text-xs text-gray-400 text-center mt-2">
-                Powered by GPT-5.1 • Press Enter to send
+                🦏 Sandy powered by GPT-5.1 • Press Enter to send
               </p>
             </div>
           </CardContent>
