@@ -2609,7 +2609,7 @@ async def generate_comprehensive_report(
                             <td><strong>{t['month_name']}</strong></td>
                             <td>{format_indian_number(t['revenue'], currency=True, use_rs_prefix=True)}</td>
                             <td>{format_indian_number(t['profit'], currency=True, use_rs_prefix=True)}</td>
-                            <td>{((t['profit'] / t['revenue']) * 100) if t['revenue'] > 0 else 0:.2f}%</td>
+                            <td>{round(((t['profit'] / t['revenue']) * 100) if t['revenue'] > 0 else 0, 2)}%</td>
                         </tr>
                         """ for t in monthly_insights.get('three_month_trend', [])])}
                     </table>
