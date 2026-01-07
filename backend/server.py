@@ -4283,27 +4283,29 @@ async def delete_financial_data(record_id: str):
 
 @api_router.get("/previous-financial-data")
 async def get_previous_financial_data(date: str):
-    """Get the financial data from the previous day for form pre-fill"""
+    """Get the financial data from the LAST AVAILABLE report before the given date.
+    This skips holidays/weekly offs by finding the most recent report, not just previous day."""
     try:
         target_date = datetime.strptime(date, "%Y-%m-%d")
-        previous_date = target_date - timedelta(days=1)
         
-        # Try to find financial data from previous day
-        previous_financial = await db.financial_data.find_one({
-            "date": {
-                "$gte": previous_date,
-                "$lt": target_date
-            }
-        }, sort=[("date", -1)])
+        # Find the most recent financial data BEFORE target_date (not just previous day)
+        # This handles holidays and weekly offs where no reports are generated
+        previous_financial = await db.financial_data.find_one(
+            {
+                "date": {"$lt": target_date}
+            },
+            sort=[("date", -1)]  # Get the most recent one before target date
+        )
         
         if previous_financial:
-            # Return the calculated values from previous day's report
+            previous_date = previous_financial.get("date")
+            # Return the calculated values from previous report
             # These become "previous" values for today's report
             previous_bank_amount = previous_financial.get("current_bank_amount")
             previous_stock_value = previous_financial.get("current_stock_value")
             
             return {
-                "previous_date": previous_date.strftime("%Y-%m-%d"),
+                "previous_date": previous_date.strftime("%Y-%m-%d") if previous_date else None,
                 "bank_amount": previous_bank_amount,
                 "stock_value": previous_stock_value,
                 "found": True
@@ -4311,7 +4313,7 @@ async def get_previous_financial_data(date: str):
         
         # If not found, return null/not found
         return {
-            "previous_date": previous_date.strftime("%Y-%m-%d"),
+            "previous_date": None,
             "bank_amount": None,
             "stock_value": None,
             "found": False
