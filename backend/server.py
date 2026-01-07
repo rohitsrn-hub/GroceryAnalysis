@@ -86,6 +86,42 @@ def format_indian_number(number, currency=False, use_rs_prefix=False):
     
     return result
 
+
+def generate_trend_bars(trend_data):
+    """Generate SVG bars for 3-month revenue/profit trend chart"""
+    if not trend_data:
+        return ""
+    
+    # Find max value for scaling
+    max_val = max([max(t.get('revenue', 0), t.get('profit', 0)) for t in trend_data]) if trend_data else 1
+    if max_val == 0:
+        max_val = 1
+    
+    svg_parts = []
+    bar_width = 30
+    gap = 90
+    start_x = 80
+    
+    for i, t in enumerate(trend_data):
+        x = start_x + i * gap
+        
+        # Revenue bar (blue)
+        rev_height = (t.get('revenue', 0) / max_val) * 120
+        rev_y = 170 - rev_height
+        svg_parts.append(f'<rect x="{x}" y="{rev_y}" width="{bar_width}" height="{rev_height}" fill="#667eea" rx="2"/>')
+        
+        # Profit bar (green)
+        profit_height = (t.get('profit', 0) / max_val) * 120
+        profit_y = 170 - profit_height
+        svg_parts.append(f'<rect x="{x + bar_width + 5}" y="{profit_y}" width="{bar_width}" height="{profit_height}" fill="#28a745" rx="2"/>')
+        
+        # Month label
+        month_label = t.get('month_name', '').split()[0][:3]  # Get first 3 chars of month
+        svg_parts.append(f'<text x="{x + bar_width}" y="185" font-size="10" text-anchor="middle" fill="#333">{month_label}</text>')
+    
+    return '\n'.join(svg_parts)
+
+
 # Create the main app without a prefix
 app = FastAPI()
 
