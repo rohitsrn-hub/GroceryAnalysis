@@ -3112,6 +3112,77 @@ async def get_daily_sales_trend(period: Optional[str] = Query(None)):
         logger.error(f"Error fetching daily sales trend: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching daily sales trend: {str(e)}")
 
+
+@api_router.get("/daily-sales-trend-by-period")
+async def get_daily_sales_trend_by_period(period: str = Query(..., description="Period in YYYY-MM format")):
+    """Get daily sales data for a specific monthly period"""
+    try:
+        from datetime import datetime, timedelta
+        
+        # Parse the period (format: YYYY-MM)
+        if not period or len(period) != 7 or '-' not in period:
+            raise HTTPException(status_code=400, detail="Period must be in YYYY-MM format")
+        
+        year, month = period.split('-')
+        year, month = int(year), int(month)
+        
+        period_start = datetime(year, month, 1)
+        # Calculate last day of month
+        if month == 12:
+            period_end = datetime(year + 1, 1, 1)
+        else:
+            period_end = datetime(year, month + 1, 1)
+        
+        # Query upload_history for daily uploads in this period
+        query_filter = {
+            "upload_type": "daily",
+            "status": "success",
+            "data_date": {
+                "$gte": period_start,
+                "$lt": period_end
+            }
+        }
+        
+        daily_uploads = await db.upload_history.find(query_filter).sort("data_date", 1).to_list(None)
+        
+        # Format data
+        data = []
+        total_sales = 0
+        
+        for upload in daily_uploads:
+            upload_date = upload.get('data_date')
+            if upload_date:
+                net_amount = float(upload.get('net_amt', 0) or 0)
+                total_sales += net_amount
+                data.append({
+                    'date': upload_date.strftime('%Y-%m-%d'),
+                    'day': upload_date.day,
+                    'sales': net_amount
+                })
+        
+        # Calculate average daily sales
+        avg_daily_sales = total_sales / len(data) if data else 0
+        
+        # Format period label
+        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        period_label = f"{month_names[month-1]} {year}"
+        
+        return {
+            "period": period,
+            "period_label": period_label,
+            "data": data,
+            "total_sales": total_sales,
+            "avg_daily_sales": avg_daily_sales,
+            "days_tracked": len(data)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching daily sales trend by period: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching daily sales trend by period: {str(e)}")
+
+
 @api_router.get("/dashboard-summary")
 async def get_dashboard_summary(period: Optional[str] = Query(None)):
     """Get overall dashboard summary statistics with averages"""
