@@ -341,6 +341,9 @@ const SalesTrendsChart = () => {
                   }}
                 />
                 <Legend 
+                  verticalAlign="top"
+                  align="center"
+                  wrapperStyle={{ paddingBottom: '20px' }}
                   formatter={(value) => {
                     const periodInfo = trendData.find(t => t.period === value);
                     return periodInfo?.periodLabel || value;
