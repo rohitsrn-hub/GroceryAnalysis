@@ -211,12 +211,12 @@ const ChatBot = () => {
     return (
       <button
         onClick={toggleChat}
-        className="fixed bottom-20 right-6 z-50 w-14 h-14 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 flex items-center justify-center group"
-        title="Chat with AI Assistant"
+        className="fixed bottom-20 right-6 z-50 w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110 flex items-center justify-center group"
+        title="Chat with Sandy 🦏"
       >
-        <MessageCircle className="h-6 w-6 group-hover:scale-110 transition-transform" />
-        <span className="absolute -top-2 -right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-xs font-bold animate-pulse">
-          AI
+        <RhinoIcon className="h-10 w-10 group-hover:scale-110 transition-transform" color="white" />
+        <span className="absolute -top-1 -right-1 px-2 py-0.5 bg-green-500 rounded-full flex items-center justify-center text-xs font-bold animate-pulse">
+          Sandy
         </span>
       </button>
     );
