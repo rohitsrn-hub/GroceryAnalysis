@@ -1,11 +1,56 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Send, X, Trash2, Bot, User, Loader2, Minimize2, Maximize2 } from 'lucide-react';
+import { Send, X, Trash2, User, Loader2, Minimize2, Maximize2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { toast } from './ui/sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// Custom Cartoon Rhino Icon Component
+const RhinoIcon = ({ className = "h-6 w-6", color = "currentColor" }) => (
+  <svg 
+    viewBox="0 0 64 64" 
+    className={className}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Body */}
+    <ellipse cx="36" cy="38" rx="20" ry="16" fill={color === "currentColor" ? "#6B7280" : color}/>
+    {/* Head */}
+    <circle cx="18" cy="32" r="14" fill={color === "currentColor" ? "#9CA3AF" : color}/>
+    {/* Ear */}
+    <ellipse cx="10" cy="22" rx="4" ry="6" fill={color === "currentColor" ? "#6B7280" : color}/>
+    <ellipse cx="10" cy="22" rx="2" ry="4" fill="#F9A8D4"/>
+    {/* Horn */}
+    <path d="M8 28 L2 20 L6 18 L12 26 Z" fill="#E5E7EB"/>
+    <path d="M12 30 L8 24 L10 22 L14 28 Z" fill="#D1D5DB"/>
+    {/* Eye */}
+    <circle cx="20" cy="30" r="4" fill="white"/>
+    <circle cx="21" cy="30" r="2.5" fill="#1F2937"/>
+    <circle cx="22" cy="29" r="1" fill="white"/>
+    {/* Nose/Snout */}
+    <ellipse cx="8" cy="36" rx="5" ry="4" fill={color === "currentColor" ? "#6B7280" : color}/>
+    <circle cx="6" cy="35" r="1.5" fill="#1F2937"/>
+    <circle cx="10" cy="35" r="1.5" fill="#1F2937"/>
+    {/* Smile */}
+    <path d="M14 40 Q18 44 22 40" stroke="#1F2937" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+    {/* Legs */}
+    <rect x="24" y="48" width="6" height="10" rx="3" fill={color === "currentColor" ? "#6B7280" : color}/>
+    <rect x="36" y="48" width="6" height="10" rx="3" fill={color === "currentColor" ? "#6B7280" : color}/>
+    <rect x="46" y="48" width="6" height="10" rx="3" fill={color === "currentColor" ? "#6B7280" : color}/>
+    {/* Tail */}
+    <path d="M56 38 Q62 36 60 42 Q58 46 54 44" stroke={color === "currentColor" ? "#6B7280" : color} strokeWidth="3" fill="none" strokeLinecap="round"/>
+    {/* Spots/details */}
+    <circle cx="30" cy="34" r="2" fill={color === "currentColor" ? "#9CA3AF" : "#D1D5DB"} opacity="0.5"/>
+    <circle cx="42" cy="36" r="3" fill={color === "currentColor" ? "#9CA3AF" : "#D1D5DB"} opacity="0.5"/>
+  </svg>
+);
+
+// Small Rhino for messages
+const RhinoSmall = ({ className = "h-4 w-4" }) => (
+  <span className={className} style={{ fontSize: '1rem', lineHeight: 1 }}>🦏</span>
+);
 
 const ChatBot = () => {
   const [isOpen, setIsOpen] = useState(false);
