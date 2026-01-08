@@ -3763,6 +3763,112 @@ async def delete_monthly_summary(period: str):
         logger.exception(f"Error deleting summary: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error deleting summary: {str(e)}")
 
+@api_router.get("/monthly-summary-details/{period}")
+async def get_monthly_summary_details(period: str):
+    """Get detailed view of a specific monthly or yearly summary including item data."""
+    try:
+        summary = await db.monthly_summaries.find_one({"period": period})
+        
+        if not summary:
+            raise HTTPException(status_code=404, detail=f"Summary for {period} not found")
+        
+        return {
+            "period": summary['period'],
+            "summary_type": summary.get('summary_type', 'monthly'),
+            "display_name": summary.get('display_name', summary['period']),
+            "item_count": summary.get('item_count', 0),
+            "total_revenue": summary.get('total_revenue', 0),
+            "total_profit": summary.get('total_profit', 0),
+            "total_qty_sold": summary.get('total_qty_sold', 0),
+            "source": summary.get('source', 'unknown'),
+            "created_at": str(summary.get('created_at', '')),
+            "original_filename": summary.get('original_filename'),
+            "items": summary.get('items', [])[:100]  # Limit to first 100 items
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error fetching summary details: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching summary details: {str(e)}")
+
+
+@api_router.post("/trigger-summary-generation")
+async def trigger_summary_generation(request: dict):
+    """Manually trigger generation of monthly or yearly summary from existing data.
+    
+    Period format:
+    - 'YYYY-MM' for monthly summary (e.g., '2025-11')
+    - 'YYYY' for yearly summary (e.g., '2025')
+    """
+    try:
+        period = request.get('period')
+        if not period:
+            raise HTTPException(status_code=400, detail="Period is required")
+        
+        # Determine if monthly or yearly
+        if len(period) == 4:  # Yearly: YYYY
+            year = int(period)
+            
+            # Check if summary already exists
+            existing = await db.monthly_summaries.find_one({
+                "period": period,
+                "summary_type": "yearly"
+            })
+            if existing:
+                # Delete existing to regenerate
+                await db.monthly_summaries.delete_one({"_id": existing["_id"]})
+            
+            result = await create_yearly_summary(year)
+            if result:
+                return {
+                    "status": "success",
+                    "message": f"Successfully generated yearly summary for {year}",
+                    "summary": {
+                        "period": period,
+                        "item_count": result.get('item_count', 0),
+                        "total_revenue": result.get('total_revenue', 0)
+                    }
+                }
+            else:
+                raise HTTPException(status_code=400, detail=f"No data found for year {year}")
+                
+        elif len(period) == 7:  # Monthly: YYYY-MM
+            year, month = period.split('-')
+            year, month = int(year), int(month)
+            
+            # Check if summary already exists
+            existing = await db.monthly_summaries.find_one({
+                "period": period,
+                "summary_type": "monthly"
+            })
+            if existing:
+                # Delete existing to regenerate
+                await db.monthly_summaries.delete_one({"_id": existing["_id"]})
+            
+            result = await create_monthly_summary(year, month)
+            if result:
+                return {
+                    "status": "success",
+                    "message": f"Successfully generated monthly summary for {result.get('display_name', period)}",
+                    "summary": {
+                        "period": period,
+                        "item_count": result.get('item_count', 0),
+                        "total_revenue": result.get('total_revenue', 0)
+                    }
+                }
+            else:
+                raise HTTPException(status_code=400, detail=f"No data found for {period}")
+        else:
+            raise HTTPException(status_code=400, detail="Period must be in format 'YYYY-MM' or 'YYYY'")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error triggering summary generation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating summary: {str(e)}")
+
+
 @api_router.post("/forecast-demand")
 async def forecast_demand(request: ForecastRequest):
     """Forecast demand using different methods.
