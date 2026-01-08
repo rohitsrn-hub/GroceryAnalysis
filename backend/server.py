@@ -5470,6 +5470,9 @@ async def chat_with_data(request: ChatMessage):
         available_periods = await db.sales_records.distinct("data_period", {"upload_source": {"$ne": "forecast"}})
         available_periods = [p for p in available_periods if p]
         
+        # Initialize system_message
+        system_message = ""
+        
         # Check if this is a comparison query first
         is_comparison = is_comparison_query(request.message)
         detected_periods = detect_multiple_periods_from_query(request.message, available_periods) if is_comparison else []
