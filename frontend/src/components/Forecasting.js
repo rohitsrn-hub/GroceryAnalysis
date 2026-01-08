@@ -1053,17 +1053,6 @@ const Forecasting = () => {
           </CardContent>
         </Card>
       )}
-                    return isUploaded || isAvailable;
-                  }).length < requiredDataUploads.filter(req => req.required).length
-                }
-              >
-                Generate Forecast
-                <Zap className="h-4 w-4 ml-2" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Step 4: Results */}
       {step === 4 && forecastResults && (
