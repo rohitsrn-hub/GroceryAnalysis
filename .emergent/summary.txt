@@ -1,140 +1,321 @@
 <analysis>**original_problem_statement:**
-The user wants to fix two issues in the  branch of the  repository.
-PRODUCT REQUIREMENTS:
-1.  **Fix Failing Report Generation**: When the user tries to generate a report from the Analytics tab, the download fails.
-2.  **Fix Tab Label UI**: The tab labels in the main navigation are overflowing. The user wants to rename specific tabs and adjust the layout to prevent overflow.
-    -   Rename Dashboard to Daily Dashboard.
-    -   Rename Financial to Daily Sales Report.
-    -   Icons should be left-justified.
-    -   Labels should wrap to two lines if needed.
-3.  **Fix Stuck Toast Message**: When report generation fails, the Generating report... toast message does not disappear.
+The user initially forked the job to add an AI chatbot feature. This was successfully implemented, including features for single-period queries, multi-period comparisons, and a custom UI (Sandy the rhino). The user then requested a migration from the  library to a direct OpenAI SDK implementation to resolve a deployment issue, which was also completed.
+
+The final and most substantial request was a complete overhaul of the forecasting system. The requirements are:
+1.  **Automatic Data Summarization:**
+    *   When the first daily data for a new month is uploaded, automatically summarize all daily data from the *previous* month into a single monthly summary record.
+    *   When the first daily data for a new year (e.g., Jan 2026) is uploaded, automatically create a monthly summary for the last month (Dec 2025) and a single yearly summary for the entire previous year (2025).
+2.  **Forecasting Logic Update:** The forecasting models should use these new, accurate monthly summaries instead of raw, last-day-of-the-month data points.
+3.  **Frontend Forecasting Wizard Update:**
+    *   The wizard must show the user which monthly/yearly summaries are available or missing.
+    *   It must provide an override option for the user to upload their own historical data file if the system's data is incomplete or if they prefer to use their own.
+4.  **Reporting and UI Enhancements:**
+    *   The Daily Sales Trends graph on the dashboard needed to be more flexible, allowing comparisons between different periods (e.g., last 3 months, compare Dec 2024 vs. Dec 2025).
+    *   The comprehensive PDF/Excel reports needed to be enhanced with more data points from the daily reports, including average daily sales, end-of-month bank balance, and new graphs for sales trends.
+    *   Fix UI bugs like overlapping legends.
+    *   Fix the daily report generation logic to pull data from the *last available day*, not the strict calendar previous day, to account for holidays.
 
 **User's preferred language**: English
 
 **what currently exists?**
-The agent has cloned the  branch and identified the relevant files for the fixes:  for the UI and report download logic, and  for the report generation endpoint. The agent attempted a fix for the download issue by fetching the data as a blob and also attempted to fix the tab overflow with CSS classes. Both attempts were not fully successful, and the user has provided more specific feedback.
+The application is a full-stack sales analytics tool.
+- **AI Chatbot (Sandy):** A fully functional chatbot is integrated. It uses a direct OpenAI SDK connection and can answer aggregate, single-period, and multi-period comparison questions about the sales data. The UI has been customized with a user-provided image and name.
+- **Enhanced Dashboard:** The main dashboard features an interactive Daily Sales Trends chart that allows for multi-period selection and comparison.
+- **Enhanced Reporting:** PDF reports now include dynamically generated SVG line graphs for daily sales trends and bar charts for 3-month performance.
+- **Forecasting System (Backend Ready, Frontend Incomplete):** The entire backend logic for the new forecasting system is complete. This includes API endpoints to trigger data summarization (daily to monthly, monthly to yearly), check the status of these summaries, and run forecasts using the aggregated data.
+- **Bug Fixes:** The daily report generation now correctly fetches data from the last available day. UI bugs like overlapping chart legends have been fixed.
 
 **Last working item**:
-*   **Last item agent was working on:** The agent was investigating why the Generate Report function is failing. The user reported that the download fails, the Generating report... toast notification gets stuck, and provided new, specific instructions for the tab UI changes. The agent was starting to debug by looking at the backend comprehensive report endpoint in .
-*   **Status:** IN PROGRESS
-*   **Agent Testing Done:** N
-*   **Which testing method agent to use?** both
-*   **User Testing Done:** Y
+- **Last item agent was working:** Implementing the frontend changes for the new forecasting system in the  component. The agent was in the process of adding the necessary data fetching and helper functions to connect the UI to the new backend endpoints.
+- **Status:** IN PROGRESS
+- **Agent Testing Done:** N
+- **Which testing method agent to use?** both
+- **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
-*   **Issue 1 (P0):** Report generation fails and the Generating report... toast message gets stuck.
-*   **Issue 2 (P1):** The UI for the navigation tabs needs specific adjustments.
-
-**Issues Detail:**
-*   **Issue 1: Report generation fails and the Generating report... toast message gets stuck.**
-    *   **Attempted fixes:** The agent modified the  function in  to fetch the report as a blob. This did not solve the download failure and did not address the stuck toast message.
-    *   **Next debug checklist:**
-        1.  **Backend ():** Add comprehensive  blocks with detailed logging to the  endpoint to identify the exact server-side error.
-        2.  **Backend Test:** Use  to call the endpoint directly and inspect the response. Example: 
-        3.  **Frontend ():** Modify the  function. Wrap the API call and toast logic in a  block to ensure  is always called, regardless of success or failure.
-    *   **Why fix this issue and what will be achieved with the fix?** This will restore the critical functionality of downloading analytical reports and improve the user experience by providing proper feedback.
-    *   **Status:** IN PROGRESS
-    *   **Is recurring issue?** N
-    *   **Should Test frontend/backend/both after fix?** Both.
-    *   **Blocked on other issue:** None.
-*   **Issue 2: The UI for the navigation tabs needs specific adjustments.**
-    *   **Attempted fixes:** The agent previously adjusted labels and added CSS classes to prevent overflow, but the user has new, more specific requirements.
-    *   **Next debug checklist:**
-        1.  **File:** .
-        2.  **Rename Labels:** Locate the  components and change the text for Dashboard to Daily Dashboard and Financial Health to Daily Sales Report.
-        3.  **Align Icons:** The current tab style is . To left-align the icon and text, this needs to be adjusted. One option is to wrap the icon and text inside a  within the tab and apply flex properties there.
-        4.  **Text Wrapping:** Ensure the tab's container allows for text to wrap to a second line. The class  should be applied to the text labels.
-    *   **Why fix this issue and what will be achieved with the fix?** To meet the user's specific UI/UX requirements for a cleaner and more readable navigation bar.
-    *   **Status:** NOT STARTED
-    *   **Is recurring issue?** Y
-    *   **Should Test frontend/backend/both after fix?** Frontend.
-    *   **Blocked on other issue:** None.
+- **Issue 1:** (P0) The frontend for the new forecasting system is incomplete. The backend logic is done, but the UI doesn't reflect the new capabilities.
+  - **Attempted fixes:** The agent created new helper functions (, ) in  but has not fully integrated them into the component's state and JSX.
+  - **Next debug checklist:**
+    1.  Modify the data fetching logic in  to call the new  endpoint.
+    2.  Update the state to store the status of monthly/yearly summaries.
+    3.  In Step 3 of the forecast wizard, render the status of the required monthly summaries (e.g., Available, Missing).
+    4.  Add a button to trigger manual summary generation via .
+    5.  Implement the file upload component for the override functionality, which should post to .
+    6.  Restart the frontend and test the complete wizard flow.
+  - **Why fix this issue and what will be achieved with the fix?** This is the user's highest priority feature. Completing it will make the new, more accurate forecasting system usable.
+  - **Status:** IN PROGRESS
+  - **Is recurring issue?** N
+  - **Should Test frontend/backend/both after fix?** both
+  - **Blocked on other issue:** None
 
 **In progress Task List**:
-There are no in-progress tasks; the current focus is on bug fixing.
+- **Task 1:** (P0) Complete the frontend implementation for the new forecasting wizard.
+  - **Where to resume:** In . The next step is to integrate the newly added helper functions into the render logic for Step 3 of the wizard and connect the data fetching to the new backend endpoints.
+  - **What will be achieved with this?** The user will be able to see the status of data summaries, generate them, and upload their own data for forecasting, fully realizing the feature requested in message #389.
+  - **Status:** IN PROGRESS
+  - **Should Test frontend/backend/both after fix?** both
+  - **Blocked on something:** None
 
 **Upcoming and Future Tasks**
-*   **Upcoming Tasks:**
-    *   **(P1) Complete Financial Health Report:** The backend logic for calculating stock value in the  endpoint in  is incomplete and needs to be implemented.
-*   **Future Tasks:**
-    *   **(P2) Flexible Database Update Modes:** Implement backend logic to allow data to be appended daily, monthly, or yearly, with corresponding data aggregation.
-    *   **(P2) Bank Transactions Table:** Implement a new feature to track bank credits and debits as an alternative to manual entry of the previous day's balance.
+- **Upcoming Tasks:**
+  - (P2) Complete Financial Health Report: The backend logic for calculating stock value in the  endpoint in  is incomplete and needs to be implemented.
+- **Future Tasks:**
+  - (P2) Flexible Database Update Modes: Implement backend logic to allow data to be appended daily, monthly, or yearly, with corresponding data aggregation.
+  - (P2) Bank Transactions Table: Implement a new feature to track bank credits and debits.
 
 **Completed work in this session**
-*   Cloned the  branch from the user's GitHub repository.
-*   Attempted to fix report generation download failure.
-*   Attempted to fix tab label overflow.
+- **AI Chatbot Sandy Implementation:**
+  - Created a frontend component () and backend endpoint ().
+  - Implemented logic for aggregate, single-period, and multi-period comparison queries.
+  - Customized the chatbot's icon, name (Sandy), and position based on user feedback.
+  - **Migrated from  to the official usage: openai [-h] [-v] [-b API_BASE] [-k API_KEY] [-p PROXY [PROXY ...]]
+              [-o ORGANIZATION] [-t {openai,azure}]
+              [--api-version API_VERSION] [--azure-endpoint AZURE_ENDPOINT]
+              [--azure-ad-token AZURE_AD_TOKEN] [-V]
+              {api,tools,migrate,grit} ...
+
+positional arguments:
+  {api,tools,migrate,grit}
+    api                 Direct API calls
+    tools               Client side tools for convenience
+
+options:
+  -h, --help            show this help message and exit
+  -v, --verbose         Set verbosity.
+  -b API_BASE, --api-base API_BASE
+                        What API base url to use.
+  -k API_KEY, --api-key API_KEY
+                        What API key to use.
+  -p PROXY [PROXY ...], --proxy PROXY [PROXY ...]
+                        What proxy to use.
+  -o ORGANIZATION, --organization ORGANIZATION
+                        Which organization to run as (will use your default
+                        organization if not specified)
+  -t {openai,azure}, --api-type {openai,azure}
+                        The backend API to call, must be `openai` or `azure`
+  --api-version API_VERSION
+                        The Azure API version, e.g.
+                        'https://learn.microsoft.com/en-us/azure/ai-
+                        services/openai/reference#rest-api-versioning'
+  --azure-endpoint AZURE_ENDPOINT
+                        The Azure endpoint, e.g.
+                        'https://endpoint.openai.azure.com'
+  --azure-ad-token AZURE_AD_TOKEN
+                        A token from Azure Active Directory,
+                        https://www.microsoft.com/en-
+                        us/security/business/identity-access/microsoft-entra-
+                        id
+  -V, --version         show program's version number and exit SDK** and removed the defunct dependency to fix a deployment error.
+- **Dashboard & Reporting Enhancements:**
+  - Created a new  component for interactive, multi-period sales trend analysis on the dashboard.
+  - Enhanced the comprehensive PDF report to include new monthly insights and dynamically generated SVG graphs for daily and monthly trends.
+  - Fixed a bug where the daily report generation failed on holidays by making it fetch the last *available* financial data.
+- **Forecasting System (Backend):**
+  - Implemented a robust backend system to automatically summarize daily data into monthly records and monthly data into yearly records.
+  - Created API endpoints to check data status, manually trigger summaries, and allow users to upload override data.
+  - Modified the forecasting logic to use these accurate, aggregated summaries.
+- **UI Bug Fixes:**
+  - Fixed an overlapping legend issue on the sales trends chart.
 
 **Earlier issues found/mentioned but not fixed**
-All known issues have been captured in the **All Pending/In progress Issue list**.
+- **Issue 1:** The Current Stock Value on the main dashboard consistently shows 0. This was mentioned in the previous fork's summary and remains unresolved.
 
 **Known issue recurrence from previous fork**
-*   **Issue recurrence in previous fork:** The project has a history of complex deployment issues, including CORS errors, Vercel environment variable caching, and database configuration mismatches.
-*   **Recurrence count:** N/A for the current bug-fixing task.
-*   **Status:** RESOLVED in the previous context, but the agent should remain cautious about deployment complexities.
+- The issue of frontend components sending user-facing display text (labels) to APIs instead of the underlying database values is a pattern to watch for in new components.
+- The backend  serialization error when calling internal functions also recurred in different endpoints before being fixed.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-*   **Frontend**: React, Tailwind CSS, Craco, Recharts, .
-*   **Backend**: FastAPI, Pydantic, Motor (async MongoDB driver), ReportLab.
-*   **Database**: MongoDB Atlas.
-*   **Deployment**: Vercel (Frontend), Render (Backend).
+- **Backend:** FastAPI, Motor, Pydantic.
+- **Frontend:** React, Tailwind CSS, Recharts.
+- **AI/LLM:** Direct integration with the usage: openai [-h] [-v] [-b API_BASE] [-k API_KEY] [-p PROXY [PROXY ...]]
+              [-o ORGANIZATION] [-t {openai,azure}]
+              [--api-version API_VERSION] [--azure-endpoint AZURE_ENDPOINT]
+              [--azure-ad-token AZURE_AD_TOKEN] [-V]
+              {api,tools,migrate,grit} ...
+
+positional arguments:
+  {api,tools,migrate,grit}
+    api                 Direct API calls
+    tools               Client side tools for convenience
+
+options:
+  -h, --help            show this help message and exit
+  -v, --verbose         Set verbosity.
+  -b API_BASE, --api-base API_BASE
+                        What API base url to use.
+  -k API_KEY, --api-key API_KEY
+                        What API key to use.
+  -p PROXY [PROXY ...], --proxy PROXY [PROXY ...]
+                        What proxy to use.
+  -o ORGANIZATION, --organization ORGANIZATION
+                        Which organization to run as (will use your default
+                        organization if not specified)
+  -t {openai,azure}, --api-type {openai,azure}
+                        The backend API to call, must be `openai` or `azure`
+  --api-version API_VERSION
+                        The Azure API version, e.g.
+                        'https://learn.microsoft.com/en-us/azure/ai-
+                        services/openai/reference#rest-api-versioning'
+  --azure-endpoint AZURE_ENDPOINT
+                        The Azure endpoint, e.g.
+                        'https://endpoint.openai.azure.com'
+  --azure-ad-token AZURE_AD_TOKEN
+                        A token from Azure Active Directory,
+                        https://www.microsoft.com/en-
+                        us/security/business/identity-access/microsoft-entra-
+                        id
+  -V, --version         show program's version number and exit Python SDK for chat completions. Use of system prompts with retrieved database context (RAG pattern) to answer user queries about sales data.
+- **Data Aggregation:** Backend logic triggered by data uploads to automatically consolidate daily sales records into monthly summaries, and monthly summaries into yearly ones.
+- **Dynamic SVG Generation:** Helper functions in  that generate SVG markup for charts (line, bar) to be embedded directly into HTML for PDF reports.
 
 **key DB schema**
-*   **sales_records**: Stores individual sales transactions.
-*   **upload_history**: Metadata for each file upload (, , , , ).
-*   **financial_records**: Stores daily financial snapshots (Mon Dec  8 00:27:35 UTC 2025, , , etc.).
+- **sales_records**: Individual sales transactions.  can be , , .
+- **upload_history**: Metadata for file uploads.
+- **financial_records**: Daily financial snapshots.
+- **data_summaries**: **(NEW)** Stores aggregated data. Contains  (e.g., 2025-11),  (monthly or yearly), and the aggregated .
 
 **changes in tech stack**
-*    was added to the backend to support PDF generation.
+- **Removed  library.**
+- **Added usage: openai [-h] [-v] [-b API_BASE] [-k API_KEY] [-p PROXY [PROXY ...]]
+              [-o ORGANIZATION] [-t {openai,azure}]
+              [--api-version API_VERSION] [--azure-endpoint AZURE_ENDPOINT]
+              [--azure-ad-token AZURE_AD_TOKEN] [-V]
+              {api,tools,migrate,grit} ...
+
+positional arguments:
+  {api,tools,migrate,grit}
+    api                 Direct API calls
+    tools               Client side tools for convenience
+
+options:
+  -h, --help            show this help message and exit
+  -v, --verbose         Set verbosity.
+  -b API_BASE, --api-base API_BASE
+                        What API base url to use.
+  -k API_KEY, --api-key API_KEY
+                        What API key to use.
+  -p PROXY [PROXY ...], --proxy PROXY [PROXY ...]
+                        What proxy to use.
+  -o ORGANIZATION, --organization ORGANIZATION
+                        Which organization to run as (will use your default
+                        organization if not specified)
+  -t {openai,azure}, --api-type {openai,azure}
+                        The backend API to call, must be `openai` or `azure`
+  --api-version API_VERSION
+                        The Azure API version, e.g.
+                        'https://learn.microsoft.com/en-us/azure/ai-
+                        services/openai/reference#rest-api-versioning'
+  --azure-endpoint AZURE_ENDPOINT
+                        The Azure endpoint, e.g.
+                        'https://endpoint.openai.azure.com'
+  --azure-ad-token AZURE_AD_TOKEN
+                        A token from Azure Active Directory,
+                        https://www.microsoft.com/en-
+                        us/security/business/identity-access/microsoft-entra-
+                        id
+  -V, --version         show program's version number and exit Python SDK** for direct LLM integration.
 
 **All files of reference**
-*   : Contains the tab UI,  function, and toast logic that need fixing.
-*   : Contains the  endpoint that is failing.
+- : Heavily modified for the chatbot, new sales trend endpoint, report enhancements, and the new forecasting/summarization logic.
+- : New file for the AI chatbot UI.
+- : New file for the enhanced interactive sales trend chart.
+- : Modified to use the new  component.
+- : The file currently being worked on to implement the frontend for the new forecasting system.
+- : Modified to include the  component.
 
-**Areas that need refactoring**:
-*    is a monolithic file. It should be modularized into separate files for models, routes, and services.
-*    is becoming overly complex. Business logic and state management could be extracted into custom hooks or a state management library.
+**Areas that need refactoring**
+-  is now over 5,800 lines long and urgently needs to be modularized into separate files for routes, services, and data models to be maintainable.
+-  is a very large component managing a complex multi-step wizard. It should be broken down into smaller sub-components.
 
 **key api endpoints**
-*   : For uploading sales data.
-*   : Endpoint for generating analytical PDF/CSV reports. **(Currently failing)**
-*   : Endpoint for generating the daily financial summary PDF.
+- : Main endpoint for the AI chatbot.
+- : New endpoint for the enhanced dashboard chart.
+- : Enhanced to include new monthly insights and graphs in PDF/Excel.
+- : **(NEW)** Checks for available monthly/yearly summaries for forecasting.
+- : **(NEW)** Manually triggers the monthly/yearly data summarization process.
+- : **(NEW)** Allows the user to upload their own historical data, overriding the system's data for forecasting.
+- : Modified to use data from the  collection.
 
 **Critical Info for New Agent**
-*   The immediate priority is fixing the failing report generation and the associated UI bugs (stuck toast, tab layout).
-*   The  function in  is where the frontend logic for the failing report resides. The toast is likely getting stuck because the error is not handled in a  block.
-*   The backend endpoint  in  is likely crashing. It needs robust error logging to diagnose the root cause.
-*   The user is very specific about the UI changes for the tabs. Pay close attention to the renaming and alignment requests.
+- **The top priority is to finish the frontend for the new forecasting system in .** The user is waiting for this feature. All backend work is complete.
+- **The chatbot now relies on a direct OpenAI integration.** For deployed environments, the user must set the  environment variable on their hosting service (e.g., Render). The code is already configured to use this key.
+- The Render deployment was previously failing because  was in . This has been fixed, and future deployments should succeed.
 
-**documents created in this job**
-*   None in the last segment of the conversation.
+**documents and test reports created in this job**
+-  (from previous fork)
+-  (from previous fork)
 
-**Last 10 User Messages and any pending user messages**
-1.  **User (pending):** Report generation is failing, the toast message gets stuck, and tab labels need specific renames and UI adjustments. This is the current task to be solved.
+**Last 10 User Messages and any pending HUMAN messages**
+1.  **User (Pending):** Pointed out that the frontend for the forecasting feature was not updated. They cannot see the override option or the correct data availability messages. (Status: IN PROGRESS)
+2.  **Agent:** Acknowledged the backend-only implementation and started working on the frontend  component.
+3.  **User:** Requested a complete overhaul of the forecasting system, including automatic monthly/yearly data summarization and a user override option in the wizard. (Status: IN PROGRESS)
+4.  **Agent:** Confirmed the  package was removed and instructed the user to redeploy.
+5.  **User:** Reported a Render deployment failure caused by  not being found. (Status: COMPLETED)
+6.  **User:** Confirmed they have an  environment variable in Render. (Status: COMPLETED)
+7.  **Agent:** Explained the code now looks for  and asked the user to confirm their environment variable name.
+8.  **User:** Stated the chatbot wasn't working after deployment and asked for the code to be changed to use the direct OpenAI SDK instead of the Emergent Key. (Status: COMPLETED)
+9.  **User:** Requested to increase the chatbot icon size, move it to the top right, and use a new provided image. (Status: COMPLETED)
+10. **User:** Requested to change the chatbot icon to a cartoon rhino and name it Sandy. (Status: COMPLETED)
 
 **Project Health Check:**
-*   **Broken**:
-    *   The Generate Report functionality ().
-    *   The toast notification system for report generation.
-*   **Mocked**: None.
+- **Broken**:
+  - The Current Stock Value card on the main dashboard shows 0.
+- **Mocked**: None.
 
 **3rd Party Integrations**
-*   **MongoDB Atlas**: User-provided key for the database.
-*   **Render**: Used for backend deployment.
-*   **Vercel**: Used for frontend deployment.
+- **MongoDB Atlas**: Database for all application data.
+- **OpenAI GPT-5.1**: Used for the AI chatbot feature, integrated via the official usage: openai [-h] [-v] [-b API_BASE] [-k API_KEY] [-p PROXY [PROXY ...]]
+              [-o ORGANIZATION] [-t {openai,azure}]
+              [--api-version API_VERSION] [--azure-endpoint AZURE_ENDPOINT]
+              [--azure-ad-token AZURE_AD_TOKEN] [-V]
+              {api,tools,migrate,grit} ...
+
+positional arguments:
+  {api,tools,migrate,grit}
+    api                 Direct API calls
+    tools               Client side tools for convenience
+
+options:
+  -h, --help            show this help message and exit
+  -v, --verbose         Set verbosity.
+  -b API_BASE, --api-base API_BASE
+                        What API base url to use.
+  -k API_KEY, --api-key API_KEY
+                        What API key to use.
+  -p PROXY [PROXY ...], --proxy PROXY [PROXY ...]
+                        What proxy to use.
+  -o ORGANIZATION, --organization ORGANIZATION
+                        Which organization to run as (will use your default
+                        organization if not specified)
+  -t {openai,azure}, --api-type {openai,azure}
+                        The backend API to call, must be `openai` or `azure`
+  --api-version API_VERSION
+                        The Azure API version, e.g.
+                        'https://learn.microsoft.com/en-us/azure/ai-
+                        services/openai/reference#rest-api-versioning'
+  --azure-endpoint AZURE_ENDPOINT
+                        The Azure endpoint, e.g.
+                        'https://endpoint.openai.azure.com'
+  --azure-ad-token AZURE_AD_TOKEN
+                        A token from Azure Active Directory,
+                        https://www.microsoft.com/en-
+                        us/security/business/identity-access/microsoft-entra-
+                        id
+  -V, --version         show program's version number and exit Python SDK. Requires a user-provided .
+- **Render**: Used for backend deployment.
+- **Vercel**: Used for frontend deployment.
 
 **Testing status**
-*   **Testing agent used after significant changes:** NO
-*   **Troubleshoot agent used after agent stuck in loop:** NO
-*   **Test files created:** None
-*   **Known regressions:** Report generation functionality is broken.
+- **Testing agent used after significant changes:** YES, for the initial chatbot feature. However, it was NOT used after major enhancements (period-specific queries, comparison logic) or for the new sales trends chart and reporting features.
+- **Troubleshoot agent used after agent stuck in loop:** NO
+- **Test files created:** Test scripts were created and used by the testing agent but not saved in the repository.
+- **Known regressions:** None.
 
 **Credentials to test flow:**
-No user credentials are required to test the application. The application is publicly accessible.
+No application credentials are required. For the chatbot to function, an  must be present as an environment variable in the backend.
 
 **What agent forgot to execute**
-*   The agent did not add a  block to the report generation promise to ensure the toast message is dismissed on failure.
-*   The agent did not implement the user's latest, specific UI change requests for tab renaming and icon alignment.</analysis>
+- The agent built the entire backend for the new forecasting system but forgot to implement the corresponding frontend changes. This was only addressed after the user explicitly pointed out the missing UI in message #438. The agent then started the frontend work but did not complete it before the session ended.</analysis>

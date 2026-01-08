@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 
 # Backend URL from environment
-BACKEND_URL = "https://retail-pulse-35.preview.emergentagent.com/api"
+BACKEND_URL = "https://rhino-forecast.preview.emergentagent.com/api"
 
 def test_previous_financial_data():
     """Test GET /api/previous-financial-data?date=2025-12-05"""
