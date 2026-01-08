@@ -752,27 +752,20 @@ async def create_monthly_summary(year: int, month: int):
     
     Aggregates all daily sales records for the given month into
     a summary with totals per item (like a monthly sales report).
+    
+    Only uses data_period field to determine which records belong to a month,
+    NOT upload_date (which is when the file was uploaded, not when the sales occurred).
     """
     try:
         period = f"{year}-{month:02d}"
-        month_start = datetime(year, month, 1)
-        if month == 12:
-            month_end = datetime(year + 1, 1, 1)
-        else:
-            month_end = datetime(year, month + 1, 1)
         
         # Aggregate daily records for this month by item
+        # IMPORTANT: Only match by data_period, not upload_date
         pipeline = [
             {
                 "$match": {
                     "upload_source": {"$ne": "forecast"},
-                    "$or": [
-                        {"data_period": period},
-                        {"data_period": {"$regex": f"^{year}-{month:02d}"}},
-                        {
-                            "upload_date": {"$gte": month_start, "$lt": month_end}
-                        }
-                    ]
+                    "data_period": {"$regex": f"^{year}-{month:02d}"}
                 }
             },
             {
