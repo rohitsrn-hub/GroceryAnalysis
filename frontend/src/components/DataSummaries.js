@@ -309,12 +309,12 @@ const DataSummaries = ({ onSummaryChange }) => {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Month (optional)</Label>
-                <Select value={generateMonth} onValueChange={setGenerateMonth}>
+                <Select value={generateMonth || "yearly"} onValueChange={(val) => setGenerateMonth(val === "yearly" ? "" : val)}>
                   <SelectTrigger className="w-32">
                     <SelectValue placeholder="All year" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Yearly Summary</SelectItem>
+                    <SelectItem value="yearly">Yearly Summary</SelectItem>
                     {months.map(m => (
                       <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                     ))}
