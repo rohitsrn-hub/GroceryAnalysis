@@ -4207,7 +4207,11 @@ async def get_daily_sales_trend(period: Optional[str] = Query(None)):
 
 @api_router.get("/daily-sales-trend-by-period")
 async def get_daily_sales_trend_by_period(period: str = Query(..., description="Period in YYYY-MM format")):
-    """Get daily sales data for a specific monthly period"""
+    """Get daily sales data for a specific monthly period.
+    
+    First tries to get data from upload_history (daily uploads).
+    Falls back to aggregating sales_records by upload_date if no daily uploads found.
+    """
     try:
         from datetime import datetime, timedelta
         
@@ -4225,7 +4229,14 @@ async def get_daily_sales_trend_by_period(period: str = Query(..., description="
         else:
             period_end = datetime(year, month + 1, 1)
         
-        # Query upload_history for daily uploads in this period
+        # Format period label
+        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        period_label = f"{month_names[month-1]} {year}"
+        
+        data = []
+        total_sales = 0
+        
+        # Method 1: Query upload_history for daily uploads in this period
         query_filter = {
             "upload_type": "daily",
             "status": "success",
@@ -4237,27 +4248,54 @@ async def get_daily_sales_trend_by_period(period: str = Query(..., description="
         
         daily_uploads = await db.upload_history.find(query_filter).sort("data_date", 1).to_list(None)
         
-        # Format data
-        data = []
-        total_sales = 0
-        
-        for upload in daily_uploads:
-            upload_date = upload.get('data_date')
-            if upload_date:
-                net_amount = float(upload.get('net_amt', 0) or 0)
-                total_sales += net_amount
-                data.append({
-                    'date': upload_date.strftime('%Y-%m-%d'),
-                    'day': upload_date.day,
-                    'sales': net_amount
-                })
+        if daily_uploads:
+            # Use upload_history data
+            for upload in daily_uploads:
+                upload_date = upload.get('data_date')
+                if upload_date:
+                    net_amount = float(upload.get('net_amt', 0) or 0)
+                    total_sales += net_amount
+                    data.append({
+                        'date': upload_date.strftime('%Y-%m-%d'),
+                        'day': upload_date.day,
+                        'sales': net_amount
+                    })
+        else:
+            # Method 2: Fallback - aggregate sales_records by upload_date for this period
+            pipeline = [
+                {
+                    "$match": {
+                        "upload_source": {"$ne": "forecast"},
+                        "data_period": period,
+                        "upload_date": {"$exists": True}
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": {
+                            "$dateToString": {"format": "%Y-%m-%d", "date": "$upload_date"}
+                        },
+                        "total_sales": {"$sum": "$r_amt"},
+                        "upload_date": {"$first": "$upload_date"}
+                    }
+                },
+                {"$sort": {"_id": 1}}
+            ]
+            
+            aggregated = await db.sales_records.aggregate(pipeline).to_list(None)
+            
+            for record in aggregated:
+                if record.get('upload_date'):
+                    net_amount = float(record.get('total_sales', 0) or 0)
+                    total_sales += net_amount
+                    data.append({
+                        'date': record['_id'],
+                        'day': record['upload_date'].day,
+                        'sales': net_amount
+                    })
         
         # Calculate average daily sales
         avg_daily_sales = total_sales / len(data) if data else 0
-        
-        # Format period label
-        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        period_label = f"{month_names[month-1]} {year}"
         
         return {
             "period": period,
