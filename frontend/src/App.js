@@ -390,21 +390,21 @@ function MainApp() {
           <TabsContent value="upload" className="space-y-6">
             {/* Sub-tabs for Bulk Upload section */}
             <Tabs defaultValue="upload-data" className="w-full">
-              <div className="bg-white rounded-lg shadow-sm border p-2 mb-6">
-                <TabsList className="grid w-full max-w-lg grid-cols-2 bg-gray-100 p-1 rounded-md">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm border border-blue-100 p-3 mb-6">
+                <TabsList className="grid w-full max-w-lg grid-cols-2 bg-white/80 p-1.5 rounded-lg shadow-inner">
                   <TabsTrigger 
                     value="upload-data" 
-                    className="flex items-center justify-center space-x-2 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md"
+                    className="flex items-center justify-center space-x-2 py-3 px-4 text-gray-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all duration-200 font-medium"
                   >
                     <Upload className="h-4 w-4" />
-                    <span className="font-medium">Upload Data</span>
+                    <span>Upload Data</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="data-summaries" 
-                    className="flex items-center justify-center space-x-2 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md"
+                    className="flex items-center justify-center space-x-2 py-3 px-4 text-gray-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all duration-200 font-medium"
                   >
                     <Layers className="h-4 w-4" />
-                    <span className="font-medium">Data Summaries</span>
+                    <span>Data Summaries</span>
                   </TabsTrigger>
                 </TabsList>
               </div>
