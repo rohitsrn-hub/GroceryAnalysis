@@ -810,37 +810,68 @@ const Forecasting = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Upload className="h-5 w-5" />
-              <span>Upload Required Data</span>
+              <span>Review Data & Override (Optional)</span>
             </CardTitle>
             <CardDescription>
-              Upload the following data files for {forecastMethod === 'trend' ? 'trend' : forecastMethod === 'statistical' ? 'statistical' : 'AI-powered'} forecasting of {' '}
+              Review available monthly summaries for {forecastMethod === 'trend' ? 'trend' : forecastMethod === 'statistical' ? 'statistical' : 'AI-powered'} forecasting of {' '}
               {forecastMonth && forecastYear && new Date(parseInt(forecastYear), parseInt(forecastMonth) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Monthly Summaries Status Banner */}
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+              <div className="flex items-start space-x-3">
+                <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-blue-800">About Monthly Summaries</h4>
+                  <p className="text-sm text-blue-700 mt-1">
+                    The system uses <strong>item-wise monthly summaries</strong> for accurate forecasting, not daily sales files.
+                    These summaries are auto-generated when you upload daily data for a new month, or you can upload your own.
+                  </p>
+                  <p className="text-sm text-blue-600 mt-2">
+                    <strong>Available summaries:</strong> {monthlySummaries.length} months | 
+                    <button 
+                      onClick={fetchMonthlySummaries}
+                      className="ml-2 text-blue-700 underline hover:text-blue-900"
+                    >
+                      Refresh
+                    </button>
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-4">
               {requiredDataUploads.map((requirement) => {
                 const availability = dataAvailability[requirement.period];
                 const isAvailable = availability?.available;
+                const isSummary = availability?.source === 'monthly_summary';
+                const showOverride = showUploadOverride[requirement.id];
                 
                 return (
                 <Card key={requirement.id} className={`border ${
                   isAvailable 
-                    ? 'border-green-200 bg-green-50' 
+                    ? isSummary ? 'border-green-300 bg-green-50' : 'border-yellow-200 bg-yellow-50'
                     : requirement.required 
-                    ? 'border-blue-200 bg-blue-50' 
+                    ? 'border-red-200 bg-red-50' 
                     : 'border-gray-200'
                 }`}>
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
+                        <div className="flex items-center space-x-2 mb-2 flex-wrap gap-2">
                           <h4 className="font-medium">{requirement.title}</h4>
                           {isAvailable ? (
-                            <Badge className="text-xs bg-green-600">Data Available</Badge>
+                            isSummary ? (
+                              <Badge className="text-xs bg-green-600">Monthly Summary Available</Badge>
+                            ) : (
+                              <Badge className="text-xs bg-yellow-600">Raw Data Only</Badge>
+                            )
                           ) : requirement.required ? (
-                            <Badge variant="destructive" className="text-xs">Required</Badge>
-                          ) : null}
+                            <Badge variant="destructive" className="text-xs">Required - Not Found</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">Optional</Badge>
+                          )}
                         </div>
                         <p className="text-sm text-gray-600 mb-3">{requirement.description}</p>
                         
@@ -850,71 +881,112 @@ const Forecasting = () => {
                               <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
                               <div className="flex-1">
                                 <p className="text-green-700 font-medium text-sm">
-                                  ✅ Data already available in database
+                                  ✅ {isSummary ? 'Monthly Summary' : 'Data'} available for {availability.display_name || requirement.period}
                                 </p>
                                 <div className="text-xs text-green-600 mt-1 space-y-0.5">
-                                  <p>• {availability.record_count.toLocaleString()} records found</p>
-                                  {availability.filename && (
-                                    <p>• From file: {availability.filename}</p>
+                                  {availability.item_count && (
+                                    <p>• {availability.item_count.toLocaleString()} items summarized</p>
                                   )}
-                                  {availability.upload_date && (
-                                    <p>• Uploaded: {new Date(availability.upload_date).toLocaleDateString()}</p>
+                                  {availability.total_revenue && (
+                                    <p>• Total Revenue: ₹{(availability.total_revenue / 100000).toFixed(2)} Lakhs</p>
+                                  )}
+                                  {availability.data_source && (
+                                    <p>• Source: {availability.data_source}</p>
+                                  )}
+                                  {availability.record_count && !isSummary && (
+                                    <p>• {availability.record_count.toLocaleString()} raw records</p>
                                   )}
                                 </div>
-                                <p className="text-xs text-green-700 mt-2 italic">
-                                  No upload needed - forecast will use existing data
+                              </div>
+                            </div>
+                            
+                            {/* Override Option */}
+                            <div className="mt-3 pt-3 border-t border-green-200">
+                              <button
+                                onClick={() => setShowUploadOverride(prev => ({...prev, [requirement.id]: !prev[requirement.id]}))}
+                                className="text-xs text-green-700 hover:text-green-900 underline"
+                              >
+                                {showOverride ? 'Hide upload option' : 'Want to override with your own data?'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-white rounded-lg border border-red-200">
+                            <div className="flex items-start space-x-2">
+                              <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
+                              <div>
+                                <p className="text-red-700 font-medium text-sm">
+                                  No monthly summary found for {requirement.period}
+                                </p>
+                                <p className="text-xs text-red-600 mt-1">
+                                  {requirement.required 
+                                    ? 'Please upload data for this period or generate a summary.'
+                                    : 'Optional - forecast will proceed without this data.'}
                                 </p>
                               </div>
                             </div>
                           </div>
-                        ) : uploadedData[requirement.id] ? (
-                          <div className="flex items-center space-x-2">
-                            {uploadedData[requirement.id].status === 'success' ? (
-                              <>
-                                <CheckCircle className="h-5 w-5 text-green-600" />
-                                <span className="text-green-700 text-sm">
-                                  ✅ {uploadedData[requirement.id].file} ({uploadedData[requirement.id].records} records)
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <AlertTriangle className="h-5 w-5 text-red-600" />
-                                <span className="text-red-700 text-sm">
-                                  ❌ {uploadedData[requirement.id].error}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-500">No file uploaded</div>
                         )}
-                      </div>
-                      
-                      <div className="ml-4">
-                        <input
-                          type="file"
-                          accept=".xlsx,.xls"
-                          onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              handleDataUpload(requirement.id, file);
-                            }
-                          }}
-                          className="hidden"
-                          id={`upload-${requirement.id}`}
-                          disabled={isAvailable}
-                        />
-                        <label
-                          htmlFor={`upload-${requirement.id}`}
-                          className={`inline-flex items-center px-4 py-2 border shadow-sm text-sm font-medium rounded-md ${
-                            isAvailable
-                              ? 'border-gray-200 text-gray-400 bg-gray-100 cursor-not-allowed'
-                              : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 cursor-pointer'
-                          }`}
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          {isAvailable ? 'Not Needed' : 'Choose File'}
-                        </label>
+                        
+                        {/* Upload Section (shown when not available or override requested) */}
+                        {(!isAvailable || showOverride) && (
+                          <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <p className="text-xs text-gray-600 mb-2">
+                              <strong>Upload your own summary:</strong> Excel file with item-wise monthly totals
+                            </p>
+                            
+                            {uploadedData[requirement.id] && (
+                              <div className="mb-2 flex items-center space-x-2">
+                                {uploadedData[requirement.id].status === 'success' ? (
+                                  <>
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                    <span className="text-green-700 text-xs">
+                                      Uploaded: {uploadedData[requirement.id].file} ({uploadedData[requirement.id].records} records)
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                                    <span className="text-red-700 text-xs">
+                                      Error: {uploadedData[requirement.id].error}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="file"
+                                accept=".xlsx,.xls"
+                                onChange={(e) => {
+                                  const file = e.target.files[0];
+                                  if (file) {
+                                    handleForecastDataUpload(requirement.id, file, requirement.period);
+                                  }
+                                }}
+                                className="hidden"
+                                id={`upload-${requirement.id}`}
+                              />
+                              <label
+                                htmlFor={`upload-${requirement.id}`}
+                                className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                              >
+                                <Upload className="h-3 w-3 mr-1" />
+                                Upload Summary File
+                              </label>
+                              {!isAvailable && (
+                                <button
+                                  onClick={() => handleGenerateSummary(requirement.period)}
+                                  className="inline-flex items-center px-3 py-1.5 border border-blue-300 text-xs font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100"
+                                >
+                                  <Zap className="h-3 w-3 mr-1" />
+                                  Auto-Generate
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -926,9 +998,34 @@ const Forecasting = () => {
               <div className="text-center py-8 text-gray-500">
                 <Info className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <p>No additional data upload required.</p>
-                <p className="text-sm">The forecast will use existing historical data in the system.</p>
+                <p className="text-sm">The forecast will use existing monthly summaries in the system.</p>
               </div>
             )}
+            
+            {/* Summary of Data Status */}
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+              <h4 className="font-medium text-gray-800 mb-2">Data Status Summary</h4>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {Object.values(dataAvailability).filter(a => a.available && a.source === 'monthly_summary').length}
+                  </div>
+                  <div className="text-gray-600">Monthly Summaries</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-600">
+                    {Object.values(dataAvailability).filter(a => a.available && a.source !== 'monthly_summary').length}
+                  </div>
+                  <div className="text-gray-600">Raw Data Only</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">
+                    {requiredDataUploads.filter(r => r.required && !dataAvailability[r.period]?.available).length}
+                  </div>
+                  <div className="text-gray-600">Missing Required</div>
+                </div>
+              </div>
+            </div>
             
             <div className="mt-6 flex justify-between">
               <Button variant="outline" onClick={goBack}>
@@ -943,9 +1040,19 @@ const Forecasting = () => {
                   requiredDataUploads.filter(req => req.required).length > 0 &&
                   requiredDataUploads.filter(req => {
                     if (!req.required) return true;
-                    // Check if data is uploaded in current session OR already available in database
                     const isUploaded = uploadedData[req.id]?.status === 'success';
                     const isAvailable = dataAvailability[req.period]?.available;
+                    return isUploaded || isAvailable;
+                  }).length < requiredDataUploads.filter(req => req.required).length
+                }
+              >
+                {loading ? 'Generating...' : 'Generate Forecast'}
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
                     return isUploaded || isAvailable;
                   }).length < requiredDataUploads.filter(req => req.required).length
                 }
