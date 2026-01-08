@@ -5777,21 +5777,32 @@ IMPORTANT GUIDELINES:
 5. Provide actionable insights when possible
 6. For comparisons, use percentages when helpful"""
 
-        # Initialize LLM chat
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=session_id,
-            system_message=system_message
+        # Get chat history for context (last 10 messages)
+        chat_history = await db.chat_history.find(
+            {"session_id": session_id}
+        ).sort("timestamp", -1).limit(10).to_list(10)
+        
+        # Build messages array for OpenAI
+        messages = [{"role": "system", "content": system_message}]
+        
+        # Add chat history (reverse to get chronological order)
+        for hist in reversed(chat_history):
+            messages.append({"role": "user", "content": hist.get("user_message", "")})
+            messages.append({"role": "assistant", "content": hist.get("assistant_response", "")})
+        
+        # Add current user message
+        messages.append({"role": "user", "content": request.message})
+        
+        # Call OpenAI API using gpt-4o (most capable and cost-effective)
+        completion = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            max_tokens=1000,
+            temperature=0.7
         )
         
-        # Configure to use OpenAI GPT-5.1
-        chat.with_model("openai", "gpt-5.1")
-        
-        # Create user message
-        user_message = UserMessage(text=request.message)
-        
-        # Get response from LLM
-        response = await chat.send_message(user_message)
+        # Extract response
+        response = completion.choices[0].message.content
         
         # Store chat history in database for persistence
         chat_record = {
