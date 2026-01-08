@@ -3494,7 +3494,11 @@ async def get_forecast_requirements():
 
 @api_router.post("/forecast-demand")
 async def forecast_demand(request: ForecastRequest):
-    """Forecast demand using different methods"""
+    """Forecast demand using different methods.
+    
+    Uses monthly summaries (auto-generated or user-uploaded) for accurate forecasting.
+    Falls back to aggregating raw sales_records if no summaries are available.
+    """
     try:
         if request.method == "trend":
             return await simple_trend_forecast(request)
@@ -3508,44 +3512,114 @@ async def forecast_demand(request: ForecastRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error in demand forecasting: {str(e)}")
 
-async def simple_trend_forecast(request: ForecastRequest):
-    """Simple linear trend forecasting"""
-    # Get historical data with product group
+
+async def get_monthly_summary_data_for_forecast():
+    """Get item-wise monthly data for forecasting.
+    
+    Priority:
+    1. Use monthly_summaries collection (auto-generated or user-uploaded)
+    2. Fall back to aggregating raw sales_records if no summaries exist
+    
+    Returns data organized by item with monthly totals.
+    """
+    # First, try to get from monthly_summaries collection
+    monthly_summaries = await db.monthly_summaries.find(
+        {"summary_type": "monthly"}
+    ).sort("period", 1).to_list(None)
+    
+    if monthly_summaries and len(monthly_summaries) >= 2:
+        # Use monthly summaries - reorganize by item across periods
+        items_data = defaultdict(lambda: {"periods": [], "sales": [], "metadata": {}})
+        
+        for summary in monthly_summaries:
+            period = summary['period']
+            for item in summary.get('items', []):
+                item_key = item.get('pluno') or item.get('item_name')
+                if item_key:
+                    items_data[item_key]["periods"].append(period)
+                    items_data[item_key]["sales"].append(item.get('net_qty', 0))
+                    if not items_data[item_key]["metadata"]:
+                        items_data[item_key]["metadata"] = {
+                            "pluno": item.get('pluno'),
+                            "item_name": item.get('item_name'),
+                            "product_group": item.get('product_group')
+                        }
+        
+        logger.info(f"Using {len(monthly_summaries)} monthly summaries for forecast with {len(items_data)} items")
+        return items_data, "monthly_summaries"
+    
+    # Fall back to aggregating from sales_records
+    logger.info("No monthly summaries found, aggregating from raw sales_records")
+    
+    # Get monthly periods only (YYYY-MM format)
+    periods = await db.sales_records.distinct("data_period", {"upload_source": {"$ne": "forecast"}})
+    monthly_periods = sorted([p for p in periods if p and len(p) == 7])  # YYYY-MM format only
+    
+    if len(monthly_periods) < 2:
+        return {}, "insufficient_data"
+    
+    # Aggregate by item and period
     pipeline = [
+        {
+            "$match": {
+                "upload_source": {"$ne": "forecast"},
+                "data_period": {"$in": monthly_periods}
+            }
+        },
         {
             "$group": {
                 "_id": {
-                    "pluno": "$pluno", 
-                    "item_name": "$item_name", 
+                    "pluno": "$pluno",
+                    "item_name": "$item_name",
                     "product_group": "$product_group",
                     "period": "$data_period"
                 },
-                "total_sold": {"$sum": "$net_qty"}
+                "total_qty": {"$sum": "$net_qty"}
             }
         },
-        {"$sort": {"_id.pluno": 1, "_id.period": 1}}
+        {"$sort": {"_id.period": 1}}
     ]
     
-    historical_data = await db.sales_records.aggregate(pipeline).to_list(None)
+    raw_data = await db.sales_records.aggregate(pipeline).to_list(None)
     
-    # Group by item and calculate trend
+    # Reorganize by item
+    items_data = defaultdict(lambda: {"periods": [], "sales": [], "metadata": {}})
+    
+    for record in raw_data:
+        item_key = record['_id'].get('pluno') or record['_id'].get('item_name')
+        if item_key:
+            items_data[item_key]["periods"].append(record['_id']['period'])
+            items_data[item_key]["sales"].append(record.get('total_qty', 0))
+            if not items_data[item_key]["metadata"]:
+                items_data[item_key]["metadata"] = {
+                    "pluno": record['_id'].get('pluno'),
+                    "item_name": record['_id'].get('item_name'),
+                    "product_group": record['_id'].get('product_group')
+                }
+    
+    logger.info(f"Aggregated {len(raw_data)} records into {len(items_data)} items from {len(monthly_periods)} periods")
+    return items_data, "raw_aggregation"
+
+
+async def simple_trend_forecast(request: ForecastRequest):
+    """Simple linear trend forecasting using monthly summarized data."""
+    
+    # Get monthly summary data
+    items_data, data_source = await get_monthly_summary_data_for_forecast()
+    
+    if not items_data:
+        return {
+            "forecasts": [],
+            "message": "Insufficient data for forecasting. Need at least 2 months of summarized data.",
+            "data_source": data_source
+        }
+    
     forecasts = {}
-    items_data = defaultdict(list)
-    items_metadata = {}  # Store pluno, item_name, product_group
     
-    for record in historical_data:
-        item_key = record['_id']['pluno']
-        items_data[item_key].append(record['total_sold'])
+    for item_key, data in items_data.items():
+        sales_data = data["sales"]
+        metadata = data["metadata"]
         
-        # Store metadata (only once per item)
-        if item_key not in items_metadata:
-            items_metadata[item_key] = {
-                "pluno": record['_id']['pluno'],
-                "item_name": record['_id']['item_name'],
-                "product_group": record['_id'].get('product_group') or extract_group_from_pluno(record['_id']['pluno'])
-            }
-    
-    for item_key, sales_data in items_data.items():
         if len(sales_data) >= 2:
             # Simple linear regression
             X = np.array(range(len(sales_data))).reshape(-1, 1)
@@ -3559,45 +3633,82 @@ async def simple_trend_forecast(request: ForecastRequest):
             future_X = np.array(list(future_periods)).reshape(-1, 1)
             forecast = model.predict(future_X)
             
-            metadata = items_metadata[item_key]
             forecasts[item_key] = {
-                "pluno": metadata["pluno"],
-                "item_name": metadata["item_name"],
-                "product_group": metadata["product_group"],
+                "pluno": metadata.get("pluno"),
+                "item_name": metadata.get("item_name"),
+                "product_group": metadata.get("product_group") or extract_group_from_pluno(metadata.get("pluno", "")),
                 "method": "trend",
+                "historical_periods": data["periods"],
                 "historical_sales": sales_data,
                 "forecasted_sales": [max(0, int(f)) for f in forecast],
-                "trend_direction": "increasing" if model.coef_[0] > 0 else "decreasing"
+                "trend_direction": "increasing" if model.coef_[0] > 0 else "decreasing",
+                "confidence": "high" if len(sales_data) >= 3 else "medium"
             }
     
-    return {"forecasts": list(forecasts.values())}
+    return {
+        "forecasts": list(forecasts.values()),
+        "data_source": data_source,
+        "periods_used": len(items_data[list(items_data.keys())[0]]["periods"]) if items_data else 0,
+        "items_forecasted": len(forecasts)
+    }
+
 
 async def statistical_forecast(request: ForecastRequest):
-    """Statistical forecasting using moving averages"""
-    pipeline = [
-        {
-            "$group": {
-                "_id": {
-                    "pluno": "$pluno", 
-                    "item_name": "$item_name",
-                    "product_group": "$product_group",
-                    "period": "$data_period"
-                },
-                "total_sold": {"$sum": "$net_qty"}
-            }
-        },
-        {"$sort": {"_id.pluno": 1, "_id.period": 1}}
-    ]
+    """Statistical forecasting using moving averages on monthly summarized data."""
     
-    historical_data = await db.sales_records.aggregate(pipeline).to_list(None)
+    # Get monthly summary data
+    items_data, data_source = await get_monthly_summary_data_for_forecast()
+    
+    if not items_data:
+        return {
+            "forecasts": [],
+            "message": "Insufficient data for forecasting. Need at least 2 months of summarized data.",
+            "data_source": data_source
+        }
     
     forecasts = {}
-    items_data = defaultdict(list)
-    items_metadata = {}  # Store pluno, item_name, product_group
     
-    for record in historical_data:
-        item_key = record['_id']['pluno']
-        items_data[item_key].append(record['total_sold'])
+    for item_key, data in items_data.items():
+        sales_data = data["sales"]
+        metadata = data["metadata"]
+        
+        if len(sales_data) >= 2:
+            # Calculate moving average
+            window = min(3, len(sales_data))
+            moving_avg = sum(sales_data[-window:]) / window
+            
+            # Calculate trend from recent data
+            if len(sales_data) >= 3:
+                recent_trend = (sales_data[-1] - sales_data[-3]) / 2
+            else:
+                recent_trend = sales_data[-1] - sales_data[-2]
+            
+            # Generate forecasts with trend adjustment
+            forecast = []
+            for i in range(request.forecast_months):
+                predicted = moving_avg + (recent_trend * (i + 1) * 0.5)  # Damped trend
+                forecast.append(max(0, int(predicted)))
+            
+            forecasts[item_key] = {
+                "pluno": metadata.get("pluno"),
+                "item_name": metadata.get("item_name"),
+                "product_group": metadata.get("product_group") or extract_group_from_pluno(metadata.get("pluno", "")),
+                "method": "statistical",
+                "historical_periods": data["periods"],
+                "historical_sales": sales_data,
+                "forecasted_sales": forecast,
+                "moving_average": round(moving_avg, 2),
+                "trend": round(recent_trend, 2),
+                "trend_direction": "increasing" if recent_trend > 0 else "decreasing",
+                "confidence": "high" if len(sales_data) >= 6 else "medium" if len(sales_data) >= 3 else "low"
+            }
+    
+    return {
+        "forecasts": list(forecasts.values()),
+        "data_source": data_source,
+        "periods_used": len(items_data[list(items_data.keys())[0]]["periods"]) if items_data else 0,
+        "items_forecasted": len(forecasts)
+    }
         
         # Store metadata (only once per item)
         if item_key not in items_metadata:
