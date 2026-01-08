@@ -3980,43 +3980,7 @@ async def statistical_forecast(request: ForecastRequest):
         "periods_used": len(items_data[list(items_data.keys())[0]]["periods"]) if items_data else 0,
         "items_forecasted": len(forecasts)
     }
-        
-        # Store metadata (only once per item)
-        if item_key not in items_metadata:
-            items_metadata[item_key] = {
-                "pluno": record['_id']['pluno'],
-                "item_name": record['_id']['item_name'],
-                "product_group": record['_id'].get('product_group') or extract_group_from_pluno(record['_id']['pluno'])
-            }
-    
-    for item_key, sales_data in items_data.items():
-        if len(sales_data) >= 3:
-            # Moving average forecast
-            window_size = min(3, len(sales_data))
-            recent_avg = np.mean(sales_data[-window_size:])
-            
-            # Simple seasonal adjustment (if we have enough data)
-            seasonal_factor = 1.0
-            if len(sales_data) >= 6:
-                first_half = np.mean(sales_data[:len(sales_data)//2])
-                second_half = np.mean(sales_data[len(sales_data)//2:])
-                seasonal_factor = second_half / first_half if first_half > 0 else 1.0
-            
-            forecast = [int(recent_avg * seasonal_factor) for _ in range(request.forecast_months)]
-            
-            metadata = items_metadata[item_key]
-            forecasts[item_key] = {
-                "pluno": metadata["pluno"],
-                "item_name": metadata["item_name"],
-                "product_group": metadata["product_group"],
-                "method": "statistical",
-                "historical_sales": sales_data,
-                "forecasted_sales": forecast,
-                "moving_average": recent_avg,
-                "seasonal_factor": seasonal_factor
-            }
-    
-    return {"forecasts": list(forecasts.values())}
+
 
 async def ai_forecast(request: ForecastRequest):
     """AI-powered forecasting (placeholder for LLM integration)"""
