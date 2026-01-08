@@ -3389,67 +3389,107 @@ async def export_data_to_excel(
 
 @api_router.get("/forecast-requirements")
 async def get_forecast_requirements():
-    """Get data requirements for accurate demand forecasting"""
+    """Get data requirements and available data for demand forecasting.
+    
+    Returns available monthly summaries (both auto-generated and user-uploaded)
+    that can be used for forecasting, along with options for user override.
+    """
     try:
-        # Check available data periods
-        periods = await db.sales_records.distinct("data_period")
+        # Check available monthly summaries
+        monthly_summaries = await db.monthly_summaries.find(
+            {"summary_type": "monthly"},
+            {"period": 1, "display_name": 1, "total_revenue": 1, "item_count": 1, "source": 1, "created_at": 1}
+        ).sort("period", -1).to_list(None)
         
-        # Check if we have enough historical data
-        total_records = await db.sales_records.count_documents({})
+        # Check available yearly summaries
+        yearly_summaries = await db.monthly_summaries.find(
+            {"summary_type": "yearly"},
+            {"period": 1, "display_name": 1, "total_revenue": 1, "item_count": 1, "source": 1}
+        ).sort("period", -1).to_list(None)
         
-        # Get sample items to show what data we need
-        sample_items = await db.sales_records.find(
-            {"net_qty": {"$gt": 0}}, 
-            {"item_name": 1, "pluno": 1, "product_group": 1}
-        ).limit(10).to_list(None)
+        # Also check raw periods from sales_records (for data not yet summarized)
+        raw_periods = await db.sales_records.distinct("data_period", {"upload_source": {"$ne": "forecast"}})
+        raw_periods = [p for p in raw_periods if p]
+        
+        # Get unique periods from both sources
+        summarized_periods = [s['period'] for s in monthly_summaries]
+        unsummarized_periods = [p for p in raw_periods if p not in summarized_periods and len(p) == 7]  # YYYY-MM format
+        
+        # Format available data for display
+        available_monthly_data = []
+        for summary in monthly_summaries:
+            summary['_id'] = str(summary.get('_id', ''))
+            available_monthly_data.append({
+                "period": summary['period'],
+                "display_name": summary.get('display_name', summary['period']),
+                "item_count": summary.get('item_count', 0),
+                "total_revenue": summary.get('total_revenue', 0),
+                "source": summary.get('source', 'unknown'),
+                "status": "summarized"
+            })
+        
+        # Add unsummarized periods
+        for period in sorted(unsummarized_periods, reverse=True):
+            # Get item count for this period
+            count = await db.sales_records.count_documents({"data_period": period, "upload_source": {"$ne": "forecast"}})
+            formatted_name = await format_period_display_name(period)
+            available_monthly_data.append({
+                "period": period,
+                "display_name": formatted_name,
+                "item_count": count,
+                "total_revenue": 0,  # Not calculated yet
+                "source": "raw_data",
+                "status": "not_summarized"
+            })
+        
+        # Sort by period descending
+        available_monthly_data.sort(key=lambda x: x['period'], reverse=True)
+        
+        total_records = await db.sales_records.count_documents({"upload_source": {"$ne": "forecast"}})
         
         requirements = {
             "current_data_status": {
-                "available_periods": periods,
-                "total_records": total_records,
-                "sample_items": len(sample_items)
+                "available_monthly_summaries": len(monthly_summaries),
+                "available_yearly_summaries": len(yearly_summaries),
+                "total_raw_records": total_records,
+                "available_periods": available_monthly_data[:12],  # Last 12 periods
+                "all_periods": available_monthly_data
             },
             "required_for_basic_forecast": {
                 "minimum_periods": 2,
                 "recommended_periods": 3,
-                "description": "Need last 3 months sales data for reliable trend analysis"
+                "description": "Need at least 2-3 months of summarized data for reliable trend analysis"
             },
             "required_for_seasonal_forecast": {
                 "minimum_periods": 12,
                 "recommended_periods": 24,
                 "description": "Need 12-24 months of monthly data for seasonal pattern recognition"
             },
-            "required_for_yearly_comparison": {
-                "years_needed": ["2022", "2023", "2024"],
-                "description": "Upload year-over-year data for the same months to fine-tune forecasts"
-            },
             "data_upload_instructions": {
-                "format": "Excel files with same column structure",
-                "naming_convention": "Month_Year (e.g., Jan_2024, Feb_2024) or Year (e.g., 2023, 2022)",
+                "format": "Excel files with same column structure as daily uploads",
+                "description": "You can upload your own historical monthly summary files to override auto-generated summaries",
                 "required_columns": ["GP_Index_No", "Item_Name", "Net_Qty", "R_Amt", "Profit", "Closing_Stock"]
             },
             "forecast_accuracy_levels": {
                 "basic_trend": {
-                    "data_needed": "2-3 months",
+                    "data_needed": "2-3 months summarized",
                     "accuracy": "70-75%",
                     "best_for": "Short-term planning"
                 },
                 "statistical_seasonal": {
-                    "data_needed": "6-12 months",
+                    "data_needed": "6-12 months summarized",
                     "accuracy": "80-85%",
                     "best_for": "Medium-term planning with seasonal adjustments"
-                },
-                "advanced_yearly": {
-                    "data_needed": "2-3 years of same period data",
-                    "accuracy": "85-90%",
-                    "best_for": "Long-term strategic planning"
                 }
-            }
+            },
+            "allow_user_override": True,
+            "message": "You can upload your own historical data files to override or supplement the auto-generated summaries."
         }
         
         return requirements
         
     except Exception as e:
+        logger.exception(f"Error getting forecast requirements: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting forecast requirements: {str(e)}")
 
 @api_router.post("/forecast-demand")
