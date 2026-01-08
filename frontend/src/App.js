@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import "./App.css";
 import Dashboard from "./components/Dashboard";
 import DataUpload from "./components/DataUpload";
+import DataSummaries from "./components/DataSummaries";
 import AnalyticsFixed from "./components/AnalyticsFixed";
 import Forecasting from "./components/Forecasting";
 import UploadHistory from "./components/UploadHistory";
@@ -12,7 +13,7 @@ import ChatBot from "./components/ChatBot";
 import { Toaster, toast } from "./components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
-import { BarChart3, Upload, TrendingUp, FileSpreadsheet, Building2, Download, Clock, Database, DollarSign, RefreshCw } from "lucide-react";
+import { BarChart3, Upload, TrendingUp, FileSpreadsheet, Building2, Download, Clock, Database, DollarSign, RefreshCw, Layers } from "lucide-react";
 import { formatIndianNumber, formatPercentage } from "./utils/numberUtils";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
