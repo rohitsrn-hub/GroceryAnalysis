@@ -62,11 +62,11 @@ const SalesTrendsChart = () => {
       let periods = [];
 
       if (viewMode === 'last3') {
-        // Get last 3 monthly periods
-        periods = availablePeriods.slice(-3).map(p => p.value);
+        // Get first 3 monthly periods (most recent including current period)
+        periods = availablePeriods.slice(0, 3).map(p => p.value);
       } else if (viewMode === 'last12') {
-        // Get last 12 monthly periods
-        periods = availablePeriods.slice(-12).map(p => p.value);
+        // Get first 12 monthly periods (most recent)
+        periods = availablePeriods.slice(0, 12).map(p => p.value);
       } else if (viewMode === 'single' && singlePeriod) {
         periods = [singlePeriod];
       } else if (viewMode === 'compare' && selectedPeriods.length > 0) {
