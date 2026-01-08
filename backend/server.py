@@ -5448,20 +5448,23 @@ async def get_period_specific_data(period: str, db) -> Dict[str, Any]:
 async def chat_with_data(request: ChatMessage):
     """
     AI Chatbot endpoint that answers questions about sales data.
-    Uses OpenAI GPT-5.1 via Emergent Integrations.
+    Uses OpenAI GPT-4o directly via official OpenAI Python SDK.
     Supports period-specific queries (e.g., "November 2025").
     """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from openai import AsyncOpenAI
     import uuid
     
     try:
         # Get or create session ID
         session_id = request.session_id or str(uuid.uuid4())
         
-        # Get API key from environment
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        # Get API key from environment - supports both OPENAI_API_KEY and EMERGENT_LLM_KEY
+        api_key = os.environ.get('OPENAI_API_KEY') or os.environ.get('EMERGENT_LLM_KEY')
         if not api_key:
-            raise HTTPException(status_code=500, detail="LLM API key not configured")
+            raise HTTPException(status_code=500, detail="OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.")
+        
+        # Initialize OpenAI client
+        client = AsyncOpenAI(api_key=api_key)
         
         # Get available periods first
         available_periods = await db.sales_records.distinct("data_period", {"upload_source": {"$ne": "forecast"}})
