@@ -846,20 +846,24 @@ async def create_monthly_summary(year: int, month: int):
 async def create_yearly_summary(year: int):
     """Create an item-wise yearly summary from all data for the year.
     
-    Aggregates all sales records (daily, monthly, bulk) for the given year
-    into a comprehensive yearly summary.
+    Aggregates all sales records for the given year into a comprehensive yearly summary.
+    Handles multiple data_period formats:
+    - 'YYYY' (e.g., '2024')
+    - 'YYYY-MM' (e.g., '2025-11')
+    - 'YYYY-MM-MM' (e.g., '2025-01-09' for Jan-Sep range)
     """
     try:
         period = str(year)
         
         # Aggregate all records for this year by item
+        # Match any data_period that starts with the year
         pipeline = [
             {
                 "$match": {
                     "upload_source": {"$ne": "forecast"},
                     "$or": [
-                        {"data_period": period},
-                        {"data_period": {"$regex": f"^{year}-"}},
+                        {"data_period": period},  # Exact year match (e.g., "2024")
+                        {"data_period": {"$regex": f"^{year}-"}}  # Monthly/range format (e.g., "2025-01", "2025-01-09")
                     ]
                 }
             },
