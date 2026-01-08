@@ -679,13 +679,16 @@ def format_indian_currency(amount: float, use_symbol: bool = True) -> str:
         return f"Rs. {amount:,.2f}"
 
 async def consolidate_daily_to_monthly(current_upload_date: str):
-    """Consolidate previous month's daily uploads into a monthly period
+    """Consolidate previous month's daily uploads into a monthly summary.
     
-    When a new month starts, all daily uploads from the previous month
-    should have their data_period updated to the monthly format (YYYY-MM)
+    When a new month starts (first upload of the new month), this function:
+    1. Aggregates all daily data from the previous month into item-wise summary
+    2. Creates a monthly summary record in monthly_summaries collection
+    3. If it's January, also creates yearly summary for the previous year
     
-    Example: When uploading data for Dec 1, 2025, all November daily uploads
-    should have data_period changed from individual dates to "2025-11"
+    Example: When uploading data for Jan 1, 2026:
+    - Creates monthly summary for December 2025
+    - Creates yearly summary for 2025
     """
     from datetime import datetime
     
@@ -697,23 +700,38 @@ async def consolidate_daily_to_monthly(current_upload_date: str):
         if current_date.month == 1:
             prev_month = 12
             prev_year = current_date.year - 1
+            is_new_year = True
         else:
             prev_month = current_date.month - 1
             prev_year = current_date.year
+            is_new_year = False
         
-        # Check if previous month has any daily uploads with individual date periods
         prev_month_period = f"{prev_year}-{prev_month:02d}"
         
-        # Find records from previous month that are from daily uploads
-        # These will have data_period matching specific dates
+        # Check if monthly summary already exists for previous month
+        existing_summary = await db.monthly_summaries.find_one({
+            "period": prev_month_period,
+            "summary_type": "monthly"
+        })
+        
+        if not existing_summary:
+            # Create monthly summary for previous month
+            await create_monthly_summary(prev_year, prev_month)
+        
+        # If new year, also create yearly summary for previous year
+        if is_new_year:
+            existing_yearly = await db.monthly_summaries.find_one({
+                "period": str(prev_year),
+                "summary_type": "yearly"
+            })
+            if not existing_yearly:
+                await create_yearly_summary(prev_year)
+        
+        # Also update data_period for daily records (existing logic)
         result = await db.sales_records.update_many(
             {
-                "upload_source": "daily",
-                "data_period": {"$regex": f"^{prev_year}-{prev_month:02d}"},
-                "upload_date": {
-                    "$gte": datetime(prev_year, prev_month, 1),
-                    "$lt": datetime(current_date.year, current_date.month, 1)
-                }
+                "upload_source": {"$in": ["daily", "analytics"]},
+                "data_period": {"$regex": f"^{prev_year}-{prev_month:02d}"}
             },
             {
                 "$set": {"data_period": prev_month_period}
@@ -727,6 +745,199 @@ async def consolidate_daily_to_monthly(current_upload_date: str):
         logger.error(f"Error consolidating daily to monthly: {str(e)}")
         # Don't fail the upload if consolidation fails
         pass
+
+
+async def create_monthly_summary(year: int, month: int):
+    """Create an item-wise monthly summary from daily upload data.
+    
+    Aggregates all daily sales records for the given month into
+    a summary with totals per item (like a monthly sales report).
+    """
+    try:
+        period = f"{year}-{month:02d}"
+        month_start = datetime(year, month, 1)
+        if month == 12:
+            month_end = datetime(year + 1, 1, 1)
+        else:
+            month_end = datetime(year, month + 1, 1)
+        
+        # Aggregate daily records for this month by item
+        pipeline = [
+            {
+                "$match": {
+                    "upload_source": {"$ne": "forecast"},
+                    "$or": [
+                        {"data_period": period},
+                        {"data_period": {"$regex": f"^{year}-{month:02d}"}},
+                        {
+                            "upload_date": {"$gte": month_start, "$lt": month_end}
+                        }
+                    ]
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "pluno": "$pluno",
+                        "item_name": "$item_name",
+                        "product_group": "$product_group"
+                    },
+                    "total_net_qty": {"$sum": "$net_qty"},
+                    "total_r_amt": {"$sum": "$r_amt"},
+                    "total_w_amt": {"$sum": "$w_amt"},
+                    "total_profit": {"$sum": "$profit"},
+                    "avg_closing_stock": {"$avg": "$closing_stock"},
+                    "avg_rate": {"$avg": "$rate"},
+                    "record_count": {"$sum": 1}
+                }
+            },
+            {"$sort": {"total_r_amt": -1}}
+        ]
+        
+        item_summaries = await db.sales_records.aggregate(pipeline).to_list(None)
+        
+        if not item_summaries:
+            logger.info(f"No data found to create monthly summary for {period}")
+            return None
+        
+        # Calculate totals
+        total_revenue = sum(item.get('total_r_amt', 0) or 0 for item in item_summaries)
+        total_profit = sum(item.get('total_profit', 0) or 0 for item in item_summaries)
+        total_qty = sum(item.get('total_net_qty', 0) or 0 for item in item_summaries)
+        
+        # Format item data
+        items_data = []
+        for item in item_summaries:
+            items_data.append({
+                "pluno": item['_id'].get('pluno'),
+                "item_name": item['_id'].get('item_name'),
+                "product_group": item['_id'].get('product_group'),
+                "net_qty": item.get('total_net_qty', 0),
+                "r_amt": item.get('total_r_amt', 0),
+                "w_amt": item.get('total_w_amt', 0),
+                "profit": item.get('total_profit', 0),
+                "closing_stock": item.get('avg_closing_stock', 0),
+                "rate": item.get('avg_rate', 0)
+            })
+        
+        month_names = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December']
+        
+        # Create summary document
+        summary_doc = {
+            "period": period,
+            "summary_type": "monthly",
+            "year": year,
+            "month": month,
+            "month_name": month_names[month - 1],
+            "display_name": f"{month_names[month - 1]} {year}",
+            "created_at": datetime.now(timezone.utc),
+            "total_revenue": total_revenue,
+            "total_profit": total_profit,
+            "total_qty_sold": total_qty,
+            "item_count": len(items_data),
+            "items": items_data,
+            "source": "auto_generated"
+        }
+        
+        await db.monthly_summaries.insert_one(summary_doc)
+        logger.info(f"Created monthly summary for {period}: {len(items_data)} items, Revenue: {total_revenue:.2f}")
+        
+        return summary_doc
+        
+    except Exception as e:
+        logger.error(f"Error creating monthly summary: {str(e)}")
+        return None
+
+
+async def create_yearly_summary(year: int):
+    """Create an item-wise yearly summary from all data for the year.
+    
+    Aggregates all sales records (daily, monthly, bulk) for the given year
+    into a comprehensive yearly summary.
+    """
+    try:
+        period = str(year)
+        
+        # Aggregate all records for this year by item
+        pipeline = [
+            {
+                "$match": {
+                    "upload_source": {"$ne": "forecast"},
+                    "$or": [
+                        {"data_period": period},
+                        {"data_period": {"$regex": f"^{year}-"}},
+                    ]
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "pluno": "$pluno",
+                        "item_name": "$item_name",
+                        "product_group": "$product_group"
+                    },
+                    "total_net_qty": {"$sum": "$net_qty"},
+                    "total_r_amt": {"$sum": "$r_amt"},
+                    "total_w_amt": {"$sum": "$w_amt"},
+                    "total_profit": {"$sum": "$profit"},
+                    "avg_closing_stock": {"$avg": "$closing_stock"},
+                    "avg_rate": {"$avg": "$rate"},
+                    "record_count": {"$sum": 1}
+                }
+            },
+            {"$sort": {"total_r_amt": -1}}
+        ]
+        
+        item_summaries = await db.sales_records.aggregate(pipeline).to_list(None)
+        
+        if not item_summaries:
+            logger.info(f"No data found to create yearly summary for {year}")
+            return None
+        
+        # Calculate totals
+        total_revenue = sum(item.get('total_r_amt', 0) or 0 for item in item_summaries)
+        total_profit = sum(item.get('total_profit', 0) or 0 for item in item_summaries)
+        total_qty = sum(item.get('total_net_qty', 0) or 0 for item in item_summaries)
+        
+        # Format item data
+        items_data = []
+        for item in item_summaries:
+            items_data.append({
+                "pluno": item['_id'].get('pluno'),
+                "item_name": item['_id'].get('item_name'),
+                "product_group": item['_id'].get('product_group'),
+                "net_qty": item.get('total_net_qty', 0),
+                "r_amt": item.get('total_r_amt', 0),
+                "w_amt": item.get('total_w_amt', 0),
+                "profit": item.get('total_profit', 0),
+                "closing_stock": item.get('avg_closing_stock', 0),
+                "rate": item.get('avg_rate', 0)
+            })
+        
+        # Create summary document
+        summary_doc = {
+            "period": period,
+            "summary_type": "yearly",
+            "year": year,
+            "display_name": f"Year {year}",
+            "created_at": datetime.now(timezone.utc),
+            "total_revenue": total_revenue,
+            "total_profit": total_profit,
+            "total_qty_sold": total_qty,
+            "item_count": len(items_data),
+            "items": items_data,
+            "source": "auto_generated"
+        }
+        
+        await db.monthly_summaries.insert_one(summary_doc)
+        logger.info(f"Created yearly summary for {year}: {len(items_data)} items, Revenue: {total_revenue:.2f}")
+        
+        return summary_doc
+        
+    except Exception as e:
+        logger.error(f"Error creating yearly summary: {str(e)}")
+        return None
 
 async def format_period_display_name(period: str) -> str:
     """Format period name intelligently based on stored period format
