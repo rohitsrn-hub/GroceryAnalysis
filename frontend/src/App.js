@@ -390,16 +390,24 @@ function MainApp() {
           <TabsContent value="upload" className="space-y-6">
             {/* Sub-tabs for Bulk Upload section */}
             <Tabs defaultValue="upload-data" className="w-full">
-              <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
-                <TabsTrigger value="upload-data" className="flex items-center space-x-2">
-                  <Upload className="h-4 w-4" />
-                  <span>Upload Data</span>
-                </TabsTrigger>
-                <TabsTrigger value="data-summaries" className="flex items-center space-x-2">
-                  <Layers className="h-4 w-4" />
-                  <span>Data Summaries</span>
-                </TabsTrigger>
-              </TabsList>
+              <div className="bg-white rounded-lg shadow-sm border p-2 mb-6">
+                <TabsList className="grid w-full max-w-lg grid-cols-2 bg-gray-100 p-1 rounded-md">
+                  <TabsTrigger 
+                    value="upload-data" 
+                    className="flex items-center justify-center space-x-2 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md"
+                  >
+                    <Upload className="h-4 w-4" />
+                    <span className="font-medium">Upload Data</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="data-summaries" 
+                    className="flex items-center justify-center space-x-2 py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md"
+                  >
+                    <Layers className="h-4 w-4" />
+                    <span className="font-medium">Data Summaries</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
               
               <TabsContent value="upload-data">
                 <DataUpload onUploadSuccess={handleDataUpload} />
