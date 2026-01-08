@@ -3492,6 +3492,277 @@ async def get_forecast_requirements():
         logger.exception(f"Error getting forecast requirements: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting forecast requirements: {str(e)}")
 
+
+@api_router.post("/generate-monthly-summary")
+async def generate_monthly_summary_endpoint(year: int, month: int):
+    """Manually trigger generation of monthly summary for a specific period.
+    
+    This allows users to generate summaries for any past month,
+    not just the previous month during daily upload.
+    """
+    try:
+        # Check if summary already exists
+        period = f"{year}-{month:02d}"
+        existing = await db.monthly_summaries.find_one({
+            "period": period,
+            "summary_type": "monthly"
+        })
+        
+        if existing:
+            return {
+                "status": "already_exists",
+                "message": f"Monthly summary for {period} already exists",
+                "summary": {
+                    "period": existing['period'],
+                    "display_name": existing.get('display_name'),
+                    "item_count": existing.get('item_count'),
+                    "total_revenue": existing.get('total_revenue'),
+                    "created_at": str(existing.get('created_at'))
+                }
+            }
+        
+        # Generate the summary
+        summary = await create_monthly_summary(year, month)
+        
+        if summary:
+            return {
+                "status": "created",
+                "message": f"Monthly summary created for {period}",
+                "summary": {
+                    "period": summary['period'],
+                    "display_name": summary.get('display_name'),
+                    "item_count": summary.get('item_count'),
+                    "total_revenue": summary.get('total_revenue')
+                }
+            }
+        else:
+            return {
+                "status": "no_data",
+                "message": f"No data found to create summary for {period}"
+            }
+            
+    except Exception as e:
+        logger.exception(f"Error generating monthly summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating monthly summary: {str(e)}")
+
+
+@api_router.post("/generate-yearly-summary")
+async def generate_yearly_summary_endpoint(year: int):
+    """Manually trigger generation of yearly summary for a specific year."""
+    try:
+        # Check if summary already exists
+        existing = await db.monthly_summaries.find_one({
+            "period": str(year),
+            "summary_type": "yearly"
+        })
+        
+        if existing:
+            return {
+                "status": "already_exists",
+                "message": f"Yearly summary for {year} already exists",
+                "summary": {
+                    "period": existing['period'],
+                    "display_name": existing.get('display_name'),
+                    "item_count": existing.get('item_count'),
+                    "total_revenue": existing.get('total_revenue'),
+                    "created_at": str(existing.get('created_at'))
+                }
+            }
+        
+        # Generate the summary
+        summary = await create_yearly_summary(year)
+        
+        if summary:
+            return {
+                "status": "created",
+                "message": f"Yearly summary created for {year}",
+                "summary": {
+                    "period": summary['period'],
+                    "display_name": summary.get('display_name'),
+                    "item_count": summary.get('item_count'),
+                    "total_revenue": summary.get('total_revenue')
+                }
+            }
+        else:
+            return {
+                "status": "no_data",
+                "message": f"No data found to create summary for {year}"
+            }
+            
+    except Exception as e:
+        logger.exception(f"Error generating yearly summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating yearly summary: {str(e)}")
+
+
+@api_router.post("/upload-forecast-history")
+async def upload_forecast_history(
+    file: UploadFile = File(...),
+    period: str = Form(...),  # Format: "YYYY-MM" for monthly, "YYYY" for yearly
+    override_existing: bool = Form(False)
+):
+    """Upload user's own historical data for forecasting.
+    
+    This allows users to upload their own summarized monthly/yearly data
+    to be used in forecasting, overriding or supplementing auto-generated summaries.
+    
+    The uploaded file should have the same format as regular sales data Excel files.
+    """
+    try:
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            raise HTTPException(status_code=400, detail="Only Excel files (.xlsx or .xls) are supported")
+        
+        # Determine summary type based on period format
+        if len(period) == 4:  # YYYY
+            summary_type = "yearly"
+            year = int(period)
+            month = None
+            display_name = f"Year {year}"
+        elif len(period) == 7:  # YYYY-MM
+            summary_type = "monthly"
+            year, month = period.split('-')
+            year, month = int(year), int(month)
+            month_names = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December']
+            display_name = f"{month_names[month - 1]} {year}"
+        else:
+            raise HTTPException(status_code=400, detail="Period must be in format 'YYYY-MM' or 'YYYY'")
+        
+        # Check if summary already exists
+        existing = await db.monthly_summaries.find_one({
+            "period": period,
+            "summary_type": summary_type
+        })
+        
+        if existing and not override_existing:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Summary for {period} already exists. Set override_existing=true to replace it."
+            )
+        
+        # Read and process the file
+        contents = await file.read()
+        
+        # Process the Excel file
+        period_info = {"period": period, "start_month": month, "end_month": month, "year": year}
+        records, net_amt, w_amt = process_excel_data(contents, file.filename, period_info)
+        
+        if not records:
+            raise HTTPException(status_code=400, detail="No valid data found in the uploaded file")
+        
+        # Calculate totals
+        total_revenue = sum(r.get('r_amt', 0) or 0 for r in records)
+        total_profit = sum(r.get('profit', 0) or 0 for r in records)
+        total_qty = sum(r.get('net_qty', 0) or 0 for r in records)
+        
+        # Format items data
+        items_data = []
+        for record in records:
+            items_data.append({
+                "pluno": record.get('pluno'),
+                "item_name": record.get('item_name'),
+                "product_group": record.get('product_group'),
+                "net_qty": record.get('net_qty', 0),
+                "r_amt": record.get('r_amt', 0),
+                "w_amt": record.get('w_amt', 0),
+                "profit": record.get('profit', 0),
+                "closing_stock": record.get('closing_stock', 0),
+                "rate": record.get('rate', 0)
+            })
+        
+        # Create or update summary document
+        summary_doc = {
+            "period": period,
+            "summary_type": summary_type,
+            "year": year,
+            "month": month,
+            "display_name": display_name,
+            "created_at": datetime.now(timezone.utc),
+            "total_revenue": total_revenue,
+            "total_profit": total_profit,
+            "total_qty_sold": total_qty,
+            "item_count": len(items_data),
+            "items": items_data,
+            "source": "user_uploaded",
+            "original_filename": file.filename
+        }
+        
+        if existing:
+            await db.monthly_summaries.replace_one({"_id": existing["_id"]}, summary_doc)
+            action = "replaced"
+        else:
+            await db.monthly_summaries.insert_one(summary_doc)
+            action = "created"
+        
+        return {
+            "status": "success",
+            "action": action,
+            "message": f"Successfully {action} {summary_type} summary for {period}",
+            "summary": {
+                "period": period,
+                "display_name": display_name,
+                "item_count": len(items_data),
+                "total_revenue": total_revenue,
+                "total_profit": total_profit
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error uploading forecast history: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading forecast history: {str(e)}")
+
+
+@api_router.get("/monthly-summaries")
+async def get_monthly_summaries():
+    """Get all available monthly and yearly summaries for forecasting."""
+    try:
+        summaries = await db.monthly_summaries.find(
+            {},
+            {"items": 0}  # Exclude items array for list view
+        ).sort("period", -1).to_list(None)
+        
+        # Format for response
+        formatted = []
+        for s in summaries:
+            formatted.append({
+                "period": s['period'],
+                "summary_type": s.get('summary_type', 'monthly'),
+                "display_name": s.get('display_name', s['period']),
+                "item_count": s.get('item_count', 0),
+                "total_revenue": s.get('total_revenue', 0),
+                "total_profit": s.get('total_profit', 0),
+                "source": s.get('source', 'unknown'),
+                "created_at": str(s.get('created_at', ''))
+            })
+        
+        return {
+            "summaries": formatted,
+            "count": len(formatted)
+        }
+        
+    except Exception as e:
+        logger.exception(f"Error fetching monthly summaries: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching monthly summaries: {str(e)}")
+
+
+@api_router.delete("/monthly-summaries/{period}")
+async def delete_monthly_summary(period: str):
+    """Delete a specific monthly or yearly summary."""
+    try:
+        result = await db.monthly_summaries.delete_one({"period": period})
+        
+        if result.deleted_count > 0:
+            return {"status": "success", "message": f"Deleted summary for {period}"}
+        else:
+            raise HTTPException(status_code=404, detail=f"Summary for {period} not found")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error deleting summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deleting summary: {str(e)}")
+
 @api_router.post("/forecast-demand")
 async def forecast_demand(request: ForecastRequest):
     """Forecast demand using different methods.
