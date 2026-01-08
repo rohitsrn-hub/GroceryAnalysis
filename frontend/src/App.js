@@ -388,7 +388,27 @@ function MainApp() {
           </TabsContent>
 
           <TabsContent value="upload" className="space-y-6">
-            <DataUpload onUploadSuccess={handleDataUpload} />
+            {/* Sub-tabs for Bulk Upload section */}
+            <Tabs defaultValue="upload-data" className="w-full">
+              <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+                <TabsTrigger value="upload-data" className="flex items-center space-x-2">
+                  <Upload className="h-4 w-4" />
+                  <span>Upload Data</span>
+                </TabsTrigger>
+                <TabsTrigger value="data-summaries" className="flex items-center space-x-2">
+                  <Layers className="h-4 w-4" />
+                  <span>Data Summaries</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="upload-data">
+                <DataUpload onUploadSuccess={handleDataUpload} />
+              </TabsContent>
+              
+              <TabsContent value="data-summaries">
+                <DataSummaries onSummaryChange={handleDataUpload} />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           <TabsContent value="history" className="space-y-6">
