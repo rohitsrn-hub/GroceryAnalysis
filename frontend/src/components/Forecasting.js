@@ -34,6 +34,13 @@ const Forecasting = () => {
   const [errorDialog, setErrorDialog] = useState({ open: false, title: "", message: "", details: "" });
   const [dataAvailability, setDataAvailability] = useState({});
   const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [monthlySummaries, setMonthlySummaries] = useState([]);
+  const [showUploadOverride, setShowUploadOverride] = useState({});
+
+  useEffect(() => {
+    // Fetch monthly summaries on component mount
+    fetchMonthlySummaries();
+  }, []);
 
   useEffect(() => {
     if (forecastMethod) {
@@ -42,30 +49,71 @@ const Forecasting = () => {
       // Check data availability when requirements change
       checkDataAvailability(requirements);
     }
-  }, [forecastMonth, forecastYear, forecastMethod]);
+  }, [forecastMonth, forecastYear, forecastMethod, monthlySummaries]);
+
+  const fetchMonthlySummaries = async () => {
+    try {
+      const response = await fetch(`${API}/monthly-summaries`);
+      if (response.ok) {
+        const data = await response.json();
+        setMonthlySummaries(data.summaries || []);
+      }
+    } catch (error) {
+      console.error("Error fetching monthly summaries:", error);
+    }
+  };
 
   const checkDataAvailability = async (requirements) => {
     if (!requirements || requirements.length === 0) return;
     
     setCheckingAvailability(true);
     try {
-      // Extract periods from requirements
-      const periods = requirements
-        .filter(req => req.period)
-        .map(req => req.period);
+      // Check both monthly summaries and raw data
+      const availability = {};
       
-      if (periods.length === 0) return;
-
-      const response = await fetch(`${API}/check-data-availability`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(periods)
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setDataAvailability(result.availability || {});
+      for (const req of requirements) {
+        if (!req.period || req.period === 'contextual' || req.period === 'current' || req.period.startsWith('quarter_')) {
+          continue;
+        }
+        
+        // First check if we have a monthly summary for this period
+        const summary = monthlySummaries.find(s => s.period === req.period);
+        
+        if (summary) {
+          availability[req.period] = {
+            available: true,
+            source: 'monthly_summary',
+            item_count: summary.item_count,
+            total_revenue: summary.total_revenue,
+            display_name: summary.display_name,
+            data_source: summary.source === 'user_uploaded' ? 'User Uploaded' : 'Auto Generated',
+            created_at: summary.created_at
+          };
+        } else {
+          // Fall back to checking raw sales records
+          try {
+            const response = await fetch(`${API}/check-data-availability`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify([req.period])
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              if (result.availability && result.availability[req.period]) {
+                availability[req.period] = {
+                  ...result.availability[req.period],
+                  source: 'raw_data'
+                };
+              }
+            }
+          } catch (e) {
+            // Ignore individual period check errors
+          }
+        }
       }
+      
+      setDataAvailability(availability);
     } catch (error) {
       console.error("Error checking data availability:", error);
     } finally {
