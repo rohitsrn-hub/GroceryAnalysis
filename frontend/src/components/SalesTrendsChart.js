@@ -40,10 +40,30 @@ const SalesTrendsChart = () => {
       const response = await fetch(`${API}/available-data-periods`);
       if (response.ok) {
         const data = await response.json();
-        // Get periods from periods_detailed which has value/label format
-        const allPeriods = data.periods_detailed || [];
-        // Filter to only include monthly periods (format YYYY-MM)
-        const monthlyPeriods = allPeriods.filter(p => p.value && p.value.match(/^\d{4}-\d{2}$/));
+        
+        // For the daily sales trend chart, extract periods from daily_uploads
+        // This ensures we only show months that have actual daily upload data
+        const dailyUploads = data.daily_uploads || [];
+        
+        // Group daily uploads by month (YYYY-MM format)
+        const monthsWithDailyData = new Map();
+        dailyUploads.forEach(upload => {
+          if (upload.date) {
+            const date = new Date(upload.date);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const label = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+            
+            if (!monthsWithDailyData.has(monthKey)) {
+              monthsWithDailyData.set(monthKey, { value: monthKey, label: label });
+            }
+          }
+        });
+        
+        // Convert to array and sort by period (newest first)
+        const monthlyPeriods = Array.from(monthsWithDailyData.values())
+          .sort((a, b) => b.value.localeCompare(a.value));
+        
         setAvailablePeriods(monthlyPeriods);
         
         // Set default single period to most recent
