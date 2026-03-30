@@ -348,9 +348,16 @@ const SalesTrendsChart = () => {
                           <p className="font-semibold mb-2">Day {label}</p>
                           {payload.filter(p => p.value !== null).map((entry, index) => {
                             const periodInfo = trendData.find(t => t.period === entry.dataKey);
+                            // Find the exact date for this day in this period
+                            const dayData = periodInfo?.data?.find(d => d.day === label);
+                            const exactDate = dayData?.date ? new Date(dayData.date).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            }) : null;
                             return (
                               <p key={index} style={{ color: entry.color }} className="text-sm">
-                                {periodInfo?.periodLabel || entry.dataKey}: ₹{formatTableNumber(entry.value)}
+                                <span className="font-medium">{exactDate || periodInfo?.periodLabel || entry.dataKey}:</span> ₹{formatTableNumber(entry.value)}
                               </p>
                             );
                           })}
