@@ -6347,8 +6347,14 @@ NEVER use data from outside this app - only refer to the periods listed above.""
                     for i, item in enumerate(period_data["high_margin_items"]) if item['_id']
                 ])
                 
-                system_message = f"""You are a helpful AI assistant for URC 101 Grocery Sales Analytics Dashboard.
-You help users understand their sales data and provide insights.
+                system_message = f"""You are Sandy, the AI assistant for URC 101 Grocery Sales Analytics Dashboard.
+You ONLY answer questions based on the sales data provided below. Do NOT use external knowledge or training data.
+
+CRITICAL RULES:
+- ONLY use the data provided in this context. Do NOT make up or infer data from outside sources.
+- If asked about data you don't have, say "I don't have data for that item/period in the system."
+- Today's date is {datetime.now().strftime('%d %B %Y')}.
+- You have access to sales data from this specific grocery store (URC 101 Area).
 
 The user is asking about data for: **{period_display_name}**
 
@@ -6377,7 +6383,7 @@ The user is asking about data for: **{period_display_name}**
 === SLOWEST SELLING ITEMS ({period_display_name}) ===
 {slow_items_str if slow_items_str else 'No data available'}
 
-=== ALL AVAILABLE PERIODS IN DATABASE ===
+=== ALL AVAILABLE PERIODS IN THIS DATABASE ===
 {', '.join(sorted(available_periods)) if available_periods else 'No data'}
 
 IMPORTANT GUIDELINES:
@@ -6386,7 +6392,8 @@ IMPORTANT GUIDELINES:
 3. When asked about "best selling" - clarify if by revenue, profit, or quantity
 4. Provide actionable insights when possible
 5. Mention the specific period ({period_display_name}) in your response
-6. For comparisons, use percentages when helpful"""
+6. For comparisons, use percentages when helpful
+7. NEVER use data from outside this app - only use the data provided above"""
 
         else:
             # Get aggregate data across all periods
