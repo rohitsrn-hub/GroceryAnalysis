@@ -6178,6 +6178,8 @@ async def chat_with_data(request: ChatMessage):
         is_comparison = is_comparison_query(request.message)
         detected_periods = detect_multiple_periods_from_query(request.message, available_periods) if is_comparison else []
         
+        logger.info(f"Chatbot query: '{request.message}', is_comparison={is_comparison}, detected_periods={detected_periods}")
+        
         # Build context based on query type
         if is_comparison and len(detected_periods) >= 2:
             # COMPARISON MODE: User wants to compare multiple periods
