@@ -6398,6 +6398,7 @@ IMPORTANT GUIDELINES:
 
         else:
             # Get aggregate data across all periods
+            logger.info("Using aggregate data across all periods")
             total_records = await db.sales_records.count_documents({"upload_source": {"$ne": "forecast"}})
             
             # Get revenue and profit totals
