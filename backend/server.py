@@ -6279,11 +6279,18 @@ IMPORTANT GUIDELINES:
             for p in sorted(available_periods):
                 formatted_periods.append(await format_period_display_name(p))
             
-            system_message = f"""You are a helpful AI assistant for URC 101 Grocery Sales Analytics Dashboard.
+            system_message = f"""You are Sandy, the AI assistant for URC 101 Grocery Sales Analytics Dashboard.
+You ONLY answer questions based on the sales data provided below. Do NOT use external knowledge or training data.
+
+CRITICAL RULES:
+- ONLY use the data provided in this context. Do NOT make up or infer data from outside sources.
+- If asked about data you don't have, say "I don't have data for that period in the system."
+- Today's date is {datetime.now().strftime('%d %B %Y')}.
+- You have access to sales data from this specific grocery store (URC 101 Area).
 
 The user seems to want a comparison but hasn't specified which periods to compare.
 
-=== AVAILABLE PERIODS FOR COMPARISON ===
+=== AVAILABLE PERIODS FOR COMPARISON IN THIS DATABASE ===
 {', '.join(formatted_periods) if formatted_periods else 'No data available'}
 
 Please help the user by:
@@ -6295,7 +6302,8 @@ Example comparison queries:
 - "Compare November 2025 with October 2025"
 - "How did sales change between Oct and Nov 2025?"
 - "Compare profit in 2024 vs 2023"
-"""
+
+NEVER use data from outside this app - only refer to the periods listed above."""
 
         elif not is_comparison:
             # Check for single period query
