@@ -6396,10 +6396,10 @@ IMPORTANT GUIDELINES:
 6. For comparisons, use percentages when helpful
 7. NEVER use data from outside this app - only use the data provided above"""
 
-        else:
-            # Get aggregate data across all periods
-            logger.info("Using aggregate data across all periods")
-            total_records = await db.sales_records.count_documents({"upload_source": {"$ne": "forecast"}})
+            else:
+                # Get aggregate data across all periods
+                logger.info("Using aggregate data across all periods")
+                total_records = await db.sales_records.count_documents({"upload_source": {"$ne": "forecast"}})
             
             # Get revenue and profit totals
             pipeline = [
