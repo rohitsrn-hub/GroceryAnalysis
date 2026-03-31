@@ -6517,27 +6517,24 @@ IMPORTANT GUIDELINES:
             {"session_id": session_id}
         ).sort("timestamp", -1).limit(10).to_list(10)
         
-        # Build messages array for OpenAI
-        messages = [{"role": "system", "content": system_message}]
+        # Build context with chat history
+        context_with_history = system_message
+        if chat_history:
+            context_with_history += "\n\n=== RECENT CONVERSATION HISTORY ===\n"
+            for hist in reversed(chat_history):
+                context_with_history += f"User: {hist.get('user_message', '')}\n"
+                context_with_history += f"Sandy: {hist.get('assistant_response', '')}\n\n"
         
-        # Add chat history (reverse to get chronological order)
-        for hist in reversed(chat_history):
-            messages.append({"role": "user", "content": hist.get("user_message", "")})
-            messages.append({"role": "assistant", "content": hist.get("assistant_response", "")})
+        # Initialize LlmChat with emergentintegrations
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"sandy-{session_id}",
+            system_message=context_with_history
+        ).with_model("openai", "gpt-4o")
         
-        # Add current user message
-        messages.append({"role": "user", "content": request.message})
-        
-        # Call OpenAI API using gpt-4o (most capable and cost-effective)
-        completion = await client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            max_tokens=1000,
-            temperature=0.7
-        )
-        
-        # Extract response
-        response = completion.choices[0].message.content
+        # Create user message and get response
+        user_message = UserMessage(text=request.message)
+        response = await chat.send_message(user_message)
         
         # Store chat history in database for persistence
         chat_record = {
