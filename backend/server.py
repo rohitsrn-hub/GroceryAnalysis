@@ -6309,6 +6309,8 @@ NEVER use data from outside this app - only refer to the periods listed above.""
             detected_period = detect_period_from_query(request.message, available_periods)
             period_display_name = await format_period_display_name(detected_period) if detected_period else None
             
+            logger.info(f"Single period query: detected_period={detected_period}")
+            
             if detected_period:
                 # Get period-specific detailed data
                 period_data = await get_period_specific_data(detected_period, db)
