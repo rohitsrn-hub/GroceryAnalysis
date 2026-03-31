@@ -6401,82 +6401,82 @@ IMPORTANT GUIDELINES:
                 logger.info("Using aggregate data across all periods")
                 total_records = await db.sales_records.count_documents({"upload_source": {"$ne": "forecast"}})
             
-            # Get revenue and profit totals
-            pipeline = [
-                {"$match": {"upload_source": {"$ne": "forecast"}}},
-                {"$group": {
-                    "_id": None,
-                    "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
-                    "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
-                    "total_qty": {"$sum": {"$ifNull": ["$net_qty", 0]}}
-                }}
-            ]
-            totals = await db.sales_records.aggregate(pipeline).to_list(1)
-            totals_data = totals[0] if totals else {"total_revenue": 0, "total_profit": 0, "total_qty": 0}
-            
-            # Get top 10 items by revenue (all time)
-            top_items_pipeline = [
-                {"$match": {"upload_source": {"$ne": "forecast"}, "r_amt": {"$gt": 0}}},
-                {"$group": {
-                    "_id": "$item_name",
-                    "total_revenue": {"$sum": "$r_amt"},
-                    "total_profit": {"$sum": "$profit"},
-                    "total_qty": {"$sum": "$net_qty"}
-                }},
-                {"$sort": {"total_revenue": -1}},
-                {"$limit": 10}
-            ]
-            top_items = await db.sales_records.aggregate(top_items_pipeline).to_list(10)
-            
-            # Get top 10 items by profit (all time)
-            top_profit_pipeline = [
-                {"$match": {"upload_source": {"$ne": "forecast"}, "profit": {"$gt": 0}}},
-                {"$group": {
-                    "_id": "$item_name",
-                    "total_revenue": {"$sum": "$r_amt"},
-                    "total_profit": {"$sum": "$profit"},
-                    "total_qty": {"$sum": "$net_qty"}
-                }},
-                {"$sort": {"total_profit": -1}},
-                {"$limit": 10}
-            ]
-            top_by_profit = await db.sales_records.aggregate(top_profit_pipeline).to_list(10)
-            
-            # Get group breakdown
-            group_pipeline = [
-                {"$match": {"upload_source": {"$ne": "forecast"}, "product_group": {"$exists": True}}},
-                {"$group": {
-                    "_id": "$product_group",
-                    "total_revenue": {"$sum": "$r_amt"},
-                    "total_profit": {"$sum": "$profit"},
-                    "item_count": {"$sum": 1}
-                }},
-                {"$sort": {"total_revenue": -1}}
-            ]
-            groups = await db.sales_records.aggregate(group_pipeline).to_list(10)
-            
-            # Format context for the LLM
-            top_items_str = "\n".join([
-                f"  {i+1}. {item['_id']}: Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}, Qty {item['total_qty']}"
-                for i, item in enumerate(top_items) if item['_id']
-            ])
-            
-            top_profit_str = "\n".join([
-                f"  {i+1}. {item['_id']}: Profit ₹{item['total_profit']:,.2f}, Revenue ₹{item['total_revenue']:,.2f}, Qty {item['total_qty']}"
-                for i, item in enumerate(top_by_profit) if item['_id']
-            ])
-            
-            groups_str = "\n".join([
-                f"  - {g['_id']}: Revenue ₹{g['total_revenue']:,.2f}, Profit ₹{g['total_profit']:,.2f}, Items {g['item_count']}"
-                for g in groups if g['_id']
-            ])
-            
-            # Format available periods nicely
-            formatted_periods = []
-            for p in sorted(available_periods):
-                formatted_periods.append(await format_period_display_name(p))
-            
-            system_message = f"""You are Sandy, the AI assistant for URC 101 Grocery Sales Analytics Dashboard.
+                # Get revenue and profit totals
+                pipeline = [
+                    {"$match": {"upload_source": {"$ne": "forecast"}}},
+                    {"$group": {
+                        "_id": None,
+                        "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+                        "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
+                        "total_qty": {"$sum": {"$ifNull": ["$net_qty", 0]}}
+                    }}
+                ]
+                totals = await db.sales_records.aggregate(pipeline).to_list(1)
+                totals_data = totals[0] if totals else {"total_revenue": 0, "total_profit": 0, "total_qty": 0}
+                
+                # Get top 10 items by revenue (all time)
+                top_items_pipeline = [
+                    {"$match": {"upload_source": {"$ne": "forecast"}, "r_amt": {"$gt": 0}}},
+                    {"$group": {
+                        "_id": "$item_name",
+                        "total_revenue": {"$sum": "$r_amt"},
+                        "total_profit": {"$sum": "$profit"},
+                        "total_qty": {"$sum": "$net_qty"}
+                    }},
+                    {"$sort": {"total_revenue": -1}},
+                    {"$limit": 10}
+                ]
+                top_items = await db.sales_records.aggregate(top_items_pipeline).to_list(10)
+                
+                # Get top 10 items by profit (all time)
+                top_profit_pipeline = [
+                    {"$match": {"upload_source": {"$ne": "forecast"}, "profit": {"$gt": 0}}},
+                    {"$group": {
+                        "_id": "$item_name",
+                        "total_revenue": {"$sum": "$r_amt"},
+                        "total_profit": {"$sum": "$profit"},
+                        "total_qty": {"$sum": "$net_qty"}
+                    }},
+                    {"$sort": {"total_profit": -1}},
+                    {"$limit": 10}
+                ]
+                top_by_profit = await db.sales_records.aggregate(top_profit_pipeline).to_list(10)
+                
+                # Get group breakdown
+                group_pipeline = [
+                    {"$match": {"upload_source": {"$ne": "forecast"}, "product_group": {"$exists": True}}},
+                    {"$group": {
+                        "_id": "$product_group",
+                        "total_revenue": {"$sum": "$r_amt"},
+                        "total_profit": {"$sum": "$profit"},
+                        "item_count": {"$sum": 1}
+                    }},
+                    {"$sort": {"total_revenue": -1}}
+                ]
+                groups = await db.sales_records.aggregate(group_pipeline).to_list(10)
+                
+                # Format context for the LLM
+                top_items_str = "\n".join([
+                    f"  {i+1}. {item['_id']}: Revenue ₹{item['total_revenue']:,.2f}, Profit ₹{item['total_profit']:,.2f}, Qty {item['total_qty']}"
+                    for i, item in enumerate(top_items) if item['_id']
+                ])
+                
+                top_profit_str = "\n".join([
+                    f"  {i+1}. {item['_id']}: Profit ₹{item['total_profit']:,.2f}, Revenue ₹{item['total_revenue']:,.2f}, Qty {item['total_qty']}"
+                    for i, item in enumerate(top_by_profit) if item['_id']
+                ])
+                
+                groups_str = "\n".join([
+                    f"  - {g['_id']}: Revenue ₹{g['total_revenue']:,.2f}, Profit ₹{g['total_profit']:,.2f}, Items {g['item_count']}"
+                    for g in groups if g['_id']
+                ])
+                
+                # Format available periods nicely
+                formatted_periods = []
+                for p in sorted(available_periods):
+                    formatted_periods.append(await format_period_display_name(p))
+                
+                system_message = f"""You are Sandy, the AI assistant for URC 101 Grocery Sales Analytics Dashboard.
 You ONLY answer questions based on the sales data provided below. Do NOT use external knowledge or training data.
 
 CRITICAL RULES:
@@ -6515,7 +6515,7 @@ IMPORTANT GUIDELINES:
 5. Provide actionable insights when possible
 6. For comparisons, use percentages when helpful
 7. NEVER use data from outside this app - only use the data provided above
-8. If the user asks about something not in the data above, say "I don't have that information in the system."""
+8. If the user asks about something not in the data above, say "I don't have that information in the system.\""""
 
         # Get chat history for context (last 10 messages)
         chat_history = await db.chat_history.find(
