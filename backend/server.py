@@ -5458,10 +5458,15 @@ async def get_previous_bank_amount(date: str):
 
 @api_router.post("/extract-canteen-summary")
 async def extract_canteen_summary(file: UploadFile = File(...)):
-    """Extract grocery and liquor sales from CSD canteen summary image"""
+    """Extract grocery and liquor sales from CSD canteen summary image.
+
+    Hybrid strategy:
+      • If OPENAI_API_KEY is set  -> use direct OpenAI SDK (Render / production).
+      • Else if EMERGENT_LLM_KEY  -> use emergentintegrations library (preview).
+    The AI chatbot endpoint is unchanged and continues to use direct openai SDK only.
+    """
     try:
         import base64
-        from openai import OpenAI
         
         logger.info(f"Received image upload: {file.filename}, type: {file.content_type}")
         
@@ -5471,18 +5476,17 @@ async def extract_canteen_summary(file: UploadFile = File(...)):
         
         # Convert to base64 for AI processing
         base64_image = base64.b64encode(contents).decode('utf-8')
+        mime = file.content_type or 'image/jpeg'
         
-        # Get API key (try Emergent LLM key first, then fallback to OpenAI key)
-        api_key = os.environ.get('EMERGENT_LLM_KEY') or os.environ.get('OPENAI_API_KEY')
-        if not api_key:
-            raise HTTPException(status_code=500, detail="API key not configured. Set EMERGENT_LLM_KEY or OPENAI_API_KEY environment variable.")
+        openai_key = os.environ.get('OPENAI_API_KEY')
+        emergent_key = os.environ.get('EMERGENT_LLM_KEY')
         
-        # Determine base URL based on key type
-        base_url = None
-        if api_key.startswith('sk-emergent-'):
-            # Emergent LLM key - use Emergent proxy
-            base_url = "https://api.emergentagi.com/v1"
-        
+        if not openai_key and not emergent_key:
+            raise HTTPException(
+                status_code=500,
+                detail="API key not configured. Set OPENAI_API_KEY or EMERGENT_LLM_KEY environment variable.",
+            )
+
         prompt = """Analyze this Canteen Summary image and extract the following data:
 1. Today's Bill Amount - Grocery (look for "Today's Bill Amount" row, Grocery column)
 2. Today's Bill Amount - Liquor (look for "Today's Bill Amount" row, Liquor column)
@@ -5495,48 +5499,116 @@ Return ONLY a JSON object with these exact fields:
 
 Remove commas and currency symbols from numbers. Return only the JSON, nothing else."""
 
-        logger.info("Calling OpenAI API with vision...")
+        response_text = None
+
+        if openai_key:
+            # === Render / production path: direct OpenAI SDK ===
+            from openai import OpenAI
+            logger.info("Using direct OpenAI SDK for image extraction")
+            client = OpenAI(api_key=openai_key)
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a data extraction assistant. Extract numerical data from images accurately.",
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:{mime};base64,{base64_image}"},
+                            },
+                        ],
+                    },
+                ],
+                max_tokens=1024,
+            )
+            response_text = response.choices[0].message.content
+        else:
+            # === Preview path: call Emergent LLM proxy directly via httpx (no retries) ===
+            # We call the proxy HTTP endpoint directly instead of going through the
+            # emergentintegrations library, which has long LiteLLM retry loops that
+            # block the request for minutes when the proxy returns 502/budget errors.
+            import httpx
+            logger.info("Using Emergent LLM proxy (direct httpx) for image extraction")
+            proxy_url = os.environ.get(
+                'INTEGRATION_PROXY_URL',
+                'https://integrations.emergentagent.com',
+            ).rstrip('/')
+            endpoint = f"{proxy_url}/llm/chat/completions"
+            payload = {
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": "You are a data extraction assistant. Extract numerical data from images accurately."},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{base64_image}"}},
+                        ],
+                    },
+                ],
+                "max_tokens": 1024,
+            }
+            try:
+                async with httpx.AsyncClient(timeout=45.0) as client:
+                    resp = await client.post(
+                        endpoint,
+                        json=payload,
+                        headers={"Authorization": f"Bearer {emergent_key}"},
+                    )
+            except httpx.TimeoutException:
+                raise HTTPException(status_code=504, detail="AI extraction timed out. Please try again.")
+            except httpx.HTTPError as e:
+                raise HTTPException(status_code=502, detail=f"AI proxy connection error: {str(e)[:200]}")
+            
+            if resp.status_code >= 400:
+                body_text = resp.text or ""
+                # Try JSON error message
+                try:
+                    err_json = resp.json()
+                    err_msg = err_json.get("error", {}).get("message") if isinstance(err_json.get("error"), dict) else err_json.get("error") or body_text
+                except Exception:
+                    err_msg = body_text
+                
+                if resp.status_code == 400 and "budget" in str(err_msg).lower():
+                    raise HTTPException(
+                        status_code=402,
+                        detail=(
+                            "Your Emergent Universal Key has run out of credits. "
+                            "Top up at Profile → Universal Key → Add Balance, or set OPENAI_API_KEY in backend/.env."
+                        ),
+                    )
+                if resp.status_code == 502:
+                    raise HTTPException(
+                        status_code=502,
+                        detail=(
+                            "AI proxy returned 502 (commonly caused by budget exhaustion). "
+                            "Top up the Universal Key at Profile → Universal Key → Add Balance, "
+                            "or set OPENAI_API_KEY in backend/.env to use your own OpenAI key."
+                        ),
+                    )
+                raise HTTPException(status_code=resp.status_code, detail=f"AI extraction failed: {str(err_msg)[:300]}")
+            
+            try:
+                completion = resp.json()
+                response_text = completion["choices"][0]["message"]["content"]
+            except Exception as parse_err:
+                raise HTTPException(status_code=500, detail=f"Malformed LLM response: {parse_err}")
         
-        # Create OpenAI client
-        client = OpenAI(api_key=api_key, base_url=base_url) if base_url else OpenAI(api_key=api_key)
+        logger.info(f"Received response from LLM: {str(response_text)[:200]}...")
         
-        # Call GPT-4o with vision
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a data extraction assistant. Extract numerical data from images accurately."
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{file.content_type or 'image/jpeg'};base64,{base64_image}"
-                            }
-                        }
-                    ]
-                }
-            ],
-            max_tokens=1024
-        )
-        
-        response_text = response.choices[0].message.content
-        logger.info(f"Received response from LLM: {response_text[:200]}...")
-        
-        # Extract JSON from response
+        # Extract JSON from response (robust to ```json fences etc.)
         import re
-        json_match = re.search(r'\{[^}]+\}', response_text)
+        text = str(response_text).strip()
+        json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
         if json_match:
             extracted_data = json.loads(json_match.group())
         else:
-            extracted_data = json.loads(response_text)
+            extracted_data = json.loads(text)
         
         logger.info(f"✓ Successfully extracted canteen data: {extracted_data}")
         
@@ -5548,6 +5620,8 @@ Remove commas and currency symbols from numbers. Return only the JSON, nothing e
             }
         }
         
+    except HTTPException:
+        raise
     except json.JSONDecodeError as e:
         logger.error(f"JSON parsing error: {str(e)}, Response: {response_text}")
         raise HTTPException(status_code=500, detail=f"Failed to parse AI response: {str(e)}")
