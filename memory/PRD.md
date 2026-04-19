@@ -35,7 +35,7 @@ chatbot ("Sandy") that answers strictly from internal DB.
 
 ## What's Been Implemented
 
-### 2026-04-19 — Session: Automated Daily Sales Report
+### 2026-04-19 — Session: Automated Daily Sales Report + Fallback Hardening
 - Pulled `Chatbot` branch from GitHub; confirmed services healthy (backend+frontend).
 - **Automated daily sales report generation** from the Daily Upload modal:
   - `DailyUploadModal.js` now accepts an optional CSD summary image alongside the Excel file.
@@ -45,7 +45,14 @@ chatbot ("Sandy") that answers strictly from internal DB.
     which persists a `financial_data` record and returns the PDF (auto-downloaded).
   - Inline editable fallback inputs for Previous Bank / Stock values if no prior record exists.
   - Step-wise progress indicator and toasts.
-  - Zero backend code changes — purely an orchestration enhancement.
+- **Backend hardening — `/api/generate-daily-report`**:
+  - `previous_bank_amount` is now **optional**; when omitted, endpoint queries the most
+    recent `financial_data` record before the target date (not just yesterday) and uses
+    its `current_bank_amount`/`current_stock_value`. Handles holidays/weekly offs/gaps.
+  - Returns explicit 400 with a helpful message only when no prior report exists anywhere.
+  - `HTTPException` now re-raised before generic `Exception` handler (no more masked 500s).
+  - `liquor_sales` defaults to `0.0` for cleaner "sales-only" reports.
+  - Covered by 8 new backend tests + 18 existing regression tests (26/26 passing).
 
 ### Previously Completed (from handover)
 - Chatbot "Sandy" rolled back from `emergentintegrations` to direct `openai` SDK.
