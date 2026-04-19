@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 
 # Backend URL from environment
-BACKEND_URL = "https://rhino-forecast.preview.emergentagent.com/api"
+BACKEND_URL = "https://sales-dashboard-486.preview.emergentagent.com/api"
 
 def test_previous_financial_data():
     """Test GET /api/previous-financial-data?date=2025-12-05"""
@@ -848,7 +848,7 @@ def main():
     print("  - PDF Report Daily Sales Trend SVG Line Graph")
     print("  - Comprehensive Report with Monthly Insights")
     print("\n⚠️  Note: Frontend testing was not performed as per testing agent instructions")
-    print("         Frontend URL: https://rhino-forecast.preview.emergentagent.com")
+    print("         Frontend URL: https://sales-dashboard-486.preview.emergentagent.com")
     print("         Frontend testing should verify:")
     print("         - Navigate to 'Bulk Data Upload' tab")
     print("         - Verify two sub-tabs: 'Upload Data' and 'Data Summaries'")
