@@ -5558,14 +5558,19 @@ Remove commas and currency symbols from numbers. Return only the JSON, nothing e
 @api_router.post("/generate-daily-report")
 async def generate_daily_sales_report(
     date: str,
-    liquor_sales: float,
-    previous_bank_amount: float,
+    liquor_sales: float = 0.0,
+    previous_bank_amount: Optional[float] = None,
     grocery_sales: Optional[float] = None,
     previous_stock_value: Optional[float] = None,
     current_stock_value: Optional[float] = None,
     notes: Optional[str] = None
 ):
-    """Generate PDF daily sales report"""
+    """Generate PDF daily sales report.
+    
+    Hardening: If `previous_bank_amount` / `previous_stock_value` are not supplied,
+    auto-fall-back to the LAST generated financial report (not just yesterday).
+    This lets the caller skip fields when history is available.
+    """
     try:
         from reportlab.lib.pagesizes import letter, A4
         from reportlab.lib import colors
@@ -5578,6 +5583,38 @@ async def generate_daily_sales_report(
         # Calculate current stock value before creating financial data
         report_date = datetime.strptime(date, "%Y-%m-%d")
         calculated_stock_value = None
+        
+        # ============================================================
+        # Fall back to the LAST generated financial report for missing baseline values.
+        # This handles cases where yesterday's report is missing (holidays, weekly offs,
+        # or the very first setup): we walk back to the most recent record before `date`.
+        # ============================================================
+        last_report = None
+        if previous_bank_amount is None or previous_stock_value is None:
+            last_report = await db.financial_data.find_one(
+                {"date": {"$lt": report_date}},
+                sort=[("date", -1)],
+                projection={"_id": 0}
+            )
+        
+        if previous_bank_amount is None:
+            if last_report and last_report.get("current_bank_amount") is not None:
+                previous_bank_amount = float(last_report["current_bank_amount"])
+                prev_date_str = last_report.get("date").strftime("%Y-%m-%d") if last_report.get("date") else "unknown"
+                logger.info(f"✓ Auto-fetched previous_bank_amount from last report ({prev_date_str}): ₹{previous_bank_amount:,.2f}")
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "previous_bank_amount is required and no prior financial report exists to fall back on. "
+                        "Please provide the opening bank balance for this report."
+                    ),
+                )
+        
+        if previous_stock_value is None and last_report and last_report.get("current_stock_value") is not None:
+            previous_stock_value = float(last_report["current_stock_value"])
+            prev_date_str = last_report.get("date").strftime("%Y-%m-%d") if last_report.get("date") else "unknown"
+            logger.info(f"✓ Auto-fetched previous_stock_value from last report ({prev_date_str}): ₹{previous_stock_value:,.2f}")
         
         # Get today's W_Amt from upload history to calculate stock value
         todays_w_amt = 0.0
@@ -5798,6 +5835,8 @@ async def generate_daily_sales_report(
             }
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error generating daily sales report PDF")
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")

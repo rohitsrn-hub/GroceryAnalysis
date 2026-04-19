@@ -116,16 +116,16 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
   };
 
   const autoGenerateReport = async ({ grocerySales, liquorSales }) => {
-    // Validate baseline
-    if (previousBankAmount === '' || previousBankAmount === null) {
-      toast.error('Previous Bank Amount is required to auto-generate the report. Please enter it and try again.');
-      return false;
-    }
+    // Backend auto-falls-back to last generated report if previous_bank_amount
+    // is omitted — so this value is now optional. Only a hard fail if there is
+    // truly no prior record anywhere, which the backend returns as 400.
     const params = new URLSearchParams({
       date: selectedDate,
       liquor_sales: String(liquorSales ?? 0),
-      previous_bank_amount: String(previousBankAmount),
     });
+    if (previousBankAmount !== '' && previousBankAmount !== null && previousBankAmount !== undefined) {
+      params.append('previous_bank_amount', String(previousBankAmount));
+    }
     if (grocerySales !== undefined && grocerySales !== null) {
       params.append('grocery_sales', String(grocerySales));
     }
@@ -137,8 +137,14 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
       method: 'POST',
     });
     if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(errText || 'Failed to generate daily sales report');
+      let detail = 'Failed to generate daily sales report';
+      try {
+        const errJson = await resp.json();
+        detail = errJson.detail || detail;
+      } catch {
+        detail = (await resp.text()) || detail;
+      }
+      throw new Error(detail);
     }
     const blob = await resp.blob();
     const url = window.URL.createObjectURL(blob);
@@ -419,7 +425,7 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
                       {previousFound ? (
                         <span className="text-green-600">(auto from {prettyPrevDate})</span>
                       ) : (
-                        <span className="text-amber-600">(required – no prior report)</span>
+                        <span className="text-gray-400">(optional – server will auto-use last report)</span>
                       )}
                     </label>
                     <input
