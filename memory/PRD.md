@@ -35,24 +35,23 @@ chatbot ("Sandy") that answers strictly from internal DB.
 
 ## What's Been Implemented
 
-### 2026-04-19 — Session: Automated Daily Sales Report + Fallback Hardening
+### 2026-04-19 — Session: Automated Daily Sales Report + Fallback Hardening + Image Extraction Fix
 - Pulled `Chatbot` branch from GitHub; confirmed services healthy (backend+frontend).
-- **Automated daily sales report generation** from the Daily Upload modal:
-  - `DailyUploadModal.js` now accepts an optional CSD summary image alongside the Excel file.
+- **Automated daily sales report generation** from the Daily Upload modal (`DailyUploadModal.js`):
+  - Accepts optional CSD summary image alongside the Excel file.
   - Auto-fetches previous bank + stock baseline from `/api/previous-financial-data`.
-  - When image is attached, the modal orchestrates: upload Excel → extract grocery/liquor
-    from image via `/api/extract-canteen-summary` → call `/api/generate-daily-report`
-    which persists a `financial_data` record and returns the PDF (auto-downloaded).
-  - Inline editable fallback inputs for Previous Bank / Stock values if no prior record exists.
-  - Step-wise progress indicator and toasts.
+  - Orchestrates: upload Excel → `/api/extract-canteen-summary` → `/api/generate-daily-report` (PDF auto-downloaded).
 - **Backend hardening — `/api/generate-daily-report`**:
-  - `previous_bank_amount` is now **optional**; when omitted, endpoint queries the most
-    recent `financial_data` record before the target date (not just yesterday) and uses
-    its `current_bank_amount`/`current_stock_value`. Handles holidays/weekly offs/gaps.
-  - Returns explicit 400 with a helpful message only when no prior report exists anywhere.
-  - `HTTPException` now re-raised before generic `Exception` handler (no more masked 500s).
-  - `liquor_sales` defaults to `0.0` for cleaner "sales-only" reports.
-  - Covered by 8 new backend tests + 18 existing regression tests (26/26 passing).
+  - `previous_bank_amount` now optional; auto-falls-back to most recent `financial_data`
+    record before target date. `HTTPException` no longer masked as 500.
+  - Covered by 26/26 backend tests.
+- **Image extraction fix — `/api/extract-canteen-summary`**:
+  - Previous code targeted a wrong base URL (`api.emergentagi.com`) → SSL errors.
+  - Rewrote as **hybrid**: uses direct OpenAI SDK when `OPENAI_API_KEY` is set
+    (Render/prod), else calls the Emergent proxy via httpx (45 s timeout, no long retries).
+  - Surfaces clear 402/502 messages for budget-exceeded / proxy-down scenarios.
+  - Verified working with `OPENAI_API_KEY` in preview — extracts grocery/liquor correctly
+    (test: 15,234.50 / 8,750.00).
 
 ### Previously Completed (from handover)
 - Chatbot "Sandy" rolled back from `emergentintegrations` to direct `openai` SDK.
