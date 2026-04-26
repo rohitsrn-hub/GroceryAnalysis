@@ -86,10 +86,7 @@ function MainApp() {
   }, []);
 
   const handleDataUpload = async () => {
-    // Refresh dashboard data after upload
-    console.log('Refreshing dashboard data...');
     await fetchDashboardData();
-    console.log('Dashboard data refreshed');
   };
 
   const handleGenerateReport = async () => {
@@ -145,12 +142,14 @@ function MainApp() {
       document.body.removeChild(link);
       
       toast.success('Report downloaded successfully', { id: loadingToast });
+      loadingToast = null; // consumed — don't dismiss in finally
       setShowReportDialog(false);
     } catch (error) {
       console.error('Report generation error:', error);
       toast.error(error.message || 'Failed to generate report', { id: loadingToast });
+      loadingToast = null;
     } finally {
-      // Ensure toast is always dismissed
+      // Only dismiss if still in loading state (e.g. early return before toast was resolved)
       if (loadingToast) {
         toast.dismiss(loadingToast);
       }

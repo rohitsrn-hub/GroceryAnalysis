@@ -119,10 +119,10 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
     // Backend auto-falls-back to last generated report if previous_bank_amount
     // is omitted — so this value is now optional. Only a hard fail if there is
     // truly no prior record anywhere, which the backend returns as 400.
-    const params = new URLSearchParams({
-      date: selectedDate,
-      liquor_sales: String(liquorSales ?? 0),
-    });
+    const params = new URLSearchParams({ date: selectedDate });
+    if (liquorSales !== undefined && liquorSales !== null) {
+      params.append('liquor_sales', String(liquorSales));
+    }
     if (previousBankAmount !== '' && previousBankAmount !== null && previousBankAmount !== undefined) {
       params.append('previous_bank_amount', String(previousBankAmount));
     }
@@ -218,6 +218,9 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
         toast.success(
           `Extracted: Grocery ₹${Number(grocerySales || 0).toLocaleString('en-IN')} • Liquor ₹${Number(liquorSales || 0).toLocaleString('en-IN')}`
         );
+        if (liquorSales === undefined || liquorSales === null) {
+          toast.warning('Liquor sales not found in image — defaulting to ₹0. Edit the report if needed.');
+        }
 
         setStepLabel('Generating daily sales report…');
         const ok = await autoGenerateReport({ grocerySales, liquorSales });

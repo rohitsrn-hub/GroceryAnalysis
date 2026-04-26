@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { Badge } from "./ui/badge";
@@ -27,14 +27,16 @@ const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, on
   const [availablePeriods, setAvailablePeriods] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const { isMobile, isTablet, isDesktop, screenWidth } = useDeviceDetect();
+  const isMounted = useRef(false);
 
   useEffect(() => {
     fetchAvailablePeriods();
-    fetchAnalyticsData();
   }, []);
 
   useEffect(() => {
-    // Re-fetch data when period selection changes
+    if (!isMounted.current) {
+      isMounted.current = true;
+    }
     fetchAnalyticsData();
   }, [dashboardPeriod]);
 
@@ -42,7 +44,9 @@ const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, on
     try {
       const response = await fetch(`${API}/available-periods`);
       if (response.ok) {
-        const periods = await response.json();
+        const data = await response.json();
+        // Route returns {available_periods: [...], periods_detailed: [...], count: N}
+        const periods = Array.isArray(data) ? data : (data.available_periods || []);
         setAvailablePeriods(periods);
       }
     } catch (error) {
@@ -72,10 +76,6 @@ const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, on
       const groups = await groupResponse.json();
       const inventory = await inventoryResponse.json();
       const trend = await trendResponse.json();
-
-      console.log('Dashboard - Fastest items received:', fastest.length, fastest.slice(0, 2));
-      console.log('Dashboard - Group analysis received:', groups.length);
-      console.log('Dashboard - Daily sales trend received:', trend.months?.length, 'months');
 
       setFastestItems(fastest);
       setGroupAnalysis(groups);

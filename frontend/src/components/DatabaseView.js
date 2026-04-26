@@ -233,48 +233,6 @@ const DatabaseView = () => {
             </div>
           )}
 
-          {/* Admin Actions - Period Migration */}
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-yellow-900 mb-1">⚡ One-Time Migration</h3>
-                <p className="text-xs text-yellow-700 mb-2">
-                  If you uploaded "Jan-Sep 2025" data before the latest update, click below to fix the period format. 
-                  This updates old "Jan 2025" records to "Jan-Sep 2025" range format.
-                </p>
-              </div>
-              <Button
-                onClick={async () => {
-                  if (!window.confirm('Run migration to fix Jan-Sep 2025 period? This will update existing records.')) {
-                    return;
-                  }
-                  
-                  const toastId = toast.loading('Running migration...');
-                  try {
-                    const response = await fetch(`${API}/fix-jan-sep-period`, {
-                      method: 'POST'
-                    });
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                      toast.success(`✅ ${data.message}`, { id: toastId, duration: 5000 });
-                      // Refresh the view
-                      fetchRecords();
-                    } else {
-                      toast.error('Migration failed', { id: toastId });
-                    }
-                  } catch (error) {
-                    console.error('Migration error:', error);
-                    toast.error('Migration failed: ' + error.message, { id: toastId });
-                  }
-                }}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-3 py-1 h-auto whitespace-nowrap"
-              >
-                Run Migration
-              </Button>
-            </div>
-          </div>
-
           {/* Filters */}
           <div className="flex flex-wrap gap-4 mb-6">
             <div className="flex-1 min-w-[200px]">

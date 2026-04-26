@@ -25,6 +25,7 @@ const UploadHistory = ({ onDataChange }) => {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [statusCounts, setStatusCounts] = useState({ success: 0, failed: 0, partial: 0 });
   const [page, setPage] = useState(0);
   const [limit] = useState(20);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -33,8 +34,26 @@ const UploadHistory = ({ onDataChange }) => {
   const [undoing, setUndoing] = useState(false);
 
   useEffect(() => {
+    fetchStatusCounts();
     fetchHistory();
   }, [page, statusFilter]);
+
+  const fetchStatusCounts = async () => {
+    try {
+      const [s, f, p] = await Promise.all([
+        fetch(`${API}/upload-history?limit=1&skip=0&status_filter=success`).then(r => r.json()),
+        fetch(`${API}/upload-history?limit=1&skip=0&status_filter=failed`).then(r => r.json()),
+        fetch(`${API}/upload-history?limit=1&skip=0&status_filter=partial`).then(r => r.json()),
+      ]);
+      setStatusCounts({
+        success: s.total || 0,
+        failed: f.total || 0,
+        partial: p.total || 0,
+      });
+    } catch (e) {
+      // non-critical: counts remain at 0
+    }
+  };
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -84,6 +103,7 @@ const UploadHistory = ({ onDataChange }) => {
       if (response.ok) {
         toast.success(`Successfully undone upload: ${undoDialog.record.filename}. Deleted ${result.deleted_count} records.`);
         setUndoDialog({ open: false, record: null });
+        fetchStatusCounts();
         fetchHistory();
         if (onDataChange) {
           onDataChange(); // Refresh dashboard
@@ -254,13 +274,13 @@ const UploadHistory = ({ onDataChange }) => {
             <div className="p-4 bg-green-50 rounded-lg border border-green-200">
               <div className="text-sm text-green-600 font-medium">Successful</div>
               <div className="text-2xl font-bold text-green-900">
-                {history.filter(h => h.status === "success").length}
+                {statusCounts.success}
               </div>
             </div>
             <div className="p-4 bg-red-50 rounded-lg border border-red-200">
               <div className="text-sm text-red-600 font-medium">Failed</div>
               <div className="text-2xl font-bold text-red-900">
-                {history.filter(h => h.status === "failed").length}
+                {statusCounts.failed}
               </div>
             </div>
             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">

@@ -5,6 +5,16 @@ import { Badge } from './ui/badge';
 import { Calendar, DollarSign, FileText, TrendingUp, Download, AlertCircle, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatIndianNumber } from '../utils/numberUtils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -17,6 +27,7 @@ const FinancialHealth = ({ onReportGenerated }) => {
   const [loading, setLoading] = useState(true);
   const [editingRecord, setEditingRecord] = useState(null);
   const [extractedData, setExtractedData] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, record: null });
 
   useEffect(() => {
     fetchFinancialRecords();
@@ -46,10 +57,14 @@ const FinancialHealth = ({ onReportGenerated }) => {
     setShowReportModal(true);
   };
 
-  const handleDeleteRecord = async (record) => {
-    if (!window.confirm(`Are you sure you want to delete the financial report for ${new Date(record.date).toLocaleDateString('en-IN')}?`)) {
-      return;
-    }
+  const handleDeleteRecord = (record) => {
+    setDeleteDialog({ open: true, record });
+  };
+
+  const confirmDeleteRecord = async () => {
+    const record = deleteDialog.record;
+    if (!record) return;
+    setDeleteDialog({ open: false, record: null });
 
     try {
       const response = await fetch(`${API}/financial-data/${record.id}`, {
@@ -62,8 +77,7 @@ const FinancialHealth = ({ onReportGenerated }) => {
 
       toast.success('Financial report deleted successfully!');
       fetchFinancialRecords();
-      
-      // Refresh dashboard if available
+
       if (onReportGenerated) {
         onReportGenerated();
       }
@@ -226,6 +240,30 @@ const FinancialHealth = ({ onReportGenerated }) => {
           extractedData={extractedData}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-900">Delete Financial Report?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteDialog.record && (
+                <>
+                  Are you sure you want to delete the financial report for{' '}
+                  <strong>{new Date(deleteDialog.record.date).toLocaleDateString('en-IN')}</strong>?
+                  This action cannot be undone.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteRecord} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
@@ -428,25 +466,12 @@ const ReportGenerationModal = ({ isOpen, onClose, onSuccess, onReportGenerated, 
     }
   }, [isOpen, formData.date, editingRecord]);
 
-  // Fetch today's upload data (grocery sales + W_Amt for stock calculation)
-  // This runs AFTER previousStockValue is loaded
   useEffect(() => {
-    console.log('useEffect for upload data - isOpen:', isOpen, 'editingRecord:', editingRecord, 'extractedData:', extractedData);
-    console.log('formData.grocerySales:', formData.grocerySales, 'formData.previousStockValue:', formData.previousStockValue);
-    
     if (isOpen && !editingRecord && !loadingPreviousData) {
-      // Only fetch if we don't already have the data
       const needsGrocery = !extractedData && !formData.grocerySales;
       const needsStock = formData.previousStockValue && !formData.currentStockValue;
-      
-      console.log('needsGrocery:', needsGrocery, 'needsStock:', needsStock);
-      
       if (needsGrocery || needsStock) {
-        console.log('Calling fetchTodaysUploadData...');
-        // Small delay to ensure previousStockValue is set
-        setTimeout(() => {
-          fetchTodaysUploadData();
-        }, 100);
+        fetchTodaysUploadData();
       }
     }
   }, [isOpen, formData.previousStockValue, formData.date, editingRecord, extractedData, loadingPreviousData]);
@@ -483,96 +508,46 @@ const ReportGenerationModal = ({ isOpen, onClose, onSuccess, onReportGenerated, 
   const fetchTodaysUploadData = async () => {
     try {
       setCalculatingStock(true);
-      console.log('Fetching upload data for date:', formData.date);
       const response = await fetch(`${API}/upload-history?data_date=${formData.date}`);
       if (response.ok) {
         const data = await response.json();
-        console.log('Upload history response:', data);
-        
-        // Find today's daily upload - use string comparison to avoid timezone issues
+
         const todayUpload = data.uploads?.find(u => {
-          if (u.upload_type !== 'daily' || u.status !== 'success') {
-            return false;
-          }
-          
-          // Extract just the date part from the data_date string (handles timezone properly)
-          const uploadDate = u.data_date.split('T')[0];
-          const matches = uploadDate === formData.date;
-          
-          console.log('Checking upload:', {
-            upload_type: u.upload_type,
-            status: u.status,
-            data_date: u.data_date,
-            uploadDate: uploadDate,
-            formData_date: formData.date,
-            matches: matches
-          });
-          
-          return matches;
+          if (u.upload_type !== 'daily' || u.status !== 'success') return false;
+          return u.data_date.split('T')[0] === formData.date;
         });
-        console.log('Found today upload:', todayUpload);
-        
+
         if (todayUpload) {
-          console.log('Processing today upload:', todayUpload);
           const updates = {};
-          
-          // Auto-fill grocery sales from Net Amt if not from image
+
           if (!extractedData && todayUpload.net_amt) {
             const netAmt = parseFloat(todayUpload.net_amt);
-            console.log('Setting grocery sales to:', netAmt);
             updates.grocerySales = netAmt.toFixed(2);
             toast.success(`✓ Grocery sales auto-filled from today's upload: ₹${netAmt.toFixed(2)}`);
-          } else {
-            console.log('Skipping grocery sales - extractedData:', extractedData, 'net_amt:', todayUpload.net_amt);
           }
-          
-          // Calculate stock value if W_Amt is available
+
           if (todayUpload.w_amt) {
             const wAmt = parseFloat(todayUpload.w_amt);
             setTodaysWAmt(wAmt);
-            console.log('W_Amt found:', wAmt);
-            console.log('Current formData.previousStockValue:', formData.previousStockValue);
-            
-            // Calculate current stock value if we have previous stock
-            // Use the callback form to get the latest state
+
             setFormData(prev => {
-              console.log('Inside setFormData - prev.previousStockValue:', prev.previousStockValue);
-              
               if (prev.previousStockValue && prev.previousStockValue !== '') {
                 const prevStock = parseFloat(prev.previousStockValue);
                 const currentStock = prevStock - wAmt;
-                console.log(`✓ Stock calculation: ${prevStock} - ${wAmt} = ${currentStock}`);
                 toast.success(`✓ Stock calculated: ₹${prevStock.toFixed(2)} - ₹${wAmt.toFixed(2)} = ₹${currentStock.toFixed(2)}`);
-                
-                return {
-                  ...prev,
-                  ...updates,
-                  currentStockValue: currentStock.toFixed(2)
-                };
-              } else {
-                console.log('No previous stock value available for calculation');
-                return {
-                  ...prev,
-                  ...updates
-                };
+                return { ...prev, ...updates, currentStockValue: currentStock.toFixed(2) };
               }
+              return { ...prev, ...updates };
             });
-            
-            return; // Exit early since we're using setFormData callback
+
+            return;
           } else {
             setTodaysWAmt(null);
           }
-          
-          // Apply all updates at once (only if no w_amt, otherwise already applied above)
-          console.log('Applying remaining updates:', updates);
-          if (!todayUpload.w_amt && Object.keys(updates).length > 0) {
-            setFormData(prev => ({
-              ...prev,
-              ...updates
-            }));
+
+          if (Object.keys(updates).length > 0) {
+            setFormData(prev => ({ ...prev, ...updates }));
           }
-        } else {
-          console.log('No matching upload found for today');
         }
       }
     } catch (error) {

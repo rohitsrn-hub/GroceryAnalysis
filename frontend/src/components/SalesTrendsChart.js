@@ -413,7 +413,7 @@ const SalesTrendsChart = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div>
-                        <div className="text-gray-500 text-xs">Total Units</div>
+                        <div className="text-gray-500 text-xs">Total Sales</div>
                         <div className="font-semibold">₹{formatTableNumber(period.totalSales)}</div>
                       </div>
                       <div>

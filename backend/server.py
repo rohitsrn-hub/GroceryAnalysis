@@ -422,52 +422,33 @@ async def check_duplicate_upload(period_covered: str) -> Optional[Dict]:
             target_month_names = month_names.get(month_int, [])
             
             if target_month_names:
-                # Get all records that might contain this month
-                all_records = await db.sales_records.find({
-                    "data_period": {"$exists": True, "$ne": None}
-                }).to_list(None)
-                
-                # Filter to find ONLY single-month records for the target month
-                matching_records = []
-                for record in all_records:
-                    data_period = record.get("data_period", "").lower()
-                    
-                    # Skip if empty
-                    if not data_period:
+                # Fetch only distinct period strings containing the target year (tiny set)
+                distinct_periods = await db.sales_records.distinct(
+                    "data_period",
+                    {"data_period": {"$exists": True, "$ne": None, "$regex": year}}
+                )
+
+                matching_periods = []
+                for data_period in distinct_periods:
+                    dp_lower = data_period.lower() if data_period else ""
+                    if not dp_lower or year not in dp_lower:
                         continue
-                    
-                    # Check if it's the target year
-                    if year not in data_period:
+                    if not any(mn in dp_lower for mn in target_month_names):
                         continue
-                    
-                    # Check if it contains the target month
-                    has_target_month = any(month_name in data_period for month_name in target_month_names)
-                    if not has_target_month:
-                        continue
-                    
-                    # CRITICAL: Exclude multi-month patterns
-                    # Look for patterns like "JAN TO SEP", "january to september", etc.
-                    is_multi_month = False
-                    for other_month_int in range(1, 13):
-                        if other_month_int != month_int:  # Different month
-                            other_month_names = month_names.get(other_month_int, [])
-                            for other_month_name in other_month_names:
-                                if other_month_name in data_period:
-                                    # Found another month name - likely a range
-                                    is_multi_month = True
-                                    break
-                            if is_multi_month:
-                                break
-                    
-                    # Also check for "TO" keyword which indicates a range
-                    if " to " in data_period and is_multi_month:
-                        continue
-                    
-                    # If we got here, it's a single-month record for our target month
+                    # Exclude multi-month ranges (contain a different month name)
+                    is_multi_month = any(
+                        mn in dp_lower
+                        for mi, names in month_names.items()
+                        if mi != month_int
+                        for mn in names
+                    )
                     if not is_multi_month:
-                        matching_records.append(record)
-                
-                existing_records = len(matching_records)
+                        matching_periods.append(data_period)
+
+                if matching_periods:
+                    existing_records = await db.sales_records.count_documents(
+                        {"data_period": {"$in": matching_periods}}
+                    )
     
     if existing_records > 0:
         # Get upload history for this period to show when it was uploaded
@@ -1197,27 +1178,24 @@ def identify_special_rows(df: pd.DataFrame) -> Dict[str, int]:
         'summary_start': None
     }
     
-    # Check first column (S.No) for special text
-    first_col = df.iloc[:, 0]
-    
-    for idx, value in enumerate(first_col):
-        if pd.isna(value):
+    # Check all columns for special row markers (markers may appear in any column)
+    for idx, row in df.iterrows():
+        row_text = " ".join(str(v).strip().lower() for v in row if not pd.isna(v))
+        if not row_text.strip():
             continue
-        
-        value_str = str(value).strip().lower()
-        
+
         # Check for Group Total
-        if 'group total' in value_str and 'report' not in value_str:
+        if 'group total' in row_text and 'report' not in row_text:
             special_rows['group_totals'].append(idx)
             logger.info(f"Found Group Total at row {idx} (Excel row {idx+2})")
-        
+
         # Check for Report Total
-        elif 'report total' in value_str:
+        elif 'report total' in row_text:
             special_rows['report_total'] = idx
             logger.info(f"Found Report Total at row {idx} (Excel row {idx+2})")
-        
+
         # Check for Summary Details
-        elif 'summary details' in value_str or ('summary' in value_str and '*' in value_str):
+        elif 'summary details' in row_text or ('summary' in row_text and '*' in row_text):
             special_rows['summary_start'] = idx
             logger.info(f"Found Summary Details section at row {idx} (Excel row {idx+2})")
     
@@ -1434,10 +1412,15 @@ def process_excel_data(file_content: bytes, filename: str, period_info: Optional
         
         logger.info(f"Converted numeric columns to proper types")
         
-        # Calculate Profit AFTER numeric conversion (R_Amt - W_Amt)
+        # Fill missing profit values from R_Amt - W_Amt; preserve Excel's Profit column when present
         if 'r_amt' in df.columns and 'w_amt' in df.columns:
-            df['profit'] = df['r_amt'].fillna(0) - df['w_amt'].fillna(0)
-            logger.info(f"Calculated profit for {len(df[df['profit'].notna()])} rows")
+            calculated = df['r_amt'].fillna(0) - df['w_amt'].fillna(0)
+            if 'profit' not in df.columns:
+                df['profit'] = calculated
+            else:
+                missing = df['profit'].isna()
+                df.loc[missing, 'profit'] = calculated[missing]
+            logger.info(f"Profit available for {len(df[df['profit'].notna()])} rows")
         
         # Use normalized period from period_info, fallback to filename if not provided
         if period_info and period_info.get('period'):
@@ -1841,27 +1824,28 @@ async def get_fastest_selling_items(
                     "total_sold": {"$sum": "$net_qty"},
                     "total_revenue": {"$sum": "$r_amt"},
                     "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
-                    "periods": {"$push": {"period": "$data_period", "qty": "$net_qty"}}
+                    "periods": {"$push": {"period": "$data_period", "qty": "$net_qty"}},
+                    "distinct_periods": {"$addToSet": "$data_period"}
                 }
             },
             {"$sort": {"total_sold": -1}},
             {"$limit": limit}
         ]
-        
+
         results = await db.sales_records.aggregate(pipeline).to_list(None)
-        
+
         fastest_items = []
         for item in results:
             # Calculate seasonal pattern (simplified)
             seasonal_pattern = {}
             for period_data in item['periods']:
                 seasonal_pattern[period_data['period']] = period_data['qty']
-            
+
             fastest_items.append({
                 "item_code": item['_id']['pluno'],
                 "item_name": item['_id']['item_name'],
                 "total_sold": item['total_sold'],
-                "avg_monthly_sales": item['total_sold'] / max(len(item['periods']), 1),
+                "avg_monthly_sales": item['total_sold'] / max(len(item['distinct_periods']), 1),
                 "group": item['_id']['group'],
                 "seasonal_pattern": seasonal_pattern,
                 "total_revenue": item.get('total_revenue', 0),
@@ -2351,16 +2335,20 @@ async def generate_comprehensive_report(
             # Get all data
             dashboard_summary = await get_dashboard_summary(period=None)
         
-        # Get ABC analysis using existing endpoint - pass None directly for group and period
-        abc_response = await get_abc_analysis(group=None, period=None)
+        # For sub-analyses, pass the period when exactly one is selected;
+        # multi-period reports fall back to all-data (sub-functions only accept a single period).
+        sub_period = period_list[0] if len(period_list) == 1 else None
+
+        # Get ABC analysis using existing endpoint
+        abc_response = await get_abc_analysis(group=None, period=sub_period)
         abc_analysis = abc_response if isinstance(abc_response, dict) else {}
-        
-        # Get capital blocking analysis using existing endpoint - pass None directly for group and period
-        capital_response = await get_capital_blocking_analysis(group=None, period=None)
+
+        # Get capital blocking analysis using existing endpoint
+        capital_response = await get_capital_blocking_analysis(group=None, period=sub_period)
         capital_analysis = capital_response if isinstance(capital_response, dict) else {}
-        
-        # Get group analysis - pass None directly for period
-        group_analysis = await get_group_analysis(period=None)
+
+        # Get group analysis
+        group_analysis = await get_group_analysis(period=sub_period)
         
         # Get fastest selling items with period filter (match_filter already defined above)
         fastest_pipeline = [
@@ -3167,31 +3155,6 @@ async def generate_comprehensive_report(
         logger.error(f"Error generating comprehensive report: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
-
-@api_router.post("/fix-jan-sep-period")
-async def fix_jan_sep_period():
-    """Migration: Fix Jan-Sep 2025 data that was incorrectly stored as 2025-01"""
-    try:
-        # Update records with period "2025-01" to "2025-01-09" (Jan-Sep range)
-        # This should only be done if the data actually represents Jan-Sep
-        result = await db.sales_records.update_many(
-            {
-                "data_period": "2025-01",
-                "upload_source": {"$ne": "forecast"}
-            },
-            {
-                "$set": {"data_period": "2025-01-09"}  # Jan (01) to Sep (09)
-            }
-        )
-        
-        return {
-            "success": True,
-            "modified_count": result.modified_count,
-            "message": f"Updated {result.modified_count} records from '2025-01' to '2025-01-09' (Jan-Sep 2025)"
-        }
-    except Exception as e:
-        logger.error(f"Error fixing period: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fixing period: {str(e)}")
 
 @api_router.get("/available-periods")
 async def get_available_periods():
@@ -4550,37 +4513,6 @@ async def get_dashboard_summary(period: Optional[str] = Query(None)):
     except Exception as e:
         logger.error(f"Error getting dashboard summary: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting dashboard summary: {str(e)}")
-
-@api_router.get("/available-periods")
-async def get_available_periods():
-    """Get list of all unique data periods available in the database"""
-    try:
-        # Get distinct periods from sales_records, excluding forecast data
-        periods = await db.sales_records.distinct(
-            "data_period",
-            {"upload_source": {"$ne": "forecast"}}
-        )
-        
-        # Filter out None values and sort
-        periods = [p for p in periods if p is not None]
-        periods.sort(reverse=True)  # Most recent first
-        
-        # Check if there's any data for current year (2025)
-        current_year = datetime.now().year
-        has_current_year_data = any(
-            str(current_year) in str(p) or str(current_year)[2:] in str(p) 
-            for p in periods
-        )
-        
-        # Add "Current Year" option at the beginning if current year data exists
-        if has_current_year_data:
-            periods.insert(0, f"{current_year} - Current Year")
-        
-        return periods
-        
-    except Exception as e:
-        logger.error(f"Error getting available periods: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error getting available periods: {str(e)}")
 
 # ============================================================================
 # PHASE 1: UPLOAD HISTORY & DATABASE VIEW ENDPOINTS
@@ -6712,12 +6644,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# CORS Configuration - FIXED per security best practices
-raw_cors = os.environ.get("CORS_ORIGINS", "")
-if raw_cors.strip() == "":
-    allow_origins = []
-elif raw_cors.strip() == "*":
+# CORS Configuration — set CORS_ORIGINS env var in production (comma-separated URLs).
+# Omitting it falls back to wildcard ("*") with a warning; set explicitly for production.
+raw_cors = os.environ.get("CORS_ORIGINS", "").strip()
+if raw_cors == "" or raw_cors == "*":
     allow_origins = ["*"]
+    if raw_cors == "":
+        logger.warning(
+            "CORS_ORIGINS env var not set — defaulting to wildcard '*'. "
+            "Set CORS_ORIGINS to your frontend URL(s) in production."
+        )
 else:
     allow_origins = [o.strip() for o in raw_cors.split(",") if o.strip()]
 
@@ -6733,7 +6669,7 @@ logger.info("CORS Configuration - allow_origins=%s allow_credentials=%s", allow_
 # Apply CORS middleware BEFORE including routes
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins or ["*"],
+    allow_origins=allow_origins,
     allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],

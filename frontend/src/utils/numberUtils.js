@@ -79,7 +79,7 @@ export const formatTableNumber = (num) => {
     return isNegative ? '-' + result : result;
   }
   
-  return absNum.toFixed(2);
+  return isNegative ? '-' + absNum.toFixed(2) : absNum.toFixed(2);
 };
 
 /**
