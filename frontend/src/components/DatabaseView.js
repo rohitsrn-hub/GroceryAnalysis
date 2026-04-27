@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -52,7 +53,7 @@ const DatabaseView = () => {
       if (gpIndexNoFilter) params.append("gp_index_no", gpIndexNoFilter);
       if (aggregated) params.append("aggregated", "true");
 
-      const response = await fetch(`${API}/database-view?${params}`);
+      const response = await apiFetch(`${API}/database-view?${params}`);
       if (!response.ok) throw new Error("Failed to fetch records");
 
       const data = await response.json();
@@ -99,7 +100,7 @@ const DatabaseView = () => {
         if (gpIndexNoFilter) params.append("gp_index_no", gpIndexNoFilter);
         if (aggregated) params.append("aggregated", "true");
 
-        const response = await fetch(`${API}/database-view?${params}`);
+        const response = await apiFetch(`${API}/database-view?${params}`);
         if (!response.ok) throw new Error("Failed to fetch records");
 
         const data = await response.json();

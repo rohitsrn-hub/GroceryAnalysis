@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { X, Upload, Calendar, FileText, Image as ImageIcon, Zap, FileDown } from 'lucide-react';
@@ -28,7 +29,7 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
     const fetchPrevious = async () => {
       try {
         setFetchingPrevious(true);
-        const resp = await fetch(`${API}/previous-financial-data?date=${selectedDate}`);
+        const resp = await apiFetch(`${API}/previous-financial-data?date=${selectedDate}`);
         if (resp.ok) {
           const data = await resp.json();
           if (data.found) {
@@ -133,7 +134,7 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
       params.append('previous_stock_value', String(previousStockValue));
     }
 
-    const resp = await fetch(`${API}/generate-daily-report?${params.toString()}`, {
+    const resp = await apiFetch(`${API}/generate-daily-report?${params.toString()}`, {
       method: 'POST',
     });
     if (!resp.ok) {
@@ -179,7 +180,7 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
       excelForm.append('upload_type', 'daily');
       excelForm.append('data_date', selectedDate);
 
-      const uploadResp = await fetch(`${API}/upload-sales-data`, {
+      const uploadResp = await apiFetch(`${API}/upload-sales-data`, {
         method: 'POST',
         body: excelForm,
       });
@@ -203,7 +204,7 @@ const DailyUploadModal = ({ isOpen, onClose, onSuccess }) => {
         setStepLabel('Extracting data from CSD summary image…');
         const imgForm = new FormData();
         imgForm.append('file', selectedImage);
-        const extractResp = await fetch(`${API}/extract-canteen-summary`, {
+        const extractResp = await apiFetch(`${API}/extract-canteen-summary`, {
           method: 'POST',
           body: imgForm,
         });

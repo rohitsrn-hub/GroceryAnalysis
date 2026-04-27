@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -40,7 +41,7 @@ const AnalyticsFixed = () => {
 
   const fetchAvailablePeriods = async () => {
     try {
-      const response = await fetch(`${API}/available-data-periods`);
+      const response = await apiFetch(`${API}/available-data-periods`);
       if (response.ok) {
         const data = await response.json();
         // Use periods_detailed which has both value and label
@@ -66,11 +67,11 @@ const AnalyticsFixed = () => {
       };
 
       const [fastestResponse, groupResponse, inventoryResponse, abcResponse, capitalResponse] = await Promise.all([
-        fetch(`${API}/fastest-selling-items?limit=20${buildQueryParams(true)}`),
-        fetch(`${API}/group-analysis${buildQueryParams()}`),
-        fetch(`${API}/inventory-analysis`),
-        fetch(`${API}/abc-analysis${buildQueryParams()}`),
-        fetch(`${API}/capital-blocking-analysis${buildQueryParams()}`)
+        apiFetch(`${API}/fastest-selling-items?limit=20${buildQueryParams(true)}`),
+        apiFetch(`${API}/group-analysis${buildQueryParams()}`),
+        apiFetch(`${API}/inventory-analysis`),
+        apiFetch(`${API}/abc-analysis${buildQueryParams()}`),
+        apiFetch(`${API}/capital-blocking-analysis${buildQueryParams()}`)
       ]);
 
       console.log('API responses received:', {
@@ -119,7 +120,7 @@ const AnalyticsFixed = () => {
       if (selectedPeriod !== 'all') params.push(`period=${selectedPeriod}`);
       const queryString = params.length > 0 ? '?' + params.join('&') : '';
       
-      const response = await fetch(`${API}/export-data/${analysisType}${queryString}`);
+      const response = await apiFetch(`${API}/export-data/${analysisType}${queryString}`);
       
       if (!response.ok) throw new Error('Export failed');
       

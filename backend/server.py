@@ -1,4 +1,5 @@
-from fastapi import FastAPI, APIRouter, UploadFile, File, HTTPException, Query, Form, Request
+from fastapi import FastAPI, APIRouter, UploadFile, File, HTTPException, Query, Form, Request, Depends
+from fastapi.security.api_key import APIKeyHeader
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -247,8 +248,17 @@ def generate_daily_sales_line_graph(daily_data):
 # Create the main app without a prefix
 app = FastAPI()
 
+# API key authentication — only enforced when APP_API_KEY env var is set.
+# Set APP_API_KEY on the backend and REACT_APP_API_KEY on the frontend to enable.
+_APP_API_KEY = os.environ.get("APP_API_KEY", "")
+_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def verify_api_key(key: str = Depends(_api_key_header)):
+    if _APP_API_KEY and key != _APP_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+
 # Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
+api_router = APIRouter(prefix="/api", dependencies=[Depends(verify_api_key)])
 
 # Define Models
 class SalesRecord(BaseModel):

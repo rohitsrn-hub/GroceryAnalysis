@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -39,7 +40,7 @@ const FinancialHealth = ({ onReportGenerated }) => {
       const endDate = new Date().toISOString().split('T')[0];
       const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       
-      const response = await fetch(`${API}/financial-data-range?start_date=${startDate}&end_date=${endDate}`);
+      const response = await apiFetch(`${API}/financial-data-range?start_date=${startDate}&end_date=${endDate}`);
       if (!response.ok) throw new Error('Failed to fetch financial records');
       
       const data = await response.json();
@@ -67,7 +68,7 @@ const FinancialHealth = ({ onReportGenerated }) => {
     setDeleteDialog({ open: false, record: null });
 
     try {
-      const response = await fetch(`${API}/financial-data/${record.id}`, {
+      const response = await apiFetch(`${API}/financial-data/${record.id}`, {
         method: 'DELETE',
       });
 
@@ -298,7 +299,7 @@ const ImageUploadDialog = ({ isOpen, onClose, onProceedWithImage, onProceedWitho
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const response = await fetch(`${API}/extract-canteen-summary`, {
+      const response = await apiFetch(`${API}/extract-canteen-summary`, {
         method: 'POST',
         body: formData,
       });
@@ -479,7 +480,7 @@ const ReportGenerationModal = ({ isOpen, onClose, onSuccess, onReportGenerated, 
   const fetchPreviousBankAmount = async () => {
     try {
       setLoadingPreviousData(true);
-      const response = await fetch(`${API}/previous-financial-data?date=${formData.date}`);
+      const response = await apiFetch(`${API}/previous-financial-data?date=${formData.date}`);
       if (response.ok) {
         const data = await response.json();
         if (data.found) {
@@ -508,7 +509,7 @@ const ReportGenerationModal = ({ isOpen, onClose, onSuccess, onReportGenerated, 
   const fetchTodaysUploadData = async () => {
     try {
       setCalculatingStock(true);
-      const response = await fetch(`${API}/upload-history?data_date=${formData.date}`);
+      const response = await apiFetch(`${API}/upload-history?data_date=${formData.date}`);
       if (response.ok) {
         const data = await response.json();
 
@@ -597,7 +598,7 @@ const ReportGenerationModal = ({ isOpen, onClose, onSuccess, onReportGenerated, 
           params.append('notes', formData.notes);
         }
 
-        const response = await fetch(`${API}/financial-data/${editingRecord.id}?${params}`, {
+        const response = await apiFetch(`${API}/financial-data/${editingRecord.id}?${params}`, {
           method: 'PUT',
         });
 
@@ -647,7 +648,7 @@ const ReportGenerationModal = ({ isOpen, onClose, onSuccess, onReportGenerated, 
           params.append('notes', formData.notes);
         }
 
-        const response = await fetch(`${API}/generate-daily-report?${params}`, {
+        const response = await apiFetch(`${API}/generate-daily-report?${params}`, {
           method: 'POST',
         });
 

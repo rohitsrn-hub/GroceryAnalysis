@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
@@ -42,7 +43,7 @@ const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, on
 
   const fetchAvailablePeriods = async () => {
     try {
-      const response = await fetch(`${API}/available-periods`);
+      const response = await apiFetch(`${API}/available-periods`);
       if (response.ok) {
         const data = await response.json();
         // Route returns {available_periods: [...], periods_detailed: [...], count: N}
@@ -62,10 +63,10 @@ const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, on
       const periodParam = dashboardPeriod && dashboardPeriod !== 'all' ? `&period=${dashboardPeriod}` : '';
       
       const [fastestResponse, groupResponse, inventoryResponse, trendResponse] = await Promise.all([
-        fetch(`${API}/fastest-selling-items?limit=10${periodParam}`),
-        fetch(`${API}/group-analysis?period=${dashboardPeriod || 'all'}`),
-        fetch(`${API}/inventory-analysis?period=${dashboardPeriod || 'all'}`),
-        fetch(`${API}/daily-sales-trend?period=${dashboardPeriod || 'all'}`)
+        apiFetch(`${API}/fastest-selling-items?limit=10${periodParam}`),
+        apiFetch(`${API}/group-analysis?period=${dashboardPeriod || 'all'}`),
+        apiFetch(`${API}/inventory-analysis?period=${dashboardPeriod || 'all'}`),
+        apiFetch(`${API}/daily-sales-trend?period=${dashboardPeriod || 'all'}`)
       ]);
 
       if (!fastestResponse.ok || !groupResponse.ok || !inventoryResponse.ok || !trendResponse.ok) {
@@ -177,12 +178,6 @@ const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, on
     revenue: item.total_revenue || 0,
     profit: item.total_profit || 0
   }));
-
-  // Debug log
-  console.log('Top Sellers Metric:', topSellersMetric);
-  console.log('Filtered Items Count:', filteredItems.length);
-  console.log('Top Items Data:', topItemsData);
-  console.log('Sample top item:', topItemsData[0]);
 
   return (
     <div className="space-y-6">

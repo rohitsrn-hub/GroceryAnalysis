@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -53,7 +54,7 @@ const Forecasting = () => {
 
   const fetchMonthlySummaries = async () => {
     try {
-      const response = await fetch(`${API}/monthly-summaries`);
+      const response = await apiFetch(`${API}/monthly-summaries`);
       if (response.ok) {
         const data = await response.json();
         setMonthlySummaries(data.summaries || []);
@@ -92,7 +93,7 @@ const Forecasting = () => {
         } else {
           // Fall back to checking raw sales records
           try {
-            const response = await fetch(`${API}/check-data-availability`, {
+            const response = await apiFetch(`${API}/check-data-availability`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify([req.period])
@@ -265,7 +266,7 @@ const Forecasting = () => {
       formData.append('file', file);
       formData.append('upload_source', 'forecast');  // Mark as forecast data
 
-      const response = await fetch(`${API}/upload-sales-data`, {
+      const response = await apiFetch(`${API}/upload-sales-data`, {
         method: 'POST',
         body: formData,
       });
@@ -381,7 +382,7 @@ const Forecasting = () => {
         }
       };
 
-      const response = await fetch(`${API}/forecast-demand`, {
+      const response = await apiFetch(`${API}/forecast-demand`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

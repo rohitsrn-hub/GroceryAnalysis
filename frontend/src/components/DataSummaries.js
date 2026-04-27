@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -78,7 +79,7 @@ const DataSummaries = ({ onSummaryChange }) => {
   const fetchSummaries = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API}/monthly-summaries`);
+      const response = await apiFetch(`${API}/monthly-summaries`);
       if (response.ok) {
         const data = await response.json();
         setSummaries(data.summaries || []);
@@ -101,7 +102,7 @@ const DataSummaries = ({ onSummaryChange }) => {
     
     setLoadingDetails(prev => ({ ...prev, [period]: true }));
     try {
-      const response = await fetch(`${API}/monthly-summary-details/${period}`);
+      const response = await apiFetch(`${API}/monthly-summary-details/${period}`);
       if (response.ok) {
         const data = await response.json();
         setSummaryDetails(prev => ({ ...prev, [period]: data }));
@@ -130,7 +131,7 @@ const DataSummaries = ({ onSummaryChange }) => {
     
     setDeleting(true);
     try {
-      const response = await fetch(`${API}/monthly-summaries/${deleteDialog.summary.period}`, {
+      const response = await apiFetch(`${API}/monthly-summaries/${deleteDialog.summary.period}`, {
         method: 'DELETE'
       });
       
@@ -163,7 +164,7 @@ const DataSummaries = ({ onSummaryChange }) => {
         ? `${generateYear}-${generateMonth.padStart(2, '0')}`
         : generateYear;
       
-      const response = await fetch(`${API}/trigger-summary-generation`, {
+      const response = await apiFetch(`${API}/trigger-summary-generation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ period })
@@ -208,7 +209,7 @@ const DataSummaries = ({ onSummaryChange }) => {
       formData.append('period', period);
       formData.append('override_existing', overrideExisting.toString());
       
-      const response = await fetch(`${API}/upload-forecast-history`, {
+      const response = await apiFetch(`${API}/upload-forecast-history`, {
         method: 'POST',
         body: formData
       });

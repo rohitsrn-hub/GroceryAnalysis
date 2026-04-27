@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -41,9 +42,9 @@ const UploadHistory = ({ onDataChange }) => {
   const fetchStatusCounts = async () => {
     try {
       const [s, f, p] = await Promise.all([
-        fetch(`${API}/upload-history?limit=1&skip=0&status_filter=success`).then(r => r.json()),
-        fetch(`${API}/upload-history?limit=1&skip=0&status_filter=failed`).then(r => r.json()),
-        fetch(`${API}/upload-history?limit=1&skip=0&status_filter=partial`).then(r => r.json()),
+        apiFetch(`${API}/upload-history?limit=1&skip=0&status_filter=success`).then(r => r.json()),
+        apiFetch(`${API}/upload-history?limit=1&skip=0&status_filter=failed`).then(r => r.json()),
+        apiFetch(`${API}/upload-history?limit=1&skip=0&status_filter=partial`).then(r => r.json()),
       ]);
       setStatusCounts({
         success: s.total || 0,
@@ -70,7 +71,7 @@ const UploadHistory = ({ onDataChange }) => {
         params.append("period_filter", periodSearch);
       }
 
-      const response = await fetch(`${API}/upload-history?${params}`);
+      const response = await apiFetch(`${API}/upload-history?${params}`);
       if (!response.ok) throw new Error("Failed to fetch history");
 
       const data = await response.json();
@@ -94,7 +95,7 @@ const UploadHistory = ({ onDataChange }) => {
     
     setUndoing(true);
     try {
-      const response = await fetch(`${API}/undo-upload/${undoDialog.record.id}`, {
+      const response = await apiFetch(`${API}/undo-upload/${undoDialog.record.id}`, {
         method: 'DELETE',
       });
 

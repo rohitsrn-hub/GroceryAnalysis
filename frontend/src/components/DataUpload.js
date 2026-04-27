@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -87,7 +88,7 @@ const DataUpload = ({ onUploadSuccess }) => {
         const formData = new FormData();
         formData.append('file', fileItem.file);
 
-        const response = await fetch(`${API}/upload-sales-data`, {
+        const response = await apiFetch(`${API}/upload-sales-data`, {
           method: 'POST',
           body: formData,
         });
@@ -148,7 +149,7 @@ const DataUpload = ({ onUploadSuccess }) => {
     
     setUndoing(true);
     try {
-      const response = await fetch(`${API}/undo-upload/${undoDialog.upload.upload_id}`, {
+      const response = await apiFetch(`${API}/undo-upload/${undoDialog.upload.upload_id}`, {
         method: 'DELETE',
       });
 
@@ -182,7 +183,7 @@ const DataUpload = ({ onUploadSuccess }) => {
   const handleResetDatabase = async () => {
     setResetting(true);
     try {
-      const response = await fetch(`${API}/reset-all-data`, {
+      const response = await apiFetch(`${API}/reset-all-data`, {
         method: 'DELETE',
       });
 

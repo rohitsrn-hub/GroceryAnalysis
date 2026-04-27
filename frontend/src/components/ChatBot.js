@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, X, Trash2, User, Loader2, Minimize2, Maximize2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -47,7 +48,7 @@ const ChatBot = () => {
     if (!sessionId) return;
     
     try {
-      const response = await fetch(`${API}/chat-history/${sessionId}`);
+      const response = await apiFetch(`${API}/chat-history/${sessionId}`);
       if (response.ok) {
         const data = await response.json();
         if (data.messages && data.messages.length > 0) {
@@ -74,7 +75,7 @@ const ChatBot = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API}/chatbot`, {
+      const response = await apiFetch(`${API}/chatbot`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -128,7 +129,7 @@ const ChatBot = () => {
   const clearChat = async () => {
     if (sessionId) {
       try {
-        await fetch(`${API}/chat-history/${sessionId}`, {
+        await apiFetch(`${API}/chat-history/${sessionId}`, {
           method: 'DELETE'
         });
       } catch (error) {

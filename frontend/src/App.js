@@ -1,3 +1,4 @@
+import { apiFetch } from './utils/api';
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import "./App.css";
@@ -36,7 +37,7 @@ function MainApp() {
       // Add period parameter to the API call
       const periodParam = period && period !== 'all' ? `&period=${period}` : '';
       // Add timestamp and cache control to prevent caching
-      const response = await fetch(`${API}/dashboard-summary?t=${Date.now()}${periodParam}`, {
+      const response = await apiFetch(`${API}/dashboard-summary?t=${Date.now()}${periodParam}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -65,7 +66,7 @@ function MainApp() {
     try {
       const cacheBuster = new Date().getTime();
       const periodParam = dashboardPeriod && dashboardPeriod !== 'all' ? `&period=${dashboardPeriod}` : '';
-      const response = await fetch(`${API}/dashboard-summary?t=${cacheBuster}${periodParam}`);
+      const response = await apiFetch(`${API}/dashboard-summary?t=${cacheBuster}${periodParam}`);
       const data = await response.json();
       setDashboardData(data);
     } catch (error) {
@@ -109,7 +110,7 @@ function MainApp() {
       loadingToast = toast.loading('Generating report...');
       
       // Fetch the report as a blob
-      const response = await fetch(url);
+      const response = await apiFetch(url);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -179,7 +180,7 @@ function MainApp() {
                     setReportFormat('excel');
                     // Fetch available periods
                     try {
-                      const response = await fetch(`${API}/available-periods`);
+                      const response = await apiFetch(`${API}/available-periods`);
                       const data = await response.json();
                       if (data.periods_detailed && data.periods_detailed.length > 0) {
                         setAvailablePeriods(data.periods_detailed);
@@ -202,7 +203,7 @@ function MainApp() {
                     setReportFormat('pdf');
                     // Fetch available periods
                     try {
-                      const response = await fetch(`${API}/available-periods`);
+                      const response = await apiFetch(`${API}/available-periods`);
                       const data = await response.json();
                       if (data.periods_detailed && data.periods_detailed.length > 0) {
                         setAvailablePeriods(data.periods_detailed);

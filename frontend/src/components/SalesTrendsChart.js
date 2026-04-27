@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -37,7 +38,7 @@ const SalesTrendsChart = () => {
 
   const fetchAvailablePeriods = async () => {
     try {
-      const response = await fetch(`${API}/available-data-periods`);
+      const response = await apiFetch(`${API}/available-data-periods`);
       if (response.ok) {
         const data = await response.json();
         
@@ -101,7 +102,7 @@ const SalesTrendsChart = () => {
 
       // Fetch data for each period
       const periodDataPromises = periods.map(async (period) => {
-        const response = await fetch(`${API}/daily-sales-trend-by-period?period=${period}`);
+        const response = await apiFetch(`${API}/daily-sales-trend-by-period?period=${period}`);
         if (response.ok) {
           return response.json();
         }
