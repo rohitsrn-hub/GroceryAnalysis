@@ -4312,7 +4312,7 @@ async def get_dashboard_summary(period: Optional[str] = Query(None)):
                 year_str = str(data_period).split('-')[0]
                 try:
                     years.add(int(year_str))
-                except:
+                except (ValueError, TypeError):
                     pass
         num_years = len(years) if years else 1
         start_year = min(years) if years else datetime.now().year
@@ -5914,27 +5914,6 @@ async def generate_daily_sales_report(
     except Exception as e:
         logger.exception("Error generating daily sales report PDF")
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
-
-        
-        if previous_financial and "current_bank_amount" in previous_financial:
-            return {
-                "previous_date": previous_date.strftime("%Y-%m-%d"),
-                "bank_amount": previous_financial["current_bank_amount"],
-                "found": True
-            }
-        
-        # If not found, return null/not found
-        return {
-            "previous_date": previous_date.strftime("%Y-%m-%d"),
-            "bank_amount": None,
-            "found": False
-        }
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid date format: {str(e)}")
-    except Exception as e:
-        logger.exception("Error fetching previous bank amount")
-        raise HTTPException(status_code=500, detail=f"Error fetching previous bank amount: {str(e)}")
 
 
 # =====================================================
