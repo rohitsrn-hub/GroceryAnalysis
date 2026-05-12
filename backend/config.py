@@ -19,8 +19,8 @@ logging.basicConfig(
 logger = logging.getLogger("grocery_analytics")
 
 # ─── Database ─────────────────────────────────────────────────────────
-MONGO_URL: str = os.environ['MONGO_URL']
-DB_NAME: str = os.environ['DB_NAME']
+MONGO_URL: str = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+DB_NAME: str = os.environ.get('DB_NAME', 'grocery_analytics')
 
 # ─── API Keys ─────────────────────────────────────────────────────────
 OPENAI_API_KEY: str | None = os.environ.get('OPENAI_API_KEY')
