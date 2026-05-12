@@ -96,23 +96,28 @@ from routes.analytics import router as analytics_router
 from routes.financial import router as financial_router
 from routes.summaries import router as summaries_router
 from routes.chatbot import router as chatbot_router
+from routes.upload import router as upload_router
+from routes.data import router as data_router
+from routes.forecast import router as forecast_router
 
 app.include_router(admin_router)
 app.include_router(analytics_router)
 app.include_router(financial_router)
 app.include_router(summaries_router)
 app.include_router(chatbot_router)
+app.include_router(upload_router)
+app.include_router(data_router)
+app.include_router(forecast_router)
 
-# NOTE: The legacy server.py still serves the following routes that haven't
-# been migrated yet: upload-sales-data, comprehensive-report, forecast-demand,
-# dashboard-summary, daily-sales-trend, database-view, chatbot POST, etc.
-# Those will be migrated in Phase 4. For now, the server.py `api_router`
-# can be included alongside the modular routes for backward compatibility:
-#
-# from server import api_router as legacy_router
-# app.include_router(legacy_router)
+# NOTE: Remaining routes still in server.py (to be migrated in Phase 6):
+# - POST /chatbot (complex OpenAI integration)
+# - POST /generate-daily-report (PDF report generation)
+# - POST /extract-canteen-summary (GPT-4o image extraction)
+# - GET /comprehensive-report (Excel/PDF export)
+# - GET /export-data/{analysis_type}
 
 logger.info(
-    "Registered %d route modules: admin, analytics, financial, summaries, chatbot",
-    5,
+    "Registered %d route modules: admin, analytics, financial, summaries, "
+    "chatbot, upload, data, forecast",
+    8,
 )
