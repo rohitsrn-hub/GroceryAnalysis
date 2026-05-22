@@ -31,20 +31,30 @@ export default function DemandAnalytics() {
   const fetchPopularSearches = async () => {
     try {
       setLoading(true);
+
+      // Wake Render free-tier server before the main fetch (cold starts = 30-50s sleep)
+      try {
+        await fetch(`${BACKEND_URL}/health`, { signal: AbortSignal.timeout(65000) });
+      } catch (_) { /* continue even if ping fails */ }
+
       let url = `${API}/popular-searches?days=${days}&limit=100`;
-      if (searchType) {
-        url += `&search_type=${searchType}`;
-      }
-      const response = await fetch(url);
+      if (searchType) url += `&search_type=${searchType}`;
+
+      const response = await fetch(url, { signal: AbortSignal.timeout(90000) });
       if (response.ok) {
         const data = await response.json();
         setPopularSearches(data.popular_searches || []);
       } else {
-        throw new Error("Failed to fetch popular searches");
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || `Server error ${response.status}`);
       }
     } catch (error) {
       console.error("Error fetching popular searches:", error);
-      toast.error("Failed to load customer demand data");
+      if (error.name === "TimeoutError" || error.name === "AbortError") {
+        toast.error("Server waking up — click ↻ Refresh in ~30 seconds", { duration: 8000 });
+      } else {
+        toast.error("Failed to load demand data: " + (error.message || "Unknown error"));
+      }
     } finally {
       setLoading(false);
     }
