@@ -60,7 +60,7 @@ async def get_available_data_periods():
 
         periods_detailed = []
         for p in periods_sorted:
-            display = await format_period_display_name(p)
+            display = format_period_display_name(p)
             periods_detailed.append({"value": p, "label": display})
 
         # Upload info
@@ -280,7 +280,7 @@ async def get_database_view(
         periods_with_display = []
         for p in raw_periods:
             if p["_id"]:
-                display = await format_period_display_name(p["_id"])
+                display = format_period_display_name(p["_id"])
                 periods_with_display.append({"value": p["_id"], "label": display})
 
         groups = await db.sales_records.aggregate([
@@ -307,3 +307,76 @@ async def get_database_view(
     except Exception as e:
         logger.error(f"Error in database view: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error fetching database view: {str(e)}")
+
+
+@router.post("/check-data-availability")
+async def check_data_availability(periods: list[str]):
+    """Check which periods have data available in the database.
+    
+    Handles both normalized (2025-09) and legacy formats (Sep 2025).
+    """
+    try:
+        import re
+        availability = {}
+        
+        for period in periods:
+            # First try exact match
+            count = await db.sales_records.count_documents({"data_period": period})
+            found_period = period
+            found_filename = None
+            
+            # If no exact match, try pattern matching for legacy formats
+            if count == 0 and period:
+                match = re.match(r'(\d{4})-(\d{2})', period)
+                if match:
+                    year = match.group(1)
+                    month_int = int(match.group(2))
+                    
+                    month_names = {
+                        1: ['jan', 'january'], 2: ['feb', 'february'], 3: ['mar', 'march'],
+                        4: ['apr', 'april'], 5: ['may'], 6: ['jun', 'june'],
+                        7: ['jul', 'july'], 8: ['aug', 'august'],
+                        9: ['sep', 'sept', 'september'], 10: ['oct', 'october'],
+                        11: ['nov', 'november'], 12: ['dec', 'december']
+                    }
+                    
+                    target_month_names = month_names.get(month_int, [])
+                    if target_month_names:
+                        # Get all records for the year
+                        cursor = db.sales_records.find({"data_period": {"$regex": year}})
+                        matching_records_count = 0
+                        async for record in cursor:
+                            data_period = record.get("data_period", "").lower()
+                            if any(mn in data_period for mn in target_month_names):
+                                # Exclude multi-month
+                                is_multi = False
+                                for other_int in range(1, 13):
+                                    if other_int != month_int:
+                                        if any(omn in data_period for omn in month_names.get(other_int, [])):
+                                            is_multi = True
+                                            break
+                                if not is_multi:
+                                    matching_records_count += 1
+                                    found_period = record.get("data_period")
+                        count = matching_records_count
+            
+            if count > 0:
+                upload_info = await db.upload_history.find_one(
+                    {"period_covered": period, "status": "success"},
+                    sort=[("upload_date", -1)]
+                )
+                
+                availability[period] = {
+                    "available": True,
+                    "record_count": count,
+                    "upload_date": upload_info.get("upload_date") if upload_info else None,
+                    "filename": upload_info.get("filename") if upload_info else None,
+                    "actual_period": found_period
+                }
+            else:
+                availability[period] = {"available": False, "record_count": 0}
+        
+        return {"periods_checked": len(periods), "availability": availability}
+    except Exception as e:
+        logger.exception("Error checking data availability")
+        raise HTTPException(status_code=500, detail=str(e))

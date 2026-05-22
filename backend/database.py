@@ -27,6 +27,7 @@ INDEX_DEFINITIONS = {
         {"keys": [("upload_batch_id", 1)], "name": "idx_batch_id"},
         {"keys": [("product_group", 1)], "name": "idx_product_group"},
         {"keys": [("item_name", "text")], "name": "idx_item_name_text"},
+        {"keys": [("item_name", 1)], "name": "idx_item_name"},
         {"keys": [("r_amt", -1)], "name": "idx_revenue_desc"},
         {"keys": [("gp_index_no", 1)], "name": "idx_gp_index"},
     ],
@@ -44,6 +45,11 @@ INDEX_DEFINITIONS = {
     ],
     "monthly_summaries": [
         {"keys": [("period", 1), ("summary_type", 1)], "name": "idx_period_type"},
+    ],
+    "customer_searches": [
+        {"keys": [("timestamp", -1)], "name": "idx_search_timestamp"},
+        {"keys": [("query", 1)], "name": "idx_search_query"},
+        {"keys": [("is_available", 1)], "name": "idx_search_avail"},
     ],
 }
 

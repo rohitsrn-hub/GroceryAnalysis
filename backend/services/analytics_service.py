@@ -74,11 +74,13 @@ async def get_fastest_selling_items(
                 "periods": {"$push": {"period": "$data_period", "qty": "$net_qty"}},
             }
         },
-        {"$sort": {"total_sold": -1}},
-        {"$limit": limit},
     ]
 
     results = await db.sales_records.aggregate(pipeline).to_list(None)
+
+    # Sort in python to bypass MongoDB 32MB sort limit
+    results.sort(key=lambda x: x.get("total_sold", 0), reverse=True)
+    results = results[:limit]
 
     items = []
     for item in results:
@@ -128,10 +130,12 @@ async def get_abc_analysis(
             }
         },
         {"$match": {"total_revenue": {"$gt": 0}}},
-        {"$sort": {"total_revenue": -1}},
     ]
 
     results = await db.sales_records.aggregate(pipeline).to_list(None)
+    
+    # Sort in python to bypass MongoDB 32MB limit
+    results.sort(key=lambda x: x.get("total_revenue", 0), reverse=True)
 
     if not results:
         return {"abc_categories": {"A": [], "B": [], "C": []}, "summary": {}}
@@ -252,11 +256,13 @@ async def get_capital_blocking_analysis(
                 ]
             }
         },
-        {"$sort": {"capital_blocked": -1}},
-        {"$limit": 50},
     ]
 
     results = await db.sales_records.aggregate(pipeline).to_list(None)
+    
+    # Sort in python to bypass MongoDB 32MB limit
+    results.sort(key=lambda x: x.get("capital_blocked", 0), reverse=True)
+    results = results[:50]
 
     # Assign risk levels
     risk_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
@@ -315,8 +321,6 @@ async def get_inventory_analysis(
                 }
             }
         },
-        {"$sort": {"avg_cost": -1, "performance_ratio": 1}},
-        {"$limit": 20},
     ]
 
     # Dead inventory
@@ -340,9 +344,7 @@ async def get_inventory_analysis(
                 ]
             }
         },
-        {"$addFields": {"capital_blocked": {"$multiply": ["$avg_closing_stock", "$avg_cost"]}}},
-        {"$sort": {"capital_blocked": -1}},
-        {"$limit": 20},
+        {"$addFields": {"capital_blocked": {"$multiply": ["$avg_closing_stock", "$avg_cost"]}}}
     ]
 
     # Slow moving
@@ -357,14 +359,20 @@ async def get_inventory_analysis(
             }
         },
         {"$addFields": {"avg_monthly_sales": {"$divide": ["$total_sold", "$periods_count"]}}},
-        {"$match": {"avg_monthly_sales": {"$gt": 0, "$lt": 5}}},
-        {"$sort": {"avg_monthly_sales": 1}},
-        {"$limit": 20},
+        {"$match": {"avg_monthly_sales": {"$gt": 0, "$lt": 5}}}
     ]
 
     high_cost = await db.sales_records.aggregate(pipeline_high_cost).to_list(None)
+    high_cost.sort(key=lambda x: (-x.get("avg_cost", 0), x.get("performance_ratio", 0)))
+    high_cost = high_cost[:20]
+    
     dead = await db.sales_records.aggregate(pipeline_dead).to_list(None)
+    dead.sort(key=lambda x: x.get("capital_blocked", 0), reverse=True)
+    dead = dead[:20]
+    
     slow = await db.sales_records.aggregate(pipeline_slow).to_list(None)
+    slow.sort(key=lambda x: x.get("avg_monthly_sales", 0))
+    slow = slow[:20]
 
     return {
         "high_cost_poor_performance": high_cost,
@@ -413,10 +421,12 @@ async def get_group_analysis(
             }
         },
         {"$match": {"_id": {"$ne": "Unknown"}}},
-        {"$sort": {"total_revenue": -1}},
     ]
 
     results = await db.sales_records.aggregate(pipeline).to_list(None)
+    
+    # Sort in python
+    results.sort(key=lambda x: x.get("total_revenue", 0), reverse=True)
 
     group_analysis = []
     for group_data in results:

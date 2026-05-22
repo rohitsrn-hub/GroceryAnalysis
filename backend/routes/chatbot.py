@@ -54,7 +54,22 @@ async def clear_chat_history(session_id: str):
         )
 
 
-# NOTE: The main /chatbot POST endpoint remains in server.py for now
-# because it has complex dependencies on multiple services (period detection,
-# OpenAI client initialization, comparison data fetching).
-# It will be migrated in Phase 3 when chatbot_service.py is complete.
+@router.post("/chatbot", response_model=ChatResponse)
+async def chat_with_data(request: ChatMessage):
+    """AI Chatbot — answers questions about sales data using GPT-4o."""
+    try:
+        from services.chatbot_service import handle_chat
+
+        result = await handle_chat(
+            message=request.message,
+            session_id=request.session_id,
+        )
+        return ChatResponse(
+            response=result["response"],
+            session_id=result["session_id"],
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=500, detail=str(ve))
+    except Exception as e:
+        logger.exception(f"Chatbot error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")

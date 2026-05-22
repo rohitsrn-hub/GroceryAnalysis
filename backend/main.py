@@ -32,6 +32,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Grocery Analytics API...")
     await ensure_indexes()
     logger.info("Database indexes verified. API ready.")
+    
+    from services.semantic_service import load_embeddings_to_cache
+    await load_embeddings_to_cache()
+    
     yield
     # Shutdown
     logger.info("Shutting down — closing MongoDB connection.")
@@ -99,6 +103,9 @@ from routes.chatbot import router as chatbot_router
 from routes.upload import router as upload_router
 from routes.data import router as data_router
 from routes.forecast import router as forecast_router
+from routes.reports import router as reports_router
+from routes.semantic import router as semantic_router
+from routes.customer import router as customer_router
 
 app.include_router(admin_router)
 app.include_router(analytics_router)
@@ -108,16 +115,15 @@ app.include_router(chatbot_router)
 app.include_router(upload_router)
 app.include_router(data_router)
 app.include_router(forecast_router)
+app.include_router(reports_router)
+app.include_router(semantic_router)
+app.include_router(customer_router)
 
-# NOTE: Remaining routes still in server.py (to be migrated in Phase 6):
-# - POST /chatbot (complex OpenAI integration)
-# - POST /generate-daily-report (PDF report generation)
-# - POST /extract-canteen-summary (GPT-4o image extraction)
-# - GET /comprehensive-report (Excel/PDF export)
-# - GET /export-data/{analysis_type}
+# All legacy server.py endpoints have been extracted.
+# server.py can now be archived or removed.
 
 logger.info(
     "Registered %d route modules: admin, analytics, financial, summaries, "
-    "chatbot, upload, data, forecast",
-    8,
+    "chatbot, upload, data, forecast, reports, semantic",
+    10,
 )

@@ -10,10 +10,12 @@ import UploadHistory from "./components/UploadHistory";
 import DatabaseView from "./components/DatabaseView";
 import FinancialHealth from "./components/FinancialHealth";
 import ChatBot from "./components/ChatBot";
+import CustomerBot from "./components/CustomerBot";
+import DemandAnalytics from "./components/DemandAnalytics";
 import { Toaster, toast } from "./components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
-import { BarChart3, Upload, TrendingUp, FileSpreadsheet, Building2, Download, Clock, Database, DollarSign, RefreshCw, Layers } from "lucide-react";
+import { BarChart3, Upload, TrendingUp, FileSpreadsheet, Building2, Download, Clock, Database, DollarSign, RefreshCw, Layers, ShoppingCart } from "lucide-react";
 import { formatIndianNumber, formatPercentage } from "./utils/numberUtils";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -325,7 +327,7 @@ function MainApp() {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-7 mb-6 bg-gradient-to-r from-gray-100 to-gray-200 shadow-xl rounded-2xl p-2 border border-gray-300">
+          <TabsList className="grid w-full grid-cols-8 mb-6 bg-gradient-to-r from-gray-100 to-gray-200 shadow-xl rounded-2xl p-2 border border-gray-300">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-start px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-blue-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
@@ -346,6 +348,13 @@ function MainApp() {
             >
               <TrendingUp className="h-4 w-4 mt-0.5 mr-1.5 flex-shrink-0" />
               <span className="text-left leading-tight whitespace-normal">Detailed Analytics</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="demand" 
+              className="flex items-start px-2 py-2 rounded-xl font-semibold text-xs transition-all duration-300 bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg hover:shadow-xl hover:from-pink-600 hover:to-pink-700 transform hover:scale-105 data-[state=active]:from-gray-300 data-[state=active]:to-gray-400 data-[state=active]:text-gray-700 data-[state=active]:shadow-inner data-[state=active]:scale-100 min-h-[60px]"
+            >
+              <ShoppingCart className="h-4 w-4 mt-0.5 mr-1.5 flex-shrink-0" />
+              <span className="text-left leading-tight whitespace-normal">Demand Analytics</span>
             </TabsTrigger>
             <TabsTrigger 
               value="forecasting" 
@@ -429,6 +438,10 @@ function MainApp() {
 
           <TabsContent value="analytics" className="space-y-6">
             <AnalyticsFixed />
+          </TabsContent>
+
+          <TabsContent value="demand" className="space-y-6">
+            <DemandAnalytics />
           </TabsContent>
 
           <TabsContent value="forecasting" className="space-y-6">
@@ -537,6 +550,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MainApp />} />
+        <Route path="/sandy" element={<CustomerBot />} />
       </Routes>
     </BrowserRouter>
   );
