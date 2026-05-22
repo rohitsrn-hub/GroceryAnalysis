@@ -631,53 +631,76 @@ async def get_popular_searches(
     limit: int = Query(50, ge=1, le=100),
     search_type: Optional[str] = Query(None)
 ):
-    """Aggregate customer searches to highlight future stock demands. (Admin endpoint)"""
+    """Aggregate customer searches to highlight future stock demands. (Admin endpoint)
+    
+    Uses Python-level aggregation to avoid MongoDB Atlas Free Tier restrictions
+    on $group, $sort, and $project pipeline operators.
+    """
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        match_query = {"timestamp": {"$gte": cutoff}}
-        
+        match_query: Dict[str, Any] = {"timestamp": {"$gte": cutoff}}
+
         if search_type:
             match_query["search_type"] = search_type
 
-        # Aggregate searches by lowercased query terms
-        pipeline = [
-            {"$match": match_query},
-            {"$group": {
-                "_id": {"$toLower": "$query"},
-                "raw_query": {"$first": "$query"},
-                "search_count": {"$sum": 1},
-                "available_count": {"$sum": {"$cond": [{"$eq": ["$is_available", True]}, 1, 0]}},
-                "categories": {"$addToSet": "$category_filter"},
-                "matched_items": {"$addToSet": "$matched_items"},
-                "last_searched": {"$max": "$timestamp"}
-            }},
-            {"$project": {
-                "_id": 0,
-                "query": "$raw_query",
-                "search_count": 1,
-                "availability_rate": {
-                    "$cond": [
-                        {"$gt": ["$search_count", 0]},
-                        {"$multiply": [{"$divide": ["$available_count", "$search_count"]}, 100]},
-                        0
-                    ]
-                },
-                "categories": 1,
-                "last_searched": 1,
-                "matched_items": {
-                    "$reduce": {
-                        "input": "$matched_items",
-                        "initialValue": [],
-                        "in": {"$setUnion": ["$$value", "$$this"]}
-                    }
-                }
-            }},
-            {"$sort": {"search_count": -1}},
-            {"$limit": limit}
-        ]
+        # Fetch raw documents — no aggregation pipeline
+        raw_docs = await db.customer_searches.find(
+            match_query,
+            {"query": 1, "is_available": 1, "category_filter": 1,
+             "matched_items": 1, "timestamp": 1, "_id": 0}
+        ).to_list(5000)
 
-        results = await db.customer_searches.aggregate(pipeline).to_list(limit)
+        # Aggregate in Python
+        buckets: Dict[str, Dict] = {}
+        for doc in raw_docs:
+            key = doc.get("query", "").strip().lower()
+            if not key:
+                continue
+
+            if key not in buckets:
+                buckets[key] = {
+                    "query": doc.get("query", "").strip(),
+                    "search_count": 0,
+                    "available_count": 0,
+                    "categories": set(),
+                    "matched_items": set(),
+                    "last_searched": doc.get("timestamp"),
+                }
+
+            b = buckets[key]
+            b["search_count"] += 1
+            if doc.get("is_available"):
+                b["available_count"] += 1
+            cat = doc.get("category_filter")
+            if cat:
+                b["categories"].add(cat)
+            for item in (doc.get("matched_items") or []):
+                b["matched_items"].add(item)
+            ts = doc.get("timestamp")
+            if ts and (b["last_searched"] is None or ts > b["last_searched"]):
+                b["last_searched"] = ts
+
+        # Build result list with availability_rate
+        results = []
+        for b in buckets.values():
+            sc = b["search_count"]
+            availability_rate = (b["available_count"] / sc * 100) if sc > 0 else 0
+            results.append({
+                "query": b["query"],
+                "search_count": sc,
+                "availability_rate": round(availability_rate, 1),
+                "categories": list(b["categories"]),
+                "matched_items": sorted(list(b["matched_items"])),
+                "last_searched": b["last_searched"].isoformat() if b["last_searched"] else None,
+            })
+
+        # Sort by search_count descending, cap at limit
+        results.sort(key=lambda x: x["search_count"], reverse=True)
+        results = results[:limit]
+
         return {"popular_searches": results, "time_range_days": days}
+
     except Exception as e:
         logger.exception("Error aggregating popular searches")
         raise HTTPException(status_code=500, detail=str(e))
+
