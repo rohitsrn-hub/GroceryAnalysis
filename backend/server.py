@@ -1843,12 +1843,13 @@ async def get_fastest_selling_items(
                     "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
                     "periods": {"$push": {"period": "$data_period", "qty": "$net_qty"}}
                 }
-            },
-            {"$sort": {"total_sold": -1}},
-            {"$limit": limit}
+            }
         ]
         
         results = await db.sales_records.aggregate(pipeline).to_list(None)
+        # Sort and limit in Python to bypass Atlas Free Tier 32MB sort limit
+        results.sort(key=lambda x: x.get("total_sold", 0), reverse=True)
+        results = results[:limit]
         
         fastest_items = []
         for item in results:
@@ -1907,11 +1908,12 @@ async def get_abc_analysis(
                     "avg_cost": {"$avg": "$w_rate"}
                 }
             },
-            {"$match": {"total_revenue": {"$gt": 0}}},
-            {"$sort": {"total_revenue": -1}}
+            {"$match": {"total_revenue": {"$gt": 0}}}
         ]
         
         results = await db.sales_records.aggregate(pipeline).to_list(None)
+        # Sort in Python to bypass Atlas Free Tier 32MB sort limit
+        results.sort(key=lambda x: x.get("total_revenue", 0), reverse=True)
         
         if not results:
             return {"abc_categories": {"A": [], "B": [], "C": []}, "summary": {}}
@@ -2040,12 +2042,13 @@ async def get_capital_blocking_analysis(
                         ]}
                     ]
                 }
-            },
-            {"$sort": {"capital_blocked": -1}},
-            {"$limit": 50}
+            }
         ]
         
         results = await db.sales_records.aggregate(pipeline).to_list(None)
+        # Sort and limit in Python to bypass Atlas Free Tier 32MB sort limit
+        results.sort(key=lambda x: x.get("capital_blocked", 0), reverse=True)
+        results = results[:50]
         
         # Calculate risk levels
         for item in results:
@@ -2118,8 +2121,6 @@ async def get_inventory_analysis(period: Optional[str] = Query(None)):
                     }
                 }
             },
-            {"$sort": {"avg_cost": -1, "performance_ratio": 1}},
-            {"$limit": 20}
         ]
         
         # Dead inventory (no sales but has closing stock)
@@ -2147,9 +2148,7 @@ async def get_inventory_analysis(period: Optional[str] = Query(None)):
                 "$addFields": {
                     "capital_blocked": {"$multiply": ["$avg_closing_stock", "$avg_cost"]}
                 }
-            },
-            {"$sort": {"capital_blocked": -1}},
-            {"$limit": 20}
+            }
         ]
         
         # Slow moving (low sales)
@@ -2168,14 +2167,21 @@ async def get_inventory_analysis(period: Optional[str] = Query(None)):
                     "avg_monthly_sales": {"$divide": ["$total_sold", "$periods_count"]}
                 }
             },
-            {"$match": {"avg_monthly_sales": {"$gt": 0, "$lt": 5}}},
-            {"$sort": {"avg_monthly_sales": 1}},
-            {"$limit": 20}
+            {"$match": {"avg_monthly_sales": {"$gt": 0, "$lt": 5}}}
         ]
         
         high_cost_items = await db.sales_records.aggregate(pipeline_high_cost).to_list(None)
+        # Sort and limit in Python to bypass Atlas Free Tier 32MB sort limit
+        high_cost_items.sort(key=lambda x: (-x.get("avg_cost", 0), x.get("performance_ratio", 0)))
+        high_cost_items = high_cost_items[:20]
+        
         dead_inventory = await db.sales_records.aggregate(pipeline_dead).to_list(None)
+        dead_inventory.sort(key=lambda x: x.get("capital_blocked", 0), reverse=True)
+        dead_inventory = dead_inventory[:20]
+        
         slow_moving = await db.sales_records.aggregate(pipeline_slow).to_list(None)
+        slow_moving.sort(key=lambda x: x.get("avg_monthly_sales", 0))
+        slow_moving = slow_moving[:20]
         
         return {
             "high_cost_poor_performance": high_cost_items,
@@ -2202,70 +2208,75 @@ async def get_group_analysis(period: Optional[str] = Query(None)):
             else:
                 match_filter["data_period"] = period
             
-        pipeline = [
+        # Pass 1: group totals only — no $push to avoid Atlas 32MB memory limit
+        pipeline_groups = [
             {"$match": match_filter},
             {
                 "$group": {
                     "_id": "$product_group",
                     "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
-                    "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
-                    "total_cost": {"$sum": {"$ifNull": ["$w_amt", 0]}},
-                    "item_count": {"$sum": 1},
-                    "items": {
-                        "$push": {
-                            "pluno": "$pluno",
-                            "item_name": "$item_name",
-                            "revenue": {"$ifNull": ["$r_amt", 0]},
-                            "profit": {"$ifNull": ["$profit", 0]},
-                            "qty": {"$ifNull": ["$net_qty", 0]}
-                        }
-                    }
+                    "total_profit":  {"$sum": {"$ifNull": ["$profit", 0]}},
+                    "total_cost":    {"$sum": {"$ifNull": ["$w_amt", 0]}},
+                    "item_count":    {"$sum": 1}
                 }
             },
-            {
-                "$addFields": {
-                    "profit_margin": {
-                        "$cond": {
-                            "if": {"$gt": ["$total_revenue", 0]},
-                            "then": {"$multiply": [{"$divide": ["$total_profit", "$total_revenue"]}, 100]},
-                            "else": 0
-                        }
-                    }
-                }
-            },
-            {"$match": {"_id": {"$ne": "Unknown"}}},
-            {"$sort": {"total_revenue": -1}}
+            {"$match": {"_id": {"$ne": None, "$nin": ["Unknown", ""]}}}
         ]
+        group_rows = await db.sales_records.aggregate(pipeline_groups).to_list(None)
         
-        results = await db.sales_records.aggregate(pipeline).to_list(None)
+        if not group_rows:
+            return []
+        
+        # Pass 2: item totals per group — lightweight, no unbounded arrays
+        pipeline_items = [
+            {"$match": match_filter},
+            {
+                "$group": {
+                    "_id": {
+                        "group":     "$product_group",
+                        "pluno":     "$pluno",
+                        "item_name": "$item_name"
+                    },
+                    "revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+                    "profit":  {"$sum": {"$ifNull": ["$profit", 0]}},
+                    "qty":     {"$sum": {"$ifNull": ["$net_qty", 0]}}
+                }
+            }
+        ]
+        item_rows = await db.sales_records.aggregate(pipeline_items).to_list(None)
+        
+        # Index items by group in Python
+        items_by_group = {}
+        for row in item_rows:
+            g = row["_id"]["group"]
+            if not g or g in ("Unknown", ""):
+                continue
+            items_by_group.setdefault(g, []).append({
+                "pluno":     row["_id"]["pluno"],
+                "item_name": row["_id"]["item_name"],
+                "revenue":   float(row.get("revenue", 0) or 0),
+                "profit":    float(row.get("profit",  0) or 0),
+                "qty":       float(row.get("qty",     0) or 0)
+            })
+        
+        # Merge and build result sorted by revenue descending
+        group_rows.sort(key=lambda x: x.get("total_revenue", 0), reverse=True)
         
         group_analysis = []
-        for group in results:
-            # Get top 5 performers in this group
-            # Filter out items with invalid revenue/profit values
-            valid_items = [
-                item for item in group['items']
-                if isinstance(item.get('revenue'), (int, float)) and isinstance(item.get('profit'), (int, float))
-            ]
-            
-            top_performers = sorted(
-                valid_items, 
-                key=lambda x: x.get('revenue', 0) or 0, 
-                reverse=True
-            )[:5]
-            
-            # Ensure values are properly converted to float
-            total_revenue = float(group.get('total_revenue', 0) or 0)
-            total_profit = float(group.get('total_profit', 0) or 0)
-            profit_margin = float(group.get('profit_margin', 0) or 0)
-            
+        for gd in group_rows:
+            grp = gd["_id"]
+            rev = float(gd.get("total_revenue", 0) or 0)
+            pft = float(gd.get("total_profit",  0) or 0)
+            margin = round((pft / rev * 100) if rev > 0 else 0.0, 2)
+            items = items_by_group.get(grp, [])
+            top_performers = sorted(items, key=lambda x: x["revenue"], reverse=True)[:5]
             group_analysis.append({
-                "group": group['_id'],
-                "total_revenue": total_revenue,
-                "total_profit": total_profit,
-                "item_count": group['item_count'],
+                "group":          grp,
+                "total_revenue":  rev,
+                "total_profit":   pft,
+                "item_count":     gd.get("item_count", 0),
                 "top_performers": top_performers,
-                "profit_margin": profit_margin
+                "profit_margin":  margin
             })
         
         return group_analysis
