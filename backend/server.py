@@ -6528,11 +6528,11 @@ IMPORTANT GUIDELINES:
                         "total_revenue": {"$sum": "$r_amt"},
                         "total_profit": {"$sum": "$profit"},
                         "total_qty": {"$sum": "$net_qty"}
-                    }},
-                    {"$sort": {"total_revenue": -1}},
-                    {"$limit": 10}
+                    }}
                 ]
-                top_items = await db.sales_records.aggregate(top_items_pipeline).to_list(10)
+                top_items_raw = await db.sales_records.aggregate(top_items_pipeline).to_list(None)
+                top_items_raw.sort(key=lambda x: x.get("total_revenue", 0), reverse=True)
+                top_items = top_items_raw[:10]
                 
                 # Get top 10 items by profit (all time)
                 top_profit_pipeline = [
@@ -6542,11 +6542,11 @@ IMPORTANT GUIDELINES:
                         "total_revenue": {"$sum": "$r_amt"},
                         "total_profit": {"$sum": "$profit"},
                         "total_qty": {"$sum": "$net_qty"}
-                    }},
-                    {"$sort": {"total_profit": -1}},
-                    {"$limit": 10}
+                    }}
                 ]
-                top_by_profit = await db.sales_records.aggregate(top_profit_pipeline).to_list(10)
+                top_by_profit_raw = await db.sales_records.aggregate(top_profit_pipeline).to_list(None)
+                top_by_profit_raw.sort(key=lambda x: x.get("total_profit", 0), reverse=True)
+                top_by_profit = top_by_profit_raw[:10]
                 
                 # Get group breakdown
                 group_pipeline = [
@@ -6556,10 +6556,35 @@ IMPORTANT GUIDELINES:
                         "total_revenue": {"$sum": "$r_amt"},
                         "total_profit": {"$sum": "$profit"},
                         "item_count": {"$sum": 1}
-                    }},
-                    {"$sort": {"total_revenue": -1}}
+                    }}
                 ]
-                groups = await db.sales_records.aggregate(group_pipeline).to_list(10)
+                groups_raw = await db.sales_records.aggregate(group_pipeline).to_list(None)
+                groups_raw.sort(key=lambda x: x.get("total_revenue", 0), reverse=True)
+                groups = groups_raw[:10]
+
+                # Get latest period's stock data for stock queries
+                latest_period_doc = await db.sales_records.find_one(
+                    {"upload_source": {"$ne": "forecast"}, "data_period": {"$exists": True}},
+                    sort=[("data_period", -1)]
+                )
+                latest_period = latest_period_doc["data_period"] if latest_period_doc else None
+
+                stock_str = "No stock data available"
+                if latest_period:
+                    stock_pipeline = [
+                        {"$match": {"upload_source": {"$ne": "forecast"}, "data_period": latest_period, "closing_stock": {"$gt": 0}}},
+                        {"$group": {
+                            "_id": "$item_name",
+                            "closing_stock": {"$avg": "$closing_stock"},
+                            "w_rate": {"$avg": "$w_rate"}
+                        }}
+                    ]
+                    stock_items = await db.sales_records.aggregate(stock_pipeline).to_list(None)
+                    stock_items.sort(key=lambda x: x.get("closing_stock", 0), reverse=True)
+                    stock_str = "\n".join([
+                        f"  - {s['_id']}: {s['closing_stock']:.0f} units (cost ₹{s.get('w_rate', 0):.2f})"
+                        for s in stock_items[:80] if s["_id"]
+                    ]) or "No stock data"
                 
                 # Format context for the LLM
                 top_items_str = "\n".join([
@@ -6608,6 +6633,9 @@ CRITICAL RULES:
 === SALES BY PRODUCT GROUP (ALL TIME) ===
 {groups_str if groups_str else 'No data available'}
 
+=== CURRENT STOCK LEVELS (Latest period: {latest_period or 'N/A'}) ===
+{stock_str}
+
 === AVAILABLE DATA PERIODS IN THIS DATABASE ===
 {', '.join(formatted_periods) if formatted_periods else 'No data'}
 
@@ -6621,8 +6649,7 @@ IMPORTANT GUIDELINES:
 5. Provide actionable insights when possible
 6. For comparisons, use percentages when helpful
 7. NEVER use data from outside this app - only use the data provided above
-8. If the user asks about something not in the data above, say "I don't have that information in the system.\""""
-
+8. If the user asks about something not in the data above, say "I don't have that information in the system.""""
         # Get chat history for context (last 10 messages)
         chat_history = await db.chat_history.find(
             {"session_id": session_id}
