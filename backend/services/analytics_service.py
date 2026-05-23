@@ -386,68 +386,88 @@ async def get_inventory_analysis(
 async def get_group_analysis(
     period: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Analyze performance by product groups."""
+    """Analyze performance by product groups.
+
+    Uses two separate lightweight pipelines to avoid the MongoDB Atlas Free Tier
+    32MB memory limit that $push (collecting all items) triggers.
+
+    Pass 1: Group-level totals only (no $push).
+    Pass 2: Item-level totals grouped by (pluno, item_name, product_group).
+    Merge top-performers per group in Python.
+    """
     match_filter = _build_match_filter(period=period)
 
-    pipeline = [
+    # ── Pass 1: group totals (no $push) ──────────────────────────────
+    pipeline_groups = [
         {"$match": match_filter},
         {
             "$group": {
                 "_id": "$product_group",
                 "total_revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
-                "total_profit": {"$sum": {"$ifNull": ["$profit", 0]}},
-                "total_cost": {"$sum": {"$ifNull": ["$w_amt", 0]}},
-                "item_count": {"$sum": 1},
-                "items": {
-                    "$push": {
-                        "pluno": "$pluno",
-                        "item_name": "$item_name",
-                        "revenue": {"$ifNull": ["$r_amt", 0]},
-                        "profit": {"$ifNull": ["$profit", 0]},
-                        "qty": {"$ifNull": ["$net_qty", 0]},
-                    }
-                },
+                "total_profit":  {"$sum": {"$ifNull": ["$profit", 0]}},
+                "total_cost":    {"$sum": {"$ifNull": ["$w_amt", 0]}},
+                "item_count":    {"$sum": 1},
             }
         },
-        {
-            "$addFields": {
-                "profit_margin": {
-                    "$cond": {
-                        "if": {"$gt": ["$total_revenue", 0]},
-                        "then": {"$multiply": [{"$divide": ["$total_profit", "$total_revenue"]}, 100]},
-                        "else": 0,
-                    }
-                }
-            }
-        },
-        {"$match": {"_id": {"$ne": "Unknown"}}},
+        {"$match": {"_id": {"$ne": None, "$nin": ["Unknown", ""]}}},
     ]
+    group_rows = await db.sales_records.aggregate(pipeline_groups).to_list(None)
 
-    results = await db.sales_records.aggregate(pipeline).to_list(None)
-    
-    # Sort in python
-    results.sort(key=lambda x: x.get("total_revenue", 0), reverse=True)
+    if not group_rows:
+        return []
+
+    # ── Pass 2: item totals per group ────────────────────────────────
+    pipeline_items = [
+        {"$match": match_filter},
+        {
+            "$group": {
+                "_id": {
+                    "group":     "$product_group",
+                    "pluno":     "$pluno",
+                    "item_name": "$item_name",
+                },
+                "revenue": {"$sum": {"$ifNull": ["$r_amt", 0]}},
+                "profit":  {"$sum": {"$ifNull": ["$profit", 0]}},
+                "qty":     {"$sum": {"$ifNull": ["$net_qty", 0]}},
+            }
+        },
+    ]
+    item_rows = await db.sales_records.aggregate(pipeline_items).to_list(None)
+
+    # Index items by group
+    items_by_group: Dict[str, List] = {}
+    for row in item_rows:
+        g = row["_id"]["group"]
+        if not g or g in ("Unknown", ""):
+            continue
+        items_by_group.setdefault(g, []).append({
+            "pluno":     row["_id"]["pluno"],
+            "item_name": row["_id"]["item_name"],
+            "revenue":   float(row.get("revenue", 0) or 0),
+            "profit":    float(row.get("profit",  0) or 0),
+            "qty":       float(row.get("qty",     0) or 0),
+        })
+
+    # ── Merge & build result ─────────────────────────────────────────
+    group_rows.sort(key=lambda x: x.get("total_revenue", 0), reverse=True)
 
     group_analysis = []
-    for group_data in results:
-        valid_items = [
-            i for i in group_data['items']
-            if isinstance(i.get('revenue'), (int, float))
-            and isinstance(i.get('profit'), (int, float))
-        ]
-        top_performers = sorted(
-            valid_items,
-            key=lambda x: x.get('revenue', 0) or 0,
-            reverse=True,
-        )[:5]
+    for gd in group_rows:
+        grp = gd["_id"]
+        rev = float(gd.get("total_revenue", 0) or 0)
+        pft = float(gd.get("total_profit",  0) or 0)
+        margin = (pft / rev * 100) if rev > 0 else 0.0
+
+        items = items_by_group.get(grp, [])
+        top_performers = sorted(items, key=lambda x: x["revenue"], reverse=True)[:5]
 
         group_analysis.append({
-            "group": group_data['_id'],
-            "total_revenue": float(group_data.get('total_revenue', 0) or 0),
-            "total_profit": float(group_data.get('total_profit', 0) or 0),
-            "item_count": group_data['item_count'],
+            "group":          grp,
+            "total_revenue":  rev,
+            "total_profit":   pft,
+            "item_count":     gd.get("item_count", 0),
             "top_performers": top_performers,
-            "profit_margin": float(group_data.get('profit_margin', 0) or 0),
+            "profit_margin":  round(margin, 2),
         })
 
     return group_analysis
