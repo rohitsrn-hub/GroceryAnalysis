@@ -382,10 +382,60 @@ async def get_items_stock_and_sales(item_names: List[str], period: Optional[str]
     logger.info(f"Resolved input names {item_names} to database names {all_db_names}")
     
     # Query all historical records to carry forward stock levels accurately
-    query = {"item_name": {"$in": all_db_names}, "upload_source": {"$ne": "forecast"}}
+    # Separate grocery items and Group V (Liquor) items
+    from services.semantic_service import _EMBEDDINGS_CACHE
     
-    cursor = db.sales_records.find(query)
-    records = await cursor.to_list(length=1000)
+    liquor_names = []
+    grocery_names = []
+    
+    for name in all_db_names:
+        is_liquor = False
+        for item in _EMBEDDINGS_CACHE:
+            if item["item_name"] == name and item.get("product_group") == "Group V":
+                is_liquor = True
+                break
+        if is_liquor:
+            liquor_names.append(name)
+        else:
+            grocery_names.append(name)
+            
+    # Double check against liquor_data collection if not matched in cache
+    for name in list(grocery_names):
+        exists = await db.client["URC1oh1LiquorSales"].liquor_data.find_one({"brand_name": name})
+        if exists:
+            grocery_names.remove(name)
+            liquor_names.append(name)
+            
+    grocery_recs = []
+    if grocery_names:
+        query = {"item_name": {"$in": grocery_names}, "upload_source": {"$ne": "forecast"}}
+        cursor = db.sales_records.find(query)
+        grocery_recs = await cursor.to_list(length=1000)
+        
+    liquor_recs = []
+    if liquor_names:
+        cursor = db.client["URC1oh1LiquorSales"].liquor_data.find({"brand_name": {"$in": liquor_names}})
+        liquor_docs = await cursor.to_list(length=100)
+        for doc in liquor_docs:
+            brand = doc.get("brand_name")
+            stock = doc.get("current_stock_qty", 0.0)
+            rate = doc.get("selling_rate") or doc.get("rate") or 0.0
+            liquor_recs.append({
+                "item_name": brand,
+                "closing_stock": float(stock),
+                "w_rate": float(doc.get("wholesale_rate") or 0.0),
+                "r_rate": float(rate),
+                "qty": 0.0,
+                "refund_qty": 0.0,
+                "net_qty": 0.0,
+                "r_amt": 0.0,
+                "w_amt": 0.0,
+                "profit": 0.0,
+                "data_period": period if (period and period != "all") else "2026-05",
+                "product_group": "Group V"
+            })
+            
+    records = grocery_recs + liquor_recs
     
     by_item = {}
     for r in records:

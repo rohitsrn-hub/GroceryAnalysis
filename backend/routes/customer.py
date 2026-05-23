@@ -20,6 +20,15 @@ from services.chatbot_service import resolve_db_item_names, get_items_stock_and_
 
 router = APIRouter(prefix="/api/customer", tags=["customer"])
 
+CATEGORY_DESCRIPTIONS = {
+    "Group I": "Group I - Personal Care & Shaving",
+    "Group II": "Group II - Household & Cleaning",
+    "Group III": "Group III - Luggage & Apparel",
+    "Group IV": "Group IV - Watches & Stationery",
+    "Group V": "Group V - Liquor",
+    "Group VI": "Group VI - Groceries, Snacks & Food"
+}
+
 # ─── Pydantic Models ──────────────────────────────────────────────────
 
 class CustomerChatRequest(BaseModel):
@@ -103,7 +112,15 @@ async def get_categories():
         groups = await db.sales_records.distinct("product_group")
         # Filter out empty or null groups and sort alphabetically
         valid_groups = sorted([g for g in groups if g])
-        return {"categories": valid_groups}
+        
+        # Append Group V for Liquor if not present in the DB groups list
+        if "Group V" not in valid_groups:
+            valid_groups.append("Group V")
+            
+        # Map to their detailed descriptive labels
+        valid_groups = sorted(valid_groups)
+        categories = [CATEGORY_DESCRIPTIONS.get(g, g) for g in valid_groups]
+        return {"categories": categories}
     except Exception as e:
         logger.exception(f"Error fetching categories: {str(e)}")
         raise HTTPException(
@@ -116,6 +133,16 @@ async def get_categories():
 async def customer_chat(request: CustomerChatRequest):
     """Secure customer-facing chatbot. Exposes only stock lookup tools."""
     from openai import AsyncOpenAI
+
+    # Map descriptive category filter back to raw group name for database queries
+    raw_category = None
+    if request.category_filter:
+        for raw, desc in CATEGORY_DESCRIPTIONS.items():
+            if desc == request.category_filter or raw == request.category_filter:
+                raw_category = raw
+                break
+        if not raw_category:
+            raw_category = request.category_filter
 
     api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
@@ -259,13 +286,17 @@ async def customer_chat(request: CustomerChatRequest):
                     results = await semantic_search_items(query_term)
                     
                     # Filter results by category if selected
-                    if request.category_filter:
-                        # Find product groups for matches
+                    if raw_category:
                         filtered_results = []
                         for name in results:
-                            rec = await db.sales_records.find_one({"item_name": name})
-                            if rec and rec.get("product_group") == request.category_filter:
-                                filtered_results.append(name)
+                            if raw_category == "Group V":
+                                exists = await db.client["URC1oh1LiquorSales"].liquor_data.find_one({"brand_name": name})
+                                if exists:
+                                    filtered_results.append(name)
+                            else:
+                                rec = await db.sales_records.find_one({"item_name": name})
+                                if rec and rec.get("product_group") == raw_category:
+                                    filtered_results.append(name)
                         results = filtered_results if filtered_results else results
                     
                     tool_result = results
@@ -290,9 +321,23 @@ async def customer_chat(request: CustomerChatRequest):
 
                         # Populate checked_items for cards display
                         db_name = val.get("matched_db_names", [k])[0] if val.get("matched_db_names") else k
-                        # find the group
+                        
+                        # Find the product group from sales_records, embeddings cache, or liquor database
+                        group_name = "General"
                         rec = await db.sales_records.find_one({"item_name": db_name})
-                        group_name = rec.get("product_group", "General") if rec else "General"
+                        if rec:
+                            group_name = rec.get("product_group", "General")
+                        else:
+                            for item in _EMBEDDINGS_CACHE:
+                                if item["item_name"] == db_name:
+                                    group_name = item.get("product_group", "General")
+                                    break
+                            if group_name == "General":
+                                is_liq = await db.client["URC1oh1LiquorSales"].liquor_data.find_one({"brand_name": db_name})
+                                if is_liq:
+                                    group_name = "Group V"
+                        
+                        group_name = CATEGORY_DESCRIPTIONS.get(group_name, group_name)
                         
                         # Avoid duplicates in checked_items
                         if not any(item["item_name"] == db_name for item in checked_items):
@@ -347,7 +392,7 @@ async def customer_chat(request: CustomerChatRequest):
                                 for emb_item in _EMBEDDINGS_CACHE:
                                     if emb_item["item_name"] in results_set:
                                         continue
-                                    if request.category_filter and emb_item["product_group"] != request.category_filter:
+                                    if raw_category and emb_item["product_group"] != raw_category:
                                         continue
                                     sim = _cosine_similarity(query_vector, emb_item["embedding"])
                                     scored_items.append((sim, emb_item["item_name"], emb_item["product_group"]))
@@ -359,15 +404,25 @@ async def customer_chat(request: CustomerChatRequest):
                             logger.error(f"Embedding generation error in tool: {emb_err}")
                             
                         if not results_set:
-                            fq = {"item_name": {"$regex": clean_item, "$options": "i"}}
-                            if request.category_filter:
-                                fq["product_group"] = request.category_filter
-                            fallback_names = await db.sales_records.distinct("item_name", fq)
+                            if raw_category:
+                                if raw_category == "Group V":
+                                    fq = {"brand_name": {"$regex": clean_item, "$options": "i"}}
+                                    fallback_names = await db.client["URC1oh1LiquorSales"].liquor_data.distinct("brand_name", fq)
+                                else:
+                                    fq = {"item_name": {"$regex": clean_item, "$options": "i"}, "product_group": raw_category}
+                                    fallback_names = await db.sales_records.distinct("item_name", fq)
+                            else:
+                                fq = {"item_name": {"$regex": clean_item, "$options": "i"}}
+                                fallback_names = await db.sales_records.distinct("item_name", fq)
+                                # Check liquor database too as fallback
+                                liq_fq = {"brand_name": {"$regex": clean_item, "$options": "i"}}
+                                liq_fallbacks = await db.client["URC1oh1LiquorSales"].liquor_data.distinct("brand_name", liq_fq)
+                                fallback_names.extend(liq_fallbacks)
                             results_set.extend(fallback_names[:3])
                             
                         matched_item_name = clean_item
                         stock_level = 0.0
-                        cat_group = request.category_filter or "General"
+                        cat_group = CATEGORY_DESCRIPTIONS.get(raw_category, raw_category) if raw_category else "General"
                         available = False
                         reason = "Not Found"
                         
@@ -378,8 +433,21 @@ async def customer_chat(request: CustomerChatRequest):
                                 data = stock_data.get(name, {})
                                 stock = data.get("current_stock", 0.0)
                                 if stock > 0:
+                                    group_name = "General"
                                     rec = await db.sales_records.find_one({"item_name": name})
-                                    group_name = rec.get("product_group", "General") if rec else "General"
+                                    if rec:
+                                        group_name = rec.get("product_group", "General")
+                                    else:
+                                        for item in _EMBEDDINGS_CACHE:
+                                            if item["item_name"] == name:
+                                                group_name = item.get("product_group", "General")
+                                                break
+                                        if group_name == "General":
+                                            is_liq = await db.client["URC1oh1LiquorSales"].liquor_data.find_one({"brand_name": name})
+                                            if is_liq:
+                                                group_name = "Group V"
+                                                
+                                    group_name = CATEGORY_DESCRIPTIONS.get(group_name, group_name)
                                     in_stock_matches.append({
                                         "item_name": name,
                                         "stock": stock,
@@ -394,8 +462,20 @@ async def customer_chat(request: CustomerChatRequest):
                                 reason = None
                             else:
                                 matched_item_name = results_set[0]
+                                group_name = "General"
                                 rec = await db.sales_records.find_one({"item_name": matched_item_name})
-                                cat_group = rec.get("product_group", "General") if rec else "General"
+                                if rec:
+                                    group_name = rec.get("product_group", "General")
+                                else:
+                                    for item in _EMBEDDINGS_CACHE:
+                                        if item["item_name"] == matched_item_name:
+                                            group_name = item.get("product_group", "General")
+                                            break
+                                    if group_name == "General":
+                                        is_liq = await db.client["URC1oh1LiquorSales"].liquor_data.find_one({"brand_name": matched_item_name})
+                                        if is_liq:
+                                            group_name = "Group V"
+                                cat_group = CATEGORY_DESCRIPTIONS.get(group_name, group_name)
                                 stock_level = 0.0
                                 available = False
                                 reason = "Out of Stock"
@@ -467,6 +547,16 @@ async def check_shopping_list(request: ShoppingListCheckRequest):
     """Check availability of a list of products. Semantic matching and stock checks."""
     from openai import AsyncOpenAI
 
+    # Map descriptive category filter back to raw group name for database queries
+    raw_category = None
+    if request.category_filter:
+        for raw, desc in CATEGORY_DESCRIPTIONS.items():
+            if desc == request.category_filter or raw == request.category_filter:
+                raw_category = raw
+                break
+        if not raw_category:
+            raw_category = request.category_filter
+
     api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
         raise HTTPException(
@@ -514,7 +604,7 @@ async def check_shopping_list(request: ShoppingListCheckRequest):
                         continue
                     
                     # Filter by category if selected
-                    if request.category_filter and emb_item["product_group"] != request.category_filter:
+                    if raw_category and emb_item["product_group"] != raw_category:
                         continue
                         
                     sim = _cosine_similarity(query_vector, emb_item["embedding"])
@@ -528,10 +618,20 @@ async def check_shopping_list(request: ShoppingListCheckRequest):
                         
             # If no embeddings cache matches, do regex fallback
             if not results_set:
-                fq = {"item_name": {"$regex": clean_item, "$options": "i"}}
-                if request.category_filter:
-                    fq["product_group"] = request.category_filter
-                fallback_names = await db.sales_records.distinct("item_name", fq)
+                if raw_category:
+                    if raw_category == "Group V":
+                        fq = {"brand_name": {"$regex": clean_item, "$options": "i"}}
+                        fallback_names = await db.client["URC1oh1LiquorSales"].liquor_data.distinct("brand_name", fq)
+                    else:
+                        fq = {"item_name": {"$regex": clean_item, "$options": "i"}, "product_group": raw_category}
+                        fallback_names = await db.sales_records.distinct("item_name", fq)
+                else:
+                    fq = {"item_name": {"$regex": clean_item, "$options": "i"}}
+                    fallback_names = await db.sales_records.distinct("item_name", fq)
+                    # Check liquor database too as fallback
+                    liq_fq = {"brand_name": {"$regex": clean_item, "$options": "i"}}
+                    liq_fallbacks = await db.client["URC1oh1LiquorSales"].liquor_data.distinct("brand_name", liq_fq)
+                    fallback_names.extend(liq_fallbacks)
                 results_set.extend(fallback_names[:3])
 
             # Gather stock info for matched items
@@ -545,8 +645,22 @@ async def check_shopping_list(request: ShoppingListCheckRequest):
                     stock = data.get("current_stock", 0.0)
                     if stock > 0:
                         # Find the group
+                        group_name = "General"
                         rec = await db.sales_records.find_one({"item_name": name})
-                        group_name = rec.get("product_group", "General") if rec else "General"
+                        if rec:
+                            group_name = rec.get("product_group", "General")
+                        else:
+                            for item in _EMBEDDINGS_CACHE:
+                                if item["item_name"] == name:
+                                    group_name = item.get("product_group", "General")
+                                    break
+                            if group_name == "General":
+                                is_liq = await db.client["URC1oh1LiquorSales"].liquor_data.find_one({"brand_name": name})
+                                if is_liq:
+                                    group_name = "Group V"
+                        
+                        group_name = CATEGORY_DESCRIPTIONS.get(group_name, group_name)
+                        
                         in_stock_matches.append({
                             "item_name": name,
                             "stock": stock,
@@ -576,14 +690,28 @@ async def check_shopping_list(request: ShoppingListCheckRequest):
                 else:
                     # Matched but out of stock
                     # Find category name
-                    rec = await db.sales_records.find_one({"item_name": results_set[0]})
-                    group_name = rec.get("product_group", "General") if rec else "General"
+                    db_name = results_set[0]
+                    group_name = "General"
+                    rec = await db.sales_records.find_one({"item_name": db_name})
+                    if rec:
+                        group_name = rec.get("product_group", "General")
+                    else:
+                        for item in _EMBEDDINGS_CACHE:
+                            if item["item_name"] == db_name:
+                                group_name = item.get("product_group", "General")
+                                break
+                        if group_name == "General":
+                            is_liq = await db.client["URC1oh1LiquorSales"].liquor_data.find_one({"brand_name": db_name})
+                            if is_liq:
+                                group_name = "Group V"
+                    group_name = CATEGORY_DESCRIPTIONS.get(group_name, group_name)
+                    
                     unavailable_list.append({
                         "original_query": original_item,
                         "clean_query": clean_item,
                         "requested_qty": qty,
                         "reason": "Out of Stock",
-                        "matched_item": results_set[0],
+                        "matched_item": db_name,
                         "category": group_name
                     })
                     

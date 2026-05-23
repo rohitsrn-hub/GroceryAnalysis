@@ -441,7 +441,7 @@ export default function CustomerBot() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col pt-20 pb-28 max-w-2xl w-full mx-auto px-5 no-print">
         
-        {activeTab === "chat" ? (
+        {activeTab === "chat" && (
           /* TAB 1: SANDY CHAT PANEL */
           <div className="flex-1 flex flex-col min-h-0 justify-between">
             
@@ -599,7 +599,9 @@ export default function CustomerBot() {
             </div>
 
           </div>
-        ) : (
+        )}
+
+        {activeTab === "list" && (
           /* TAB 2: SHOPPING LIST CHECKER PANEL */
           <div className="space-y-6">
             
@@ -782,6 +784,140 @@ export default function CustomerBot() {
           </div>
         )}
 
+        {activeTab === "help" && (
+          /* TAB 3: HELP & FLOWCHART PANEL */
+          <div className="space-y-6 animate-fade-in-up">
+            <div className="glass-panel p-6 rounded-[24px] space-y-4 text-center">
+              <h2 className="font-semibold text-2xl text-[#3525cd]" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                How to Shop with Sandy
+              </h2>
+              <p className="text-slate-600 text-sm max-w-md mx-auto">
+                Sandy is your virtual grocery assistant. Follow these simple steps to check stock and build your store shopping list.
+              </p>
+            </div>
+
+            {/* Vertical Flowchart Timeline */}
+            <div className="relative border-l-2 border-dashed border-[#8a4cfc]/30 pl-8 ml-4 mr-2 space-y-8 py-4">
+              
+              {/* Step 1 */}
+              <div className="relative">
+                <div className="absolute -left-[43px] top-1.5 w-7 h-7 rounded-full bg-gradient-to-r from-[#8a4cfc] to-[#712ae2] text-white flex items-center justify-center text-xs font-bold shadow-[0_0_10px_rgba(138,76,252,0.4)]">
+                  1
+                </div>
+                <div className="glass-panel p-6 rounded-2xl space-y-2 hover:translate-y-[-2px] transition-transform duration-300 border border-white/40">
+                  <div className="flex items-center gap-2 text-[#712ae2]">
+                    <span className="material-symbols-outlined font-bold">chat_bubble</span>
+                    <h3 className="font-bold text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Step 1: Ask Sandy (Chat)</h3>
+                  </div>
+                  <p className="text-slate-600 text-xs leading-relaxed">
+                    Query stock in natural language or filter by category. Sandy understands normal queries like <em>"Do you have cookies?"</em> or <em>"Is whiskey in stock?"</em>. Narrow down searches using the dropdown filter at the top.
+                  </p>
+                  
+                  {/* Visual Aid */}
+                  <div className="mt-3 bg-white/40 rounded-xl p-3 border border-white/20 text-xs text-slate-600 flex flex-col gap-1.5 shadow-sm">
+                    <div className="self-end bg-gradient-to-r from-[#712ae2] to-[#3525cd] text-white px-3 py-1.5 rounded-xl rounded-tr-none max-w-[85%] font-medium">
+                      "Do you have Dove shampoo in stock?"
+                    </div>
+                    <div className="self-start bg-white/70 text-slate-800 px-3 py-1.5 rounded-xl rounded-tl-none border border-slate-100 max-w-[85%] font-medium shadow-[0_2px_5px_rgba(0,0,0,0.02)] flex gap-1.5 items-center">
+                      <span>🧴 Dove Shampoo: <strong>5 in stock</strong></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="relative">
+                <div className="absolute -left-[43px] top-1.5 w-7 h-7 rounded-full bg-gradient-to-r from-[#8a4cfc] to-[#712ae2] text-white flex items-center justify-center text-xs font-bold shadow-[0_0_10px_rgba(138,76,252,0.4)]">
+                  2
+                </div>
+                <div className="glass-panel p-6 rounded-2xl space-y-2 hover:translate-y-[-2px] transition-transform duration-300 border border-white/40">
+                  <div className="flex items-center gap-2 text-[#712ae2]">
+                    <span className="material-symbols-outlined font-bold">add_circle</span>
+                    <h3 className="font-bold text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Step 2: Add to Shopping List</h3>
+                  </div>
+                  <p className="text-slate-600 text-xs leading-relaxed">
+                    When Sandy finds matching items, click the <strong>+</strong> button on any item card to instantly add it to your shopping list, or ask Sandy to add items directly in the chat window.
+                  </p>
+
+                  {/* Visual Aid */}
+                  <div className="mt-3 bg-white/40 rounded-xl p-3 border border-white/20 text-xs text-slate-600 flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🧴</span>
+                      <div>
+                        <p className="font-semibold text-slate-800 text-[11px]">Dove Shampoo (180ml)</p>
+                        <p className="text-[9px] text-slate-500 font-medium">Group I - 5 in stock</p>
+                      </div>
+                    </div>
+                    <div className="w-7 h-7 rounded-full bg-[#eff4ff] text-[#3525cd] flex items-center justify-center font-bold shadow-sm">
+                      <span className="material-symbols-outlined text-[16px] font-bold">add</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="relative">
+                <div className="absolute -left-[43px] top-1.5 w-7 h-7 rounded-full bg-gradient-to-r from-[#8a4cfc] to-[#712ae2] text-white flex items-center justify-center text-xs font-bold shadow-[0_0_10px_rgba(138,76,252,0.4)]">
+                  3
+                </div>
+                <div className="glass-panel p-6 rounded-2xl space-y-2 hover:translate-y-[-2px] transition-transform duration-300 border border-white/40">
+                  <div className="flex items-center gap-2 text-[#712ae2]">
+                    <span className="material-symbols-outlined font-bold">fact_check</span>
+                    <h3 className="font-bold text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Step 3: Check & Adjust List</h3>
+                  </div>
+                  <p className="text-slate-600 text-xs leading-relaxed">
+                    Switch to the <strong>List Checker</strong> tab to paste or edit your shopping list. Check real-time stock levels of your entire list simultaneously and adjust purchase quantities with steppers.
+                  </p>
+
+                  {/* Visual Aid */}
+                  <div className="mt-3 bg-white/40 rounded-xl p-3 border border-white/20 text-xs text-slate-600 flex flex-col gap-2 shadow-sm">
+                    <div className="flex justify-between items-center bg-emerald-500/10 text-emerald-700 p-2 rounded-lg border border-emerald-500/10">
+                      <span className="font-semibold flex items-center gap-1.5"><span className="material-symbols-outlined text-[15px]">check_circle</span> Dove Shampoo</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="bg-white/80 px-2 py-0.5 rounded text-[9px] text-slate-700 font-bold border border-slate-100">Qty: 2</span>
+                        <span className="font-bold text-[9px]">In Stock</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 4 */}
+              <div className="relative">
+                <div className="absolute -left-[43px] top-1.5 w-7 h-7 rounded-full bg-gradient-to-r from-[#8a4cfc] to-[#712ae2] text-white flex items-center justify-center text-xs font-bold shadow-[0_0_10px_rgba(138,76,252,0.4)]">
+                  4
+                </div>
+                <div className="glass-panel p-6 rounded-2xl space-y-2 hover:translate-y-[-2px] transition-transform duration-300 border border-white/40">
+                  <div className="flex items-center gap-2 text-[#712ae2]">
+                    <span className="material-symbols-outlined font-bold">print</span>
+                    <h3 className="font-bold text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Step 4: Check Off & Shop</h3>
+                  </div>
+                  <p className="text-slate-600 text-xs leading-relaxed">
+                    As you collect items in the aisles, check them off digitally, or click <strong>Print & Save List</strong> to print a cleanly formatted receipt-slip to bring with you to checkout!
+                  </p>
+
+                  {/* Visual Aid */}
+                  <div className="mt-3 bg-white/40 rounded-xl p-2.5 border border-white/20 text-center text-[#712ae2] font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm">
+                    <span className="material-symbols-outlined text-[15px] font-bold">print</span> Print & Save List
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Quick Action Button to go to Chat */}
+            <div className="pt-2 text-center">
+              <button 
+                onClick={() => setActiveTab("chat")}
+                className="rhino-shimmer active-scale px-8 py-3.5 bg-gradient-to-r from-[#8a4cfc] to-[#712ae2] text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all inline-flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined">rocket_launch</span>
+                <span>Get Started Now</span>
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Sticky Bottom Navigation Bar */}
@@ -803,6 +939,15 @@ export default function CustomerBot() {
           >
             <span className="material-symbols-outlined" style={{ fontVariationSettings: activeTab === 'list' ? "'FILL' 1" : "'FILL' 0" }}>fact_check</span>
             <span className="font-semibold text-[10px] mt-0.5">List Checker</span>
+          </button>
+
+          {/* Tab 3 button */}
+          <button 
+            onClick={() => setActiveTab("help")}
+            className={`flex-1 flex flex-col items-center justify-center py-2 transition-all duration-200 ease-out rounded-full ${activeTab === 'help' ? 'bg-[#8a4cfc] text-white shadow-[0_0_15px_rgba(138,76,252,0.4)]' : 'text-slate-600 opacity-70 hover:opacity-100'}`}
+          >
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: activeTab === 'help' ? "'FILL' 1" : "'FILL' 0" }}>help_outline</span>
+            <span className="font-semibold text-[10px] mt-0.5">Help</span>
           </button>
         </div>
       </nav>
