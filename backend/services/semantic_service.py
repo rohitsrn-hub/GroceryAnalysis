@@ -26,7 +26,8 @@ def _cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
 async def load_embeddings_to_cache():
     """Load all product embeddings into memory for fast cosine similarity search."""
     global _EMBEDDINGS_CACHE
-    cache_file = r"c:\Users\rohit\Downloads\urc GROCERY SALES APP\backend\embeddings_cache.pkl"
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cache_file = os.path.join(base_dir, "embeddings_cache.pkl")
     
     # 1. Try loading from local pickle file first
     if os.path.exists(cache_file):
