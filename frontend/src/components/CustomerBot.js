@@ -30,6 +30,9 @@ export default function CustomerBot() {
   const [listResults, setListResults] = useState(null); // { available: [], unavailable: [] }
   const [checkedItems, setCheckedItems] = useState({}); // { item_name: boolean }
   const [itemQuantities, setItemQuantities] = useState({}); // { [item_name]: qty }
+  const [showDisclaimer, setShowDisclaimer] = useState(() => {
+    return !localStorage.getItem("sandy_disclaimer_dismissed");
+  });
 
   // Generate Session ID on mount
   useEffect(() => {
@@ -359,6 +362,20 @@ export default function CustomerBot() {
         }
         .animate-fade-in-up {
           animation: fadeInUp 0.4s ease-out forwards;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.25s ease-out forwards;
+        }
+        .animate-scale-in {
+          animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
         @media print {
           .no-print { display: none !important; }
@@ -1010,6 +1027,41 @@ export default function CustomerBot() {
 
           <div className="mt-16 text-center border-t border-slate-200 pt-4 text-xs text-slate-400">
             <p>Thank you for shopping with us! Assisted by Sandy the Grocery Concierge.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Disclaimer Modal */}
+      {showDisclaimer && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in no-print">
+          <div className="glass-panel max-w-md w-full rounded-[28px] p-6 md:p-8 space-y-6 border border-white/30 shadow-2xl relative overflow-hidden animate-scale-in">
+            {/* Ambient inner glow */}
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#8a4cfc] rounded-full blur-2xl opacity-40 pointer-events-none"></div>
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-[#3525cd] rounded-full blur-2xl opacity-30 pointer-events-none"></div>
+            
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#eff4ff] text-[#3525cd] flex items-center justify-center shadow-inner">
+                <span className="material-symbols-outlined text-[32px] font-bold">info</span>
+              </div>
+              <h3 className="font-bold text-xl text-slate-800" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                AI Stock Assistant Disclaimer
+              </h3>
+              <p className="text-slate-600 text-sm leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
+                This application uses Artificial Intelligence to match products and check real-time stock positions. While we strive for accuracy, AI predictions may occasionally vary, and items shown in stock may not always be available.
+                <br /><br />
+                Please bear with us in case of non-availability.
+              </p>
+            </div>
+            
+            <button
+              onClick={() => {
+                localStorage.setItem("sandy_disclaimer_dismissed", "true");
+                setShowDisclaimer(false);
+              }}
+              className="rhino-shimmer active-scale w-full bg-gradient-to-r from-[#8a4cfc] to-[#712ae2] hover:from-[#712ae2] hover:to-[#3525cd] text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-xl transition-all text-sm flex justify-center items-center gap-2"
+            >
+              <span>I Understand</span>
+            </button>
           </div>
         </div>
       )}
