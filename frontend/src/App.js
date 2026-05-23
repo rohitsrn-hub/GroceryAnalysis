@@ -545,7 +545,21 @@ function MainApp() {
   );
 }
 
+const IS_CUSTOMER_ONLY = process.env.REACT_APP_IS_CUSTOMER_ONLY === "true";
+
 function App() {
+  if (IS_CUSTOMER_ONLY) {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<CustomerBot />} />
+          <Route path="/sandy" element={<CustomerBot />} />
+          <Route path="*" element={<CustomerBot />} />
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
