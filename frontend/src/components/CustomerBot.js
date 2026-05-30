@@ -22,6 +22,7 @@ export default function CustomerBot() {
     }
   ]);
   const [chatLoading, setChatLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const chatEndRef = useRef(null);
 
   // List Checker States
@@ -51,6 +52,50 @@ export default function CustomerBot() {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [chatHistory, activeTab]);
+
+  // Rotates witty loading messages when chat is taking time
+  useEffect(() => {
+    let intervalId;
+    if (chatLoading) {
+      // Determine if this is the first search of the session (welcome message + first user message)
+      const isFirstSearch = chatHistory.filter(m => m.role === 'user').length <= 1;
+      
+      const wittyMessages = isFirstSearch 
+        ? [
+            "Sandy is heading to the store shelves...",
+            "Waking up the database... it stayed up late watching Rhino documentaries 🦏",
+            "Checking the backroom... Sandy is scanning 4,660 product embeddings 🔍",
+            "OpenAI is thinking... probably debating if tomatoes are a fruit or vegetable 🍅",
+            "Still searching... Render's free tier container is having its morning coffee ☕",
+            "Hang tight! Our server is doing stretch exercises before running your search 🏃‍♂️",
+            "Sandy is currently checking the top shelves... (Rhinos aren't known for their height) 🪜",
+            "Almost there! Double-checking the inventory records for you..."
+          ]
+        : [
+            "Sandy is scanning the shelves...",
+            "Double-checking the inventory list...",
+            "OpenAI is running the numbers...",
+            "Checking the storage room... almost got it!",
+            "Sandy is consulting the store catalog..."
+          ];
+
+      setLoadingMessage(wittyMessages[0]);
+      let index = 1;
+      
+      intervalId = setInterval(() => {
+        if (index < wittyMessages.length) {
+          setLoadingMessage(wittyMessages[index]);
+          index++;
+        }
+      }, 3500); // Change message every 3.5 seconds
+    } else {
+      setLoadingMessage("");
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [chatLoading, chatHistory]);
 
   const fetchCategories = async () => {
     try {
@@ -537,12 +582,17 @@ export default function CustomerBot() {
                       src="/sandy-rhino.png"
                     />
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <div className="glass-panel px-4 py-3 rounded-2xl rounded-bl-none text-[#0b1c30] flex items-center justify-center min-w-[70px]">
-                      <div className="flex space-x-1.5">
-                        <div className="w-2.5 h-2.5 bg-[#8a4cfc] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2.5 h-2.5 bg-[#712ae2] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2.5 h-2.5 bg-[#3525cd] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="glass-panel px-4 py-3 rounded-2xl rounded-bl-none text-[#0b1c30] flex flex-col gap-2 items-start max-w-sm">
+                      {loadingMessage && (
+                        <p className="text-xs text-slate-700 italic animate-pulse leading-relaxed">
+                          {loadingMessage}
+                        </p>
+                      )}
+                      <div className="flex space-x-1.5 py-1">
+                        <div className="w-2 h-2 bg-[#8a4cfc] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-[#712ae2] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-[#3525cd] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                       </div>
                     </div>
                   </div>

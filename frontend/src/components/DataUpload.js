@@ -21,7 +21,7 @@ import {
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-const DataUpload = ({ onUploadSuccess }) => {
+const DataUpload = ({ onUploadSuccess, lastUploadDate }) => {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -231,13 +231,22 @@ const DataUpload = ({ onUploadSuccess }) => {
       {/* File Upload Area */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Upload className="h-5 w-5" />
-            <span>Upload Historical Data</span>
-          </CardTitle>
-          <CardDescription>
-            Upload historical sales data for months or years. For today's data, use the "Upload Today's Data" button on the dashboard.
-          </CardDescription>
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+            <div>
+              <CardTitle className="flex items-center space-x-2">
+                <Upload className="h-5 w-5" />
+                <span>Upload Historical Data</span>
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Upload historical sales data for months or years. For today's data, use the "Upload Today's Data" button on the dashboard.
+              </CardDescription>
+            </div>
+            {lastUploadDate && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs py-1 px-3 w-fit shrink-0 font-medium">
+                Last Upload: {lastUploadDate}
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {/* Dropzone */}
@@ -355,10 +364,15 @@ const DataUpload = ({ onUploadSuccess }) => {
               <Button
                 onClick={uploadFiles}
                 disabled={uploading || files.every(f => f.status === 'success')}
-                className="flex-1"
+                className="flex-1 h-auto py-3 flex flex-col items-center justify-center"
                 data-testid="upload-button"
               >
-                {uploading ? 'Uploading...' : 'Upload Files'}
+                <span className="font-bold">{uploading ? 'Uploading...' : 'Upload Files'}</span>
+                {!uploading && lastUploadDate && (
+                  <span className="text-[10px] font-normal opacity-85 mt-0.5">
+                    Last: {lastUploadDate}
+                  </span>
+                )}
               </Button>
             </div>
           )}

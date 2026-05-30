@@ -16,7 +16,7 @@ const API = `${BACKEND_URL}/api`;
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
 
-const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, onDataUpload }) => {
+const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, onDataUpload, lastUploadDate }) => {
   const [fastestItems, setFastestItems] = useState([]);
   const [groupAnalysis, setGroupAnalysis] = useState([]);
   const [inventoryAnalysis, setInventoryAnalysis] = useState(null);
@@ -215,6 +215,12 @@ const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, on
                     month: 'long', 
                     day: 'numeric' 
                   })}
+                  {lastUploadDate && <span className="block mt-1 text-xs opacity-90 font-medium">Last data uploaded on: {lastUploadDate}</span>}
+                </p>
+              )}
+              {isMobile && lastUploadDate && (
+                <p className="text-blue-50 text-xs opacity-90 mt-1">
+                  Last upload: {lastUploadDate}
                 </p>
               )}
             </div>
@@ -228,7 +234,14 @@ const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, on
               <svg className={isMobile ? "w-5 h-5" : "w-6 h-6"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              <span>{isMobile ? 'Upload Data' : 'Upload Today\'s Data'}</span>
+              <div className="flex flex-col items-center">
+                <span>{isMobile ? 'Upload Data' : 'Upload Today\'s Data'}</span>
+                {lastUploadDate && (
+                  <span className="text-[10px] font-normal text-blue-500/80 mt-0.5">
+                    Last: {lastUploadDate.split(',')[0]}
+                  </span>
+                )}
+              </div>
             </button>
           </div>
         </CardContent>
@@ -633,6 +646,7 @@ const Dashboard = ({ dashboardData, loading, dashboardPeriod, onPeriodChange, on
           }
           toast.success("Dashboard data refreshed!");
         }}
+        lastUploadDate={lastUploadDate}
       />
     </div>
   );

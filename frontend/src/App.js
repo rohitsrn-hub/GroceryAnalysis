@@ -31,6 +31,31 @@ function MainApp() {
   const [reportFormat, setReportFormat] = useState('excel');
   const [selectedPeriods, setSelectedPeriods] = useState([]);
   const [availablePeriods, setAvailablePeriods] = useState([]);
+  const [lastUploadDate, setLastUploadDate] = useState("");
+
+  const fetchLastUploadDate = async () => {
+    try {
+      const response = await fetch(`${API}/upload-history?limit=1&status_filter=success`);
+      if (response.ok) {
+        const data = await response.json();
+        const latest = data.results?.[0] || data.uploads?.[0];
+        if (latest && latest.upload_date) {
+          const date = new Date(latest.upload_date);
+          const formatted = date.toLocaleString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          });
+          setLastUploadDate(formatted);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching last upload date:", error);
+    }
+  };
 
   const fetchDashboardData = async (period = `${new Date().getFullYear()} - Current Year`) => {
     try {
@@ -85,12 +110,14 @@ function MainApp() {
   useEffect(() => {
     // Fetch with current year on initial load
     fetchDashboardData(`${new Date().getFullYear()} - Current Year`);
+    fetchLastUploadDate();
   }, []);
 
   const handleDataUpload = async () => {
     // Refresh dashboard data after upload
     console.log('Refreshing dashboard data...');
-    await fetchDashboardData();
+    await fetchDashboardData(dashboardPeriod);
+    await fetchLastUploadDate();
     console.log('Dashboard data refreshed');
   };
 
@@ -392,7 +419,8 @@ function MainApp() {
               loading={loading} 
               dashboardPeriod={dashboardPeriod}
               onPeriodChange={handlePeriodChange}
-              onDataUpload={() => fetchDashboardData(dashboardPeriod)}
+              onDataUpload={handleDataUpload}
+              lastUploadDate={lastUploadDate}
             />
           </TabsContent>
 
@@ -406,7 +434,7 @@ function MainApp() {
                     className="flex items-center justify-center space-x-2 py-3 px-4 text-gray-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all duration-200 font-medium"
                   >
                     <Upload className="h-4 w-4" />
-                    <span>Upload Data</span>
+                    <span>Upload Data {lastUploadDate && `(Last: ${lastUploadDate.split(',')[0]})`}</span>
                   </TabsTrigger>
                   <TabsTrigger 
                     value="data-summaries" 
@@ -419,7 +447,7 @@ function MainApp() {
               </div>
               
               <TabsContent value="upload-data">
-                <DataUpload onUploadSuccess={handleDataUpload} />
+                <DataUpload onUploadSuccess={handleDataUpload} lastUploadDate={lastUploadDate} />
               </TabsContent>
               
               <TabsContent value="data-summaries">
