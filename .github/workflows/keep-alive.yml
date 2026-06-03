@@ -1,0 +1,20 @@
+name: Render Keep Alive
+
+on:
+  schedule:
+    # Run every 12 minutes (Render free tier timeout is 15 minutes)
+    - cron: '*/12 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health check endpoint
+        run: |
+          response=$(curl -s -w "%{http_code}" -o /dev/null "https://groceryanalysis.onrender.com/health")
+          echo "Render HTTP Response Code: $response"
+          if [ "$response" -ne 200 ]; then
+            echo "Warning: Health check failed with status $response"
+            exit 1
+          fi
