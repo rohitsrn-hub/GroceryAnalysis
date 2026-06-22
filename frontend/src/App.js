@@ -39,17 +39,42 @@ function MainApp() {
       if (response.ok) {
         const data = await response.json();
         const latest = data.results?.[0] || data.uploads?.[0];
-        if (latest && latest.upload_date) {
-          const date = new Date(latest.upload_date);
-          const formatted = date.toLocaleString('en-IN', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-          });
-          setLastUploadDate(formatted);
+        if (latest) {
+          if (latest.upload_type === "daily" && latest.data_date) {
+            const date = new Date(latest.data_date);
+            const formatted = date.toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric'
+            });
+            setLastUploadDate(formatted);
+          } else if (latest.period_covered) {
+            // Format YYYY-MM to MMM YYYY if possible
+            const parts = latest.period_covered.split('-');
+            if (parts.length === 2 && parts[0].length === 4 && parts[1].length === 2) {
+              const year = parts[0];
+              const month = parseInt(parts[1], 10);
+              const monthNames = [
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+              ];
+              if (month >= 1 && month <= 12) {
+                setLastUploadDate(`${monthNames[month - 1]} ${year}`);
+              } else {
+                setLastUploadDate(latest.period_covered);
+              }
+            } else {
+              setLastUploadDate(latest.period_covered);
+            }
+          } else if (latest.upload_date) {
+            const date = new Date(latest.upload_date);
+            const formatted = date.toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric'
+            });
+            setLastUploadDate(formatted);
+          }
         }
       }
     } catch (error) {
